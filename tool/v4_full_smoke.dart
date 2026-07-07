@@ -130,10 +130,16 @@ Future<_FullSmokePreparation> _runAutoPreparation(
     );
   }
 
-  items.add(await _prepareAppiumForSmoke(config, options, resources));
-  if (!options.skipIos && config.deviceSession.requiresAppiumTunnel) {
+  final driverCheck = await _checkAppiumDriversForSmoke(config, options);
+  items.add(driverCheck);
+  if (driverCheck.ok) {
+    items.add(await _prepareAppiumForSmoke(config, options, resources));
+  }
+  if (driverCheck.ok &&
+      !options.skipIos &&
+      config.deviceSession.requiresAppiumTunnel) {
     items.add(await _prepareIosTunnelForSmoke(config, options, resources));
-  } else if (!options.skipIos) {
+  } else if (driverCheck.ok && !options.skipIos) {
     items.add(
       const _FullSmokePreparationItem(
         name: 'iOS 隧道',
@@ -148,6 +154,64 @@ Future<_FullSmokePreparation> _runAutoPreparation(
   }
 
   return _FullSmokePreparation(items: items);
+}
+
+// 检查当前 Appium 可见的平台 driver，避免到创建 session 时才发现缺失。
+Future<_FullSmokePreparationItem> _checkAppiumDriversForSmoke(
+  StudioProjectConfig config,
+  _FullSmokeOptions options,
+) async {
+  final requiredDrivers = <String>[
+    if (!options.skipIos) 'xcuitest',
+    if (!options.skipAndroid) 'uiautomator2',
+  ];
+  if (requiredDrivers.isEmpty) {
+    return const _FullSmokePreparationItem(
+      name: '驱动组件',
+      ok: true,
+      detail: '无需平台 driver',
+      nextStep: '-',
+    );
+  }
+
+  final projectDirectory = _projectDirectoryForConfig(config);
+  final result = await _runShortProcess(
+    config.appiumProcess.executable,
+    const ['driver', 'list', '--installed'],
+    timeout: options.preflightTimeout,
+    workingDirectory: projectDirectory.path,
+    environment: config.appiumProcess.environment,
+  );
+  if (result.exitCode != 0) {
+    return _FullSmokePreparationItem(
+      name: '驱动组件',
+      ok: false,
+      detail: _shortProcessIssue(result),
+      nextStep: '确认 Appium 可运行，并安装 iOS / Android 平台 driver。',
+    );
+  }
+
+  final installed = _installedAppiumDriverNames(
+    '${result.stdout}\n${result.stderr}',
+  );
+  final missing = requiredDrivers
+      .where((driver) => !installed.contains(driver))
+      .toList(growable: false);
+  if (missing.isNotEmpty) {
+    return _FullSmokePreparationItem(
+      name: '驱动组件',
+      ok: false,
+      detail: '缺少 ${missing.join('、')}',
+      nextStep: '运行 npm install 后重试，或检查 package.json 的 Appium driver 依赖。',
+    );
+  }
+
+  return _FullSmokePreparationItem(
+    name: '驱动组件',
+    ok: true,
+    detail: '已安装 ${requiredDrivers.join('、')}',
+    nextStep: '-',
+  );
 }
 
 // 准备 Appium 主服务；已有外部服务时只复用，不停止。
@@ -608,13 +672,17 @@ Future<_ProcessProbe> _runShortProcess(
   String executable,
   List<String> arguments, {
   required Duration timeout,
+  String? workingDirectory,
+  Map<String, String>? environment,
 }) async {
   try {
     final result = await Process.run(
       executable,
       arguments,
+      workingDirectory: workingDirectory,
       environment: {
         ...Platform.environment,
+        ...?environment,
         'DART_SUPPRESS_ANALYTICS': 'true',
         'FLUTTER_SUPPRESS_ANALYTICS': 'true',
       },
@@ -629,6 +697,18 @@ Future<_ProcessProbe> _runShortProcess(
   } on Object catch (error) {
     return _ProcessProbe(exitCode: 1, stderr: _redactText('$error'));
   }
+}
+
+// 从 appium driver list --installed 输出中提取 driver 名称。
+Set<String> _installedAppiumDriverNames(String output) {
+  final names = <String>{};
+  for (final line in output.split(RegExp(r'\r?\n'))) {
+    final match = RegExp(r'-\s+([a-zA-Z0-9_-]+)@').firstMatch(line.trim());
+    if (match == null) continue;
+    final name = match.group(1)?.trim();
+    if (name != null && name.isNotEmpty) names.add(name);
+  }
+  return names;
 }
 
 // 执行单个步骤并捕获输出，超时也会形成可写入报告的结果。

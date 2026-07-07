@@ -79,7 +79,18 @@ Future<void> _assertPackageSmokeScripts() async {
   _expect(await packageFile.exists(), '必须存在 package.json。');
   final decoded = jsonDecode(await packageFile.readAsString());
   _expect(decoded is Map, 'package.json 必须是 JSON 对象。');
-  final scripts = _mapAt(Map<String, Object?>.from(decoded as Map), 'scripts');
+  final packageJson = Map<String, Object?>.from(decoded as Map);
+  final scripts = _mapAt(packageJson, 'scripts');
+  final devDependencies = _mapAt(packageJson, 'devDependencies');
+  _expect(
+    devDependencies['appium-xcuitest-driver'] is String,
+    'package.json 必须固定 Appium XCUITest driver。',
+  );
+  _expect(
+    devDependencies['appium-uiautomator2-driver'] is String,
+    'package.json 必须固定 Appium UiAutomator2 driver。',
+  );
+  await _assertFullSmokeDriverProbe();
   _assertFullSmokeScript(
     scripts,
     name: 'v4:ios-smoke:full',
@@ -106,6 +117,17 @@ void _assertFullSmokeScript(
   _expect(command.contains('--confirm-actions'), '$name 必须显式确认真实动作。');
   _expect(command.contains('--auto-prepare'), '$name 必须自动准备本机环境。');
   _expect(command.contains(requiredSkipFlag), '$name 必须包含 $requiredSkipFlag。');
+}
+
+// 断言平台 driver 探测同时解析 stdout / stderr，兼容 Appium CLI 的实际输出流。
+Future<void> _assertFullSmokeDriverProbe() async {
+  final sourceFile = File('tool/v4_full_smoke.dart');
+  _expect(await sourceFile.exists(), '必须存在 full smoke 编排器。');
+  final source = await sourceFile.readAsString();
+  _expect(
+    source.contains(r'${result.stdout}\n${result.stderr}'),
+    '平台 driver 探测必须同时解析 stdout 和 stderr。',
+  );
 }
 
 // 写入最小 full smoke fixture，用于验证 readiness 能索引最近编排报告。
@@ -632,7 +654,8 @@ void _assertAcceptanceMarkdown(String markdown) {
     '## 结论',
     '## 现场摘要',
     'Android 手机',
-    'Android 前置诊断',
+    'Android smoke 前置诊断',
+    '最近完整冒烟',
     '留档数量',
     '## 下一步',
     '完成审计',

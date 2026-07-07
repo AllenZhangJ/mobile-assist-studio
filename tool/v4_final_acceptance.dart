@@ -582,7 +582,7 @@ final class _AcceptanceEvidenceSummary {
       final androidPreflight = _jsonMapAt(artifacts, 'latestAndroidPreflight');
       if (androidPreflight.isNotEmpty) {
         buffer
-          ..writeln('### Android 前置诊断')
+          ..writeln('### Android smoke 前置诊断')
           ..writeln()
           ..writeln(
             '- 最近：${_plainText(androidPreflight['summary']?.toString() ?? '无摘要')}',
@@ -595,6 +595,18 @@ final class _AcceptanceEvidenceSummary {
       }
     }
     if (archive != null) {
+      final latestFullSmoke = _jsonMapAt(archive!, 'latestFullSmoke');
+      if (latestFullSmoke.isNotEmpty) {
+        buffer
+          ..writeln('### 最近完整冒烟')
+          ..writeln()
+          ..writeln('- 最近：${_latestFullSmokeLine(latestFullSmoke)}');
+        final blockers = _jsonStringList(latestFullSmoke['blockers']);
+        if (blockers.isNotEmpty) {
+          buffer.writeln('- 阻断：${blockers.join('、')}');
+        }
+        buffer.writeln();
+      }
       final counts = _jsonMapAt(archive!, 'counts');
       buffer
         ..writeln('### 留档数量')
@@ -609,6 +621,13 @@ final class _AcceptanceEvidenceSummary {
     }
     return buffer.toString();
   }
+}
+
+// 格式化 archive 中最近 full smoke 的短摘要。
+String _latestFullSmokeLine(Map<String, Object?> summary) {
+  final label = _plainText(summary['label']?.toString() ?? '未知');
+  final timestamp = _plainText(summary['timestamp']?.toString() ?? '无时间');
+  return '$label，时间 $timestamp';
 }
 
 // 读取最新 readiness 报告的关键摘要。

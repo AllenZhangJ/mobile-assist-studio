@@ -154,7 +154,7 @@ npm run v4:android-smoke -- --allow-actions
 npm run v4:android-smoke -- --workflow-basic --allow-actions
 ```
 
-`npm run v4:smoke:full` 是最终现场验收入口，会先做只读前置检查，再顺序执行 iOS 与 Android 的真实 Tap、Swipe、Input 和基础 Project DSL workflow，并在最后生成 full smoke Markdown / JSON、readiness / completion audit 留档。`npm run v4:ios-smoke:full` 和 `npm run v4:android-smoke:full` 也走同一个编排器，只跳过另一个平台，适合单平台排障。`npm run v4:smoke:full:dry-run` 只展示命令，不执行真实动作。
+`npm run v4:smoke:full` 是最终现场验收入口，会先检查 Appium 平台 driver，做只读前置检查，再顺序执行 iOS 与 Android 的真实 Tap、Swipe、Input 和基础 Project DSL workflow，并在最后生成 full smoke Markdown / JSON、readiness / completion audit 留档。`npm run v4:ios-smoke:full` 和 `npm run v4:android-smoke:full` 也走同一个编排器，只跳过另一个平台，适合单平台排障。`npm run v4:smoke:full:dry-run` 只展示命令，不执行真实动作。
 
 full smoke 编排器会为每个平台设置步骤超时；超时后会终止子进程并继续生成脱敏汇总，避免现场验证卡死或留下孤儿进程。
 

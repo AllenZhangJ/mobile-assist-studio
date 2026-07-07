@@ -422,6 +422,14 @@ final class _AcceptanceReport {
         .toList(growable: false);
   }
 
+  // 根据最终失败摘要生成可执行下一步，不读取本机隐私信息。
+  List<String> get nextSteps {
+    if (finalFailures.isEmpty) {
+      return const <String>['保留本次报告，进入交付复核。'];
+    }
+    return _nextStepsForFailures(failures: finalFailures, auditOk: auditOk);
+  }
+
   String toJsonString() {
     const encoder = JsonEncoder.withIndent('  ');
     return '${encoder.convert(toJsonObject())}\n';
@@ -445,6 +453,7 @@ final class _AcceptanceReport {
             : '基础审计失败',
         'failures': finalFailures,
       },
+      'nextSteps': nextSteps,
       'steps': results.map((result) => result.toJsonObject()).toList(),
     };
   }
@@ -480,8 +489,43 @@ final class _AcceptanceReport {
         buffer.writeln('- $failure');
       }
     }
+    buffer
+      ..writeln()
+      ..writeln('## 下一步')
+      ..writeln();
+    for (final step in nextSteps) {
+      buffer.writeln('- $step');
+    }
     return buffer.toString();
   }
+}
+
+// 从失败文本中提炼下一步命令，保证最终报告能直接指导现场补验。
+List<String> _nextStepsForFailures({
+  required List<String> failures,
+  required bool auditOk,
+}) {
+  final joined = failures.join('\n');
+  final steps = <String>[];
+  if (!auditOk) {
+    steps.add(
+      '基础：先运行 `npm run v4:smoke-readiness` 和 `npm run v4:smoke-archive`。',
+    );
+  }
+  if (joined.contains('iOS 平台')) {
+    steps.add('iOS：连接并信任一台 iPhone，运行 `npm run v4:ios-smoke:full`。');
+  }
+  if (joined.contains('Android 平台')) {
+    steps.add('Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。');
+  }
+  if (joined.contains('截图')) {
+    steps.add('截图：保留 Mac App 或设备 smoke 截图，再重新生成 archive。');
+  }
+  if (joined.contains('full smoke') || joined.contains('双平台完整 smoke')) {
+    steps.add('双平台：iOS 和 Android 单平台 smoke 都通过后，运行 `npm run v4:smoke:full`。');
+  }
+  steps.add('终验：补齐留档后运行 `npm run v4:acceptance-final`。');
+  return steps.toSet().toList(growable: false);
 }
 
 const _usage = '''

@@ -25,6 +25,7 @@ Future<void> main(List<String> args) async {
     if (device != null) {
       stdout.writeln('设备：${device.displayName} ${device.maskedIdentifier}');
     }
+    await _ensureTunnelReadyIfNeeded(config.deviceSession);
     final sessionManager = DeviceSessionManager(
       client: client,
       config: config.deviceSession,
@@ -66,6 +67,27 @@ Future<void> main(List<String> args) async {
     _fail('iOS 冒烟失败：$error');
   } finally {
     client?.close(force: true);
+  }
+}
+
+// iOS 18+ 真机会话依赖 XCUITest tunnel registry。
+// 未就绪时提前失败，避免用户等待 Appium session 长超时。
+Future<void> _ensureTunnelReadyIfNeeded(DeviceSessionConfig config) async {
+  if (!config.requiresAppiumTunnel) return;
+  final udid = config.udid;
+  if (udid == null) {
+    _fail('手机绑定缺失。请先打开 Mac App 点连接设备。');
+  }
+  Set<String> devices;
+  try {
+    devices = await defaultAppiumTunnelRegistryReader(
+      AppiumTunnelProcessConfig(udid: udid),
+    );
+  } on Object {
+    devices = const <String>{};
+  }
+  if (!devices.contains(udid)) {
+    _fail('本机隧道未就绪。请先在 Mac App 点连接设备，输入 Mac 密码并在手机点允许。');
   }
 }
 

@@ -284,6 +284,7 @@ Future<void> _assertPackageSmokeScripts() async {
     'package.json 必须固定 Appium UiAutomator2 driver。',
   );
   await _assertFullSmokeDriverProbe();
+  await _assertFullSmokePreflightStateContracts();
   _assertFullSmokeScript(
     scripts,
     name: 'v4:ios-smoke:full',
@@ -369,6 +370,91 @@ Future<void> _assertFullSmokeDriverProbe() async {
     source.contains('ANDROID_SMOKE_PREFLIGHT_') &&
         source.contains("'source': 'full-smoke'"),
     'full smoke 的 Android 前置阻断必须同步生成 Android preflight 留档。',
+  );
+  _expect(
+    source.contains('_probeIosUsbMux') &&
+        source.contains('available: count == 1') &&
+        source.contains('available: ready == 1'),
+    'full smoke preflight 必须同时按唯一 iOS USB 和唯一 Android 手机判定可用。',
+  );
+}
+
+// 断言 full smoke 执行入口也会在真实动作前拦截多设备状态。
+Future<void> _assertFullSmokePreflightStateContracts() async {
+  final tempDir = await Directory.systemTemp.createTemp(
+    'ias-v4-full-smoke-state-',
+  );
+  try {
+    await _assertFullSmokePreflightState(
+      tempDir,
+      name: 'ios-multi-usb',
+      arguments: const <String>['--skip-android'],
+      adbDevicesOutput: 'List of devices attached\n\n',
+      usbmuxOutput: '[{"ConnectionType":"USB"},{"ConnectionType":"USB"}]',
+      checkName: 'iOS USB',
+      expectedDetail: 'USB 2',
+      expectedNextStep: '只连接一台 iPhone，解锁并信任后重试。',
+    );
+    await _assertFullSmokePreflightState(
+      tempDir,
+      name: 'android-multi-ready',
+      arguments: const <String>['--skip-ios'],
+      adbDevicesOutput:
+          'List of devices attached\nFAKE001\tdevice\nFAKE002\tdevice\n',
+      usbmuxOutput: '[]',
+      checkName: 'Android 手机',
+      expectedDetail: '可用 2，未授权 0，离线 0',
+      expectedNextStep: '只保留一台已授权 Android 手机后重试。',
+    );
+  } finally {
+    await tempDir.delete(recursive: true);
+  }
+}
+
+// 运行 full smoke preflight fixture，并校验指定检查项阻断。
+Future<void> _assertFullSmokePreflightState(
+  Directory rootDir, {
+  required String name,
+  required List<String> arguments,
+  required String adbDevicesOutput,
+  required String usbmuxOutput,
+  required String checkName,
+  required String expectedDetail,
+  required String expectedNextStep,
+}) async {
+  final binDir = Directory('${rootDir.path}/bin-$name');
+  await _writeFakeProbeCommands(
+    binDir,
+    adbDevicesOutput: adbDevicesOutput,
+    usbmuxOutput: usbmuxOutput,
+  );
+  final outDir = Directory('${rootDir.path}/out-$name');
+  final result = await _runFullSmoke(
+    outDir,
+    arguments: arguments,
+    environment: <String, String>{
+      'PATH': '${binDir.path}:${Platform.environment['PATH'] ?? ''}',
+    },
+  );
+  _expect(
+    result.exitCode == 1,
+    'full smoke 状态 fixture $name 必须在前置检查返回 1，实际 ${result.exitCode}。',
+  );
+  _expect(result.stderr.contains('V4 full smoke 前置准备未通过'), '$name 必须输出前置阻断。');
+
+  final artifacts = await _loadFullSmokeArtifacts(outDir);
+  final preflight = _mapAt(artifacts.json, 'preflight');
+  final checks = _listAt(preflight, 'items').map(_mapFrom).toList();
+  final item = checks.firstWhere(
+    (check) => check['name'] == checkName,
+    orElse: () => const <String, Object?>{},
+  );
+  _expect(item.isNotEmpty, '$name 必须包含 $checkName 检查项。');
+  _expect(item['ok'] == false, '$name 的 $checkName 必须为阻断。');
+  _expect(item['detail'] == expectedDetail, '$name 的 $checkName detail 不正确。');
+  _expect(
+    item['nextStep'] == expectedNextStep,
+    '$name 的 $checkName nextStep 不正确。',
   );
 }
 
@@ -923,6 +1009,23 @@ Future<_ProcessResult> _runReadiness(
   ], environment: environment);
 }
 
+// 调用 full smoke 编排器，只跑前置检查 fixture，不连接真实设备。
+Future<_ProcessResult> _runFullSmoke(
+  Directory outDir, {
+  required List<String> arguments,
+  Map<String, String>? environment,
+}) async {
+  return _runDartTool(<String>[
+    'tool/v4_full_smoke.dart',
+    '--confirm-actions',
+    '--out-dir',
+    outDir.path,
+    '--preflight-timeout',
+    '1',
+    ...arguments,
+  ], environment: environment);
+}
+
 // 调用现有 archive 工具端到端生成本地索引。
 Future<_ProcessResult> _runArchive(Directory outDir) async {
   return _runDartTool(<String>[
@@ -1053,6 +1156,36 @@ Future<_ReadinessArtifacts> _loadGeneratedArtifacts(Directory outDir) async {
   final decoded = jsonDecode(jsonText);
   _expect(decoded is Map, 'readiness JSON 必须是对象。');
   return _ReadinessArtifacts(
+    json: Map<String, Object?>.from(decoded as Map),
+    markdown: markdown,
+    allText: '$jsonText\n$markdown',
+  );
+}
+
+// 读取 full smoke 生成的最新 JSON 和 Markdown。
+Future<_FullSmokeArtifacts> _loadFullSmokeArtifacts(Directory outDir) async {
+  final jsonFiles = await _matchingFiles(
+    outDir,
+    RegExp(r'^FULL_SMOKE_.*\.json$'),
+  );
+  final markdownFiles = await _matchingFiles(
+    outDir,
+    RegExp(r'^FULL_SMOKE_.*\.md$'),
+  );
+  _expect(
+    jsonFiles.length == 1,
+    'full smoke JSON 数量应为 1，实际 ${jsonFiles.length}',
+  );
+  _expect(
+    markdownFiles.length == 1,
+    'full smoke Markdown 数量应为 1，实际 ${markdownFiles.length}',
+  );
+
+  final jsonText = await jsonFiles.single.readAsString();
+  final markdown = await markdownFiles.single.readAsString();
+  final decoded = jsonDecode(jsonText);
+  _expect(decoded is Map, 'full smoke JSON 必须是对象。');
+  return _FullSmokeArtifacts(
     json: Map<String, Object?>.from(decoded as Map),
     markdown: markdown,
     allText: '$jsonText\n$markdown',
@@ -1653,6 +1786,19 @@ final class _ProcessResult {
 // readiness 生成物集合。
 final class _ReadinessArtifacts {
   const _ReadinessArtifacts({
+    required this.json,
+    required this.markdown,
+    required this.allText,
+  });
+
+  final Map<String, Object?> json;
+  final String markdown;
+  final String allText;
+}
+
+// full smoke 生成物集合。
+final class _FullSmokeArtifacts {
+  const _FullSmokeArtifacts({
     required this.json,
     required this.markdown,
     required this.allText,

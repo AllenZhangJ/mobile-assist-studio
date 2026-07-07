@@ -142,14 +142,19 @@ Future<_FullSmokePreparation> _runAutoPreparation(
 
   final driverCheck = await _checkAppiumDriversForSmoke(config, options);
   items.add(driverCheck);
-  if (driverCheck.ok) {
+  final iosUsbCheck = !options.skipIos
+      ? await _checkIosUsbForSmoke(options.preflightTimeout)
+      : null;
+  if (iosUsbCheck != null) items.add(iosUsbCheck);
+  if (driverCheck.ok && (iosUsbCheck?.ok ?? true)) {
     items.add(await _prepareAppiumForSmoke(config, options, resources));
   }
   if (driverCheck.ok &&
+      (iosUsbCheck?.ok ?? true) &&
       !options.skipIos &&
       config.deviceSession.requiresAppiumTunnel) {
     items.add(await _prepareIosTunnelForSmoke(config, options, resources));
-  } else if (driverCheck.ok && !options.skipIos) {
+  } else if (driverCheck.ok && (iosUsbCheck?.ok ?? true) && !options.skipIos) {
     items.add(
       const _FullSmokePreparationItem(
         name: 'iOS 隧道',
@@ -164,6 +169,33 @@ Future<_FullSmokePreparation> _runAutoPreparation(
   }
 
   return _FullSmokePreparation(items: items);
+}
+
+// 检查 iOS USB 视角是否能唯一确认当前手机。
+Future<_FullSmokePreparationItem> _checkIosUsbForSmoke(Duration timeout) async {
+  final iosUsb = await _probeIosUsbMux(timeout);
+  if (!iosUsb.toolAvailable || iosUsb.permissionDenied) {
+    return _FullSmokePreparationItem(
+      name: 'iOS USB',
+      ok: true,
+      detail: iosUsb.detail ?? 'USB 探测受限',
+      nextStep: '-',
+    );
+  }
+  if (iosUsb.available) {
+    return const _FullSmokePreparationItem(
+      name: 'iOS USB',
+      ok: true,
+      detail: '已发现一台 USB iPhone',
+      nextStep: '-',
+    );
+  }
+  return _FullSmokePreparationItem(
+    name: 'iOS USB',
+    ok: false,
+    detail: _iosUsbStateDetail(iosUsb.usbDevices),
+    nextStep: _iosUsbNextStep(iosUsb.usbDevices),
+  );
 }
 
 // 检查当前 Appium 可见的平台 driver，避免到创建 session 时才发现缺失。
@@ -460,6 +492,17 @@ String _androidNextStep({
   return '开启 USB 调试，插线并在手机上点允许。';
 }
 
+// 把 iOS USB 数量转成统一短说明。
+String _iosUsbStateDetail(int usbDevices) {
+  return 'USB $usbDevices';
+}
+
+// 生成 iOS USB 下一步，避免无 USB 和多 USB 使用同一句提示。
+String _iosUsbNextStep(int usbDevices) {
+  if (usbDevices > 1) return '只连接一台 iPhone，解锁并信任后重试。';
+  return '用数据线连接一台 iPhone，解锁并信任后重试。';
+}
+
 // 等待 HTTP ready，供自动准备后的 Appium 服务复核。
 Future<bool> _waitForHttpReady(
   Uri uri, {
@@ -613,6 +656,7 @@ Future<_FullSmokePreflight> _runPreflight(_FullSmokeOptions options) async {
 
   if (!options.skipIos) {
     final ios = await _probeIosDevices(options.preflightTimeout);
+    final iosUsb = await _probeIosUsbMux(options.preflightTimeout);
     final tunnel = await _probeHttpJson(
       Uri(
         scheme: 'http',
@@ -629,6 +673,22 @@ Future<_FullSmokePreflight> _runPreflight(_FullSmokeOptions options) async {
           ok: ios.available,
           detail: ios.detail ?? '可用 ${ios.connected}，不可用 ${ios.unavailable}',
           nextStep: '连接并解锁一台 USB iPhone，再点 Mac App 的“连接设备”。',
+        ),
+      )
+      ..add(
+        _FullSmokePreflightItem(
+          name: 'iOS USB',
+          ok:
+              iosUsb.available ||
+              !iosUsb.toolAvailable ||
+              iosUsb.permissionDenied,
+          detail: iosUsb.detail ?? _iosUsbStateDetail(iosUsb.usbDevices),
+          nextStep:
+              iosUsb.available ||
+                  !iosUsb.toolAvailable ||
+                  iosUsb.permissionDenied
+              ? '-'
+              : _iosUsbNextStep(iosUsb.usbDevices),
         ),
       )
       ..add(
@@ -931,6 +991,57 @@ Future<_IosProbe> _probeIosDevices(Duration timeout) async {
   );
 }
 
+// 探测 usbmux USB 视角，避免 CoreDevice 历史记录或多台 USB 误导 full smoke。
+Future<_IosUsbMuxProbe> _probeIosUsbMux(Duration timeout) async {
+  final result = await _runShortProcess('pymobiledevice3', const [
+    'usbmux',
+    'list',
+  ], timeout: timeout);
+  if (result.exitCode == 0) {
+    final count = _countUsbmuxDevices(result.stdout);
+    return _IosUsbMuxProbe(
+      available: count == 1,
+      toolAvailable: true,
+      usbDevices: count,
+    );
+  }
+
+  final issue = '${result.stderr}\n${result.stdout}'.toLowerCase();
+  final toolMissing =
+      issue.contains('no such file') ||
+      issue.contains('not found') ||
+      issue.contains('cannot run program');
+  final permissionDenied =
+      issue.contains('operation not permitted') || issue.contains('permission');
+  return _IosUsbMuxProbe(
+    available: false,
+    toolAvailable: !toolMissing,
+    permissionDenied: permissionDenied,
+    detail: toolMissing
+        ? '工具不可用'
+        : permissionDenied
+        ? '权限受限'
+        : '探测失败',
+  );
+}
+
+// 从 pymobiledevice3 输出中只提取设备数量，不保留设备号。
+int _countUsbmuxDevices(String stdoutText) {
+  final trimmed = stdoutText.trim();
+  if (trimmed.isEmpty || trimmed == '[]') return 0;
+  try {
+    final decoded = jsonDecode(trimmed);
+    if (decoded is List) return decoded.length;
+  } on Object {
+    // 非 JSON 表格输出继续走文本计数。
+  }
+  return trimmed
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.contains('USB') || line.contains('Network'))
+      .length;
+}
+
 // 探测当前 Android 设备数量，只保留状态统计，不写 serial。
 Future<_AndroidProbe> _probeAndroidDevices(Duration timeout) async {
   final result = await _runShortProcess('adb', const [
@@ -955,7 +1066,7 @@ Future<_AndroidProbe> _probeAndroidDevices(Duration timeout) async {
     }
   }
   return _AndroidProbe(
-    available: ready > 0,
+    available: ready == 1,
     ready: ready,
     unauthorized: unauthorized,
     offline: offline,
@@ -1557,6 +1668,23 @@ final class _IosProbe {
   final bool available;
   final int connected;
   final int unavailable;
+  final String? detail;
+}
+
+// iOS usbmux 设备探测结果，只保留数量和工具状态。
+final class _IosUsbMuxProbe {
+  const _IosUsbMuxProbe({
+    required this.available,
+    required this.toolAvailable,
+    this.usbDevices = 0,
+    this.permissionDenied = false,
+    this.detail,
+  });
+
+  final bool available;
+  final bool toolAvailable;
+  final int usbDevices;
+  final bool permissionDenied;
   final String? detail;
 }
 

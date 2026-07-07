@@ -788,6 +788,7 @@ void main() {
     expect(find.text('本机指引'), findsOneWidget);
     expect(find.text('驱动服务'), findsWidgets);
     expect(find.text('2.19.0'), findsOneWidget);
+    expect(find.textContaining('中间不加接口服务'), findsOneWidget);
     expect(find.text('开发工具'), findsWidgets);
     expect(find.textContaining('Xcode 16.2'), findsOneWidget);
     expect(find.text('会话与信任'), findsOneWidget);
@@ -810,6 +811,24 @@ void main() {
     expect(find.text('已复制'), findsOneWidget);
 
     await tester.dragUntilVisible(
+      find.text('安卓准备'),
+      find.byKey(const ValueKey('local-setup-guide-scroll')),
+      const Offset(0, -180),
+      maxIteration: 8,
+    );
+    expect(find.text('安卓准备'), findsOneWidget);
+    expect(find.text('开调试'), findsOneWidget);
+    expect(find.text('插数据线'), findsOneWidget);
+    expect(find.text('点允许'), findsWidgets);
+    expect(find.text('跑安卓'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('copy-android-smoke-command')));
+    await tester.pump();
+
+    expect(copiedText(), 'npm run v4:android-smoke:full');
+    expect(copiedText(), isNot(contains('/Users/')));
+    expect(copiedText(), isNot(contains('127.0.0.1')));
+
+    await tester.dragUntilVisible(
       find.text('边界'),
       find.byKey(const ValueKey('local-setup-guide-scroll')),
       const Offset(0, -220),
@@ -817,7 +836,6 @@ void main() {
     );
     expect(find.text('边界'), findsOneWidget);
     expect(find.textContaining('信任、签名或开发者模式'), findsOneWidget);
-    expect(find.textContaining('中间不加接口服务'), findsOneWidget);
     expect(find.textContaining('127.0.0.1'), findsNothing);
     expect(find.textContaining('/Users/'), findsNothing);
     expect(find.textContaining('device-unique-placeholder'), findsNothing);

@@ -1,15 +1,5 @@
 part of '../../studio_mac_workspace.dart';
 
-const String _v4FullSmokeCommand = 'npm run v4:smoke:full';
-const String _v4PasswordSmokeCommand = 'npm run v4:smoke:full:password-stdin';
-const String _v4AndroidSmokeCommand = 'npm run v4:android-smoke:full';
-const String _v4AcceptanceAuditCommand = 'npm run v4:acceptance-audit';
-const String _v4AcceptanceFinalCommand = 'npm run v4:acceptance-final';
-const String _v4AcceptanceRouteCommands =
-    'npm run v4:android-smoke:full\n'
-    'npm run v4:smoke:full\n'
-    'npm run v4:acceptance-final';
-
 // V4 验收入口只展示本地线索和复制命令，不直接启动真机动作。
 class _V4AcceptanceStatusPanel extends StatelessWidget {
   const _V4AcceptanceStatusPanel({required this.snapshot});

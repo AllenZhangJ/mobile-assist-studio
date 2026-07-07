@@ -116,6 +116,8 @@ class _LocalSetupGuideDrawer extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      const _AndroidSetupCard(),
+                      const SizedBox(height: 12),
                       const _LocalSetupBoundaryCard(),
                     ],
                   ),

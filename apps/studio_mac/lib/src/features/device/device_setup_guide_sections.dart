@@ -220,6 +220,97 @@ class _LocalTunnelSteps extends StatelessWidget {
   }
 }
 
+class _AndroidSetupCard extends StatelessWidget {
+  const _AndroidSetupCard();
+
+  /// 渲染 Android 真机 smoke 的现场准备说明。
+  /// 这里只复制安全命令，不启动 ADB、驱动或真机动作。
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: StudioColors.cyan.withValues(alpha: 0.06),
+        border: Border.all(color: StudioColors.cyan.withValues(alpha: 0.24)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.android_outlined, size: 17),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    '安卓准备',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  key: const ValueKey('copy-android-smoke-command'),
+                  icon: const Icon(Icons.content_copy, size: 16),
+                  label: const Text('复制安卓'),
+                  onPressed: () async {
+                    await _copyPlainText(context, text: _v4AndroidSmokeCommand);
+                  },
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              '终验还缺安卓真机留档。接一台安卓手机后，按下面顺序走。',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: StudioColors.muted, height: 1.4),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: const [
+                _AndroidSetupStep(label: '开调试'),
+                _AndroidSetupStep(label: '插数据线'),
+                _AndroidSetupStep(label: '点允许'),
+                _AndroidSetupStep(label: '跑安卓'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AndroidSetupStep extends StatelessWidget {
+  const _AndroidSetupStep({required this.label});
+
+  final String label;
+
+  /// 渲染 Android 准备短步骤，保持紧凑不撑开抽屉。
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 72,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: StudioColors.panel.withValues(alpha: 0.72),
+        border: Border.all(color: StudioColors.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
+      ),
+    );
+  }
+}
+
 class _LocalSetupBoundaryCard extends StatelessWidget {
   const _LocalSetupBoundaryCard();
 

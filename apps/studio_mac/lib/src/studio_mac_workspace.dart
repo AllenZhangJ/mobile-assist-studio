@@ -286,3 +286,12 @@ part 'shell/bottom_console.dart';
 
 const _iosTunnelCommand =
     'sudo node_modules/.bin/appium driver run xcuitest tunnel-creation';
+const String _v4FullSmokeCommand = 'npm run v4:smoke:full';
+const String _v4PasswordSmokeCommand = 'npm run v4:smoke:full:password-stdin';
+const String _v4AndroidSmokeCommand = 'npm run v4:android-smoke:full';
+const String _v4AcceptanceAuditCommand = 'npm run v4:acceptance-audit';
+const String _v4AcceptanceFinalCommand = 'npm run v4:acceptance-final';
+const String _v4AcceptanceRouteCommands =
+    'npm run v4:android-smoke:full\n'
+    'npm run v4:smoke:full\n'
+    'npm run v4:acceptance-final';

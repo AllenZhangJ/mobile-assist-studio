@@ -1173,6 +1173,24 @@ _AcceptanceGateGap _gateGapFromWarning(String warning, bool iosTunnelNeeded) {
       required: '至少保留一张 Mac App 或设备 smoke 截图',
     );
   }
+  if (text.contains('iOS 平台') && text.contains('当前提交完整通过')) {
+    return _AcceptanceGateGap(
+      title: 'iOS smoke',
+      current: text,
+      required: 'iOS 当前提交真机 smoke run 完整通过',
+      command: iosTunnelNeeded
+          ? 'npm run v4:ios-smoke:full:password-prompt'
+          : 'npm run v4:ios-smoke:full',
+    );
+  }
+  if (text.contains('Android 平台') && text.contains('当前提交完整通过')) {
+    return _AcceptanceGateGap(
+      title: 'Android smoke',
+      current: text,
+      required: 'Android 当前提交真机 smoke run 完整通过',
+      command: 'npm run v4:android-smoke:full',
+    );
+  }
   if (text.contains('iOS 平台')) {
     return _AcceptanceGateGap(
       title: 'iOS smoke',

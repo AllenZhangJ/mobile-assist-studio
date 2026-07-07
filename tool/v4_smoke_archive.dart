@@ -51,6 +51,16 @@ List<String> _finalGateFailures(
       '未发现 iOS 平台 smoke run。',
     if (options.requirePlatformRuns && summary.androidRuns == 0)
       '未发现 Android 平台 smoke run。',
+    if (options.requirePlatformRuns &&
+        options.requireComplete &&
+        summary.iosRuns > 0 &&
+        !summary.latestIosSmokeFullMatchesGit(currentGit))
+      '最近 iOS 平台 smoke run 尚未在当前提交完整通过。',
+    if (options.requirePlatformRuns &&
+        options.requireComplete &&
+        summary.androidRuns > 0 &&
+        !summary.latestAndroidSmokeFullMatchesGit(currentGit))
+      '最近 Android 平台 smoke run 尚未在当前提交完整通过。',
     if (options.requireComplete && !summary.latestFullSmokeComplete)
       '最近 full smoke 尚未完整通过。',
     if (options.requireComplete &&
@@ -80,10 +90,17 @@ Future<_SmokeArchiveReport> _buildArchive(
     artifacts: artifacts,
     kind: _ArtifactKind.fullSmokeJson,
   );
+  final latestIosSmoke = await _latestPlatformRunSummary(options.outDir, 'ios');
+  final latestAndroidSmoke = await _latestPlatformRunSummary(
+    options.outDir,
+    'android',
+  );
   final summary = _ArchiveSummary.fromArtifacts(
     artifacts: artifacts,
     latestReadiness: latestReadiness,
     latestFullSmoke: latestFullSmoke,
+    latestIosSmoke: latestIosSmoke,
+    latestAndroidSmoke: latestAndroidSmoke,
   );
   return _SmokeArchiveReport(
     timestamp: timestamp,
@@ -225,6 +242,151 @@ Future<_ReportJsonSummary?> _latestJsonSummary({
   } on Object {
     return null;
   }
+}
+
+// 读取最近平台 smoke run 的结构化摘要，只读取元数据和事件类型。
+Future<_PlatformRunSummary?> _latestPlatformRunSummary(
+  Directory outDir,
+  String platform,
+) async {
+  final dir = Directory('${outDir.path}/$platform');
+  if (!await dir.exists()) return null;
+  final runs = <Directory>[];
+  await for (final entity in dir.list(recursive: false, followLinks: false)) {
+    if (entity is Directory && _entityName(entity).startsWith('run-')) {
+      runs.add(entity);
+    }
+  }
+  if (runs.isEmpty) return null;
+  runs.sort((left, right) {
+    return _entityName(right).compareTo(_entityName(left));
+  });
+  return _readPlatformRunSummary(runs.first, platform);
+}
+
+// 解析单个平台 run，避免 archive final 只靠目录数量误判通过。
+Future<_PlatformRunSummary> _readPlatformRunSummary(
+  Directory dir,
+  String platform,
+) async {
+  final metadata = await _readJsonObject(File('${dir.path}/metadata.json'));
+  final finished = await _readJsonObject(File('${dir.path}/finished.json'));
+  final events = await _readEventObjects(File('${dir.path}/events.jsonl'));
+  final eventTypes = events
+      .map((event) => event['type']?.toString() ?? '')
+      .where((type) => type.isNotEmpty)
+      .toSet();
+  return _PlatformRunSummary(
+    platform: platform,
+    runName: _redactText(_entityName(dir)),
+    git: _shortGitRevision(
+      metadata?['git'] ??
+          finished?['git'] ??
+          _firstEventField(events, 'smokeStart', 'git'),
+    ),
+    status: finished?['status']?.toString() ?? 'running',
+    actionsAllowed: _eventBool(events, 'smokeStart', 'actionsAllowed'),
+    hasScreenshot: eventTypes.contains('smokeScreenshot'),
+    workflowExecuted: eventTypes.contains('smokeWorkflowStart'),
+    actionNames: _smokeActionNames(events),
+    logsCollected: eventTypes.contains('smokeLogs'),
+  );
+}
+
+// 读取文件或目录名，兼容 Directory URI 尾斜线。
+String _entityName(FileSystemEntity entity) {
+  return _normalizePath(entity.path).split('/').last;
+}
+
+// 安全读取 JSON object，坏文件按缺失处理。
+Future<Map<String, Object?>?> _readJsonObject(File file) async {
+  if (!await file.exists()) return null;
+  try {
+    final decoded = jsonDecode(await file.readAsString());
+    if (decoded is Map<String, Object?>) return decoded;
+    if (decoded is Map) return Map<String, Object?>.from(decoded);
+  } on Object {
+    return null;
+  }
+  return null;
+}
+
+// 读取 JSONL 事件；坏行跳过，避免一条损坏影响 archive。
+Future<List<Map<String, Object?>>> _readEventObjects(File file) async {
+  if (!await file.exists()) return const <Map<String, Object?>>[];
+  final events = <Map<String, Object?>>[];
+  try {
+    final lines = await file.readAsLines();
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, Object?>) {
+        events.add(decoded);
+      } else if (decoded is Map) {
+        events.add(Map<String, Object?>.from(decoded));
+      }
+    }
+  } on Object {
+    return events;
+  }
+  return events;
+}
+
+// 读取第一条指定事件字段。
+Object? _firstEventField(
+  List<Map<String, Object?>> events,
+  String type,
+  String field,
+) {
+  for (final event in events) {
+    if (event['type'] == type && event.containsKey(field)) return event[field];
+  }
+  return null;
+}
+
+// 从指定事件读取布尔字段。
+bool? _eventBool(List<Map<String, Object?>> events, String type, String field) {
+  for (final event in events) {
+    if (event['type'] != type) continue;
+    final value = event[field];
+    if (value is bool) return value;
+  }
+  return null;
+}
+
+// 提取真实交互动作，用于判断平台 smoke 是否完整。
+Set<String> _smokeActionNames(List<Map<String, Object?>> events) {
+  final actions = <String>{};
+  for (final event in events) {
+    final type = event['type']?.toString();
+    if (type == 'smokeAction') {
+      _addSmokeAction(actions, event['action']);
+      continue;
+    }
+    if (type == 'smokeWorkflowStep') {
+      _addSmokeAction(actions, event['nodeType']);
+      _addSmokeAction(actions, event['action']);
+    }
+  }
+  return actions;
+}
+
+// 归一化动作名，保持和 readiness 的完整冒烟标准一致。
+void _addSmokeAction(Set<String> actions, Object? raw) {
+  final normalized = _normalizeSmokeAction(raw);
+  if (normalized != null) actions.add(normalized);
+}
+
+// 将 Appium / workflow 事件动作名收敛为 tap / swipe / input。
+String? _normalizeSmokeAction(Object? raw) {
+  final value = raw?.toString().trim().toLowerCase();
+  return switch (value) {
+    'tap' || 'click' || 'press' => 'tap',
+    'swipe' || 'drag' => 'swipe',
+    'input' || 'text' || 'sendkeys' || 'send_keys' => 'input',
+    _ => null,
+  };
 }
 
 // 当前 git commit 只保留短 hash，失败时返回 unknown。
@@ -514,6 +676,93 @@ final class _ReportJsonSummary {
   }
 }
 
+// 最近一次平台 smoke run 摘要，只保存结构化状态，不包含截图内容。
+final class _PlatformRunSummary {
+  const _PlatformRunSummary({
+    required this.platform,
+    required this.runName,
+    required this.git,
+    required this.status,
+    required this.actionsAllowed,
+    required this.hasScreenshot,
+    required this.workflowExecuted,
+    required this.actionNames,
+    required this.logsCollected,
+  });
+
+  final String platform;
+  final String runName;
+  final String? git;
+  final String status;
+  final bool? actionsAllowed;
+  final bool hasScreenshot;
+  final bool workflowExecuted;
+  final Set<String> actionNames;
+  final bool logsCollected;
+
+  bool get passed => status == 'success';
+
+  bool get tapExecuted => actionNames.contains('tap');
+
+  bool get swipeExecuted => actionNames.contains('swipe');
+
+  bool get inputExecuted => actionNames.contains('input');
+
+  bool get fullPassed =>
+      passed &&
+      actionsAllowed == true &&
+      hasScreenshot &&
+      workflowExecuted &&
+      tapExecuted &&
+      swipeExecuted &&
+      inputExecuted;
+
+  bool matchesGit(String currentGit) {
+    return currentGit != 'unknown' && git != null && git == currentGit;
+  }
+
+  String get markdownLabel {
+    final actions = <String>[
+      if (tapExecuted) 'tap',
+      if (swipeExecuted) 'swipe',
+      if (inputExecuted) 'input',
+    ];
+    final parts = <String>[
+      fullPassed
+          ? '完整通过'
+          : passed
+          ? '通过但未完整'
+          : status == 'failed'
+          ? '失败'
+          : '运行中',
+      if (git != null) '提交 $git',
+      actionsAllowed == true ? '允许动作' : '动作未授权',
+      actions.isEmpty ? '未执行动作' : '动作 ${actions.join('/')}',
+      workflowExecuted ? '含流程' : '无流程',
+      hasScreenshot ? '有截图' : '无截图',
+      logsCollected ? '有日志' : '无日志',
+    ];
+    return parts.join('，');
+  }
+
+  // 转成脱敏 JSON 摘要。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'platform': platform,
+      'runName': runName,
+      'git': git,
+      'status': status,
+      'actionsAllowed': actionsAllowed,
+      'hasScreenshot': hasScreenshot,
+      'workflowExecuted': workflowExecuted,
+      'actions': actionNames.toList()..sort(),
+      'logsCollected': logsCollected,
+      'fullPassed': fullPassed,
+      'summary': markdownLabel,
+    };
+  }
+}
+
 // archive 汇总。
 final class _ArchiveSummary {
   const _ArchiveSummary({
@@ -526,6 +775,8 @@ final class _ArchiveSummary {
     required this.totalBytes,
     required this.latestReadiness,
     required this.latestFullSmoke,
+    required this.latestIosSmoke,
+    required this.latestAndroidSmoke,
   });
 
   final int totalFiles;
@@ -537,6 +788,8 @@ final class _ArchiveSummary {
   final int totalBytes;
   final _ReportJsonSummary? latestReadiness;
   final _ReportJsonSummary? latestFullSmoke;
+  final _PlatformRunSummary? latestIosSmoke;
+  final _PlatformRunSummary? latestAndroidSmoke;
 
   bool get latestFullSmokeComplete => latestFullSmoke?.complete ?? false;
 
@@ -546,11 +799,23 @@ final class _ArchiveSummary {
     return git != 'unknown' && smokeGit != null && smokeGit == git;
   }
 
+  bool latestIosSmokeFullMatchesGit(String git) {
+    final latest = latestIosSmoke;
+    return latest != null && latest.fullPassed && latest.matchesGit(git);
+  }
+
+  bool latestAndroidSmokeFullMatchesGit(String git) {
+    final latest = latestAndroidSmoke;
+    return latest != null && latest.fullPassed && latest.matchesGit(git);
+  }
+
   // 从 artifact 列表生成汇总。
   factory _ArchiveSummary.fromArtifacts({
     required List<_ArtifactEntry> artifacts,
     required _ReportJsonSummary? latestReadiness,
     required _ReportJsonSummary? latestFullSmoke,
+    required _PlatformRunSummary? latestIosSmoke,
+    required _PlatformRunSummary? latestAndroidSmoke,
   }) {
     final iosRuns = artifacts
         .where((entry) => entry.platform == 'ios' && entry.runName != null)
@@ -578,6 +843,8 @@ final class _ArchiveSummary {
       totalBytes: artifacts.fold<int>(0, (sum, entry) => sum + entry.bytes),
       latestReadiness: latestReadiness,
       latestFullSmoke: latestFullSmoke,
+      latestIosSmoke: latestIosSmoke,
+      latestAndroidSmoke: latestAndroidSmoke,
     );
   }
 
@@ -593,6 +860,8 @@ final class _ArchiveSummary {
       'totalBytes': totalBytes,
       'latestReadiness': latestReadiness?.toJsonObject(),
       'latestFullSmoke': latestFullSmoke?.toJsonObject(),
+      'latestIosSmoke': latestIosSmoke?.toJsonObject(),
+      'latestAndroidSmoke': latestAndroidSmoke?.toJsonObject(),
     };
   }
 }
@@ -662,6 +931,10 @@ final class _SmokeArchiveReport {
       ..writeln(
         '- Full smoke：${summary.latestFullSmoke?.markdownLabel ?? '无记录'}',
       )
+      ..writeln('- iOS smoke：${summary.latestIosSmoke?.markdownLabel ?? '无记录'}')
+      ..writeln(
+        '- Android smoke：${summary.latestAndroidSmoke?.markdownLabel ?? '无记录'}',
+      )
       ..writeln()
       ..writeln('## 截图索引')
       ..writeln();
@@ -705,6 +978,11 @@ final class _SmokeArchiveReport {
       if (summary.screenshots == 0) '缺少截图留档。请保留 Mac App 或设备 smoke 截图。',
       if (summary.iosRuns == 0) '缺少 iOS 平台 smoke run。',
       if (summary.androidRuns == 0) '缺少 Android 平台 smoke run。',
+      if (summary.iosRuns > 0 && !summary.latestIosSmokeFullMatchesGit(git))
+        '最近 iOS 平台 smoke run 尚未在当前提交完整通过。',
+      if (summary.androidRuns > 0 &&
+          !summary.latestAndroidSmokeFullMatchesGit(git))
+        '最近 Android 平台 smoke run 尚未在当前提交完整通过。',
       if (!summary.latestFullSmokeComplete) '最近 full smoke 尚未完整通过。',
       if (summary.latestFullSmokeComplete && !_latestFullSmokeMatchesGit())
         '最近 full smoke 不属于当前提交。请重新运行 `npm run v4:smoke:full`。',

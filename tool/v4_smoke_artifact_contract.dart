@@ -37,8 +37,9 @@ Future<void> main() async {
     );
     _expect(
       finalArchive.stderr.contains('Android 平台') &&
+          finalArchive.stderr.contains('iOS 平台') &&
           finalArchive.stderr.contains('full smoke'),
-      'archive final 必须提示缺失平台 run 和 full smoke 缺口。',
+      'archive final 必须提示平台 run 和 full smoke 缺口。',
     );
 
     final acceptance = await _runFinalAcceptance(tempDir);
@@ -123,6 +124,25 @@ Future<void> main() async {
       mismatchArchiveFinal.exitCode == 2 &&
           mismatchArchiveFinal.stderr.contains('不属于当前提交'),
       '旧提交 full smoke 的 archive final 必须提示不属于当前提交。',
+    );
+
+    final platformMismatchDir = Directory(
+      '${tempDir.path}/complete-old-platform-runs',
+    );
+    await _seedCompleteSmokeFixture(
+      platformMismatchDir,
+      fullSmokeGit: currentGit,
+      platformGit: _differentGit(currentGit),
+    );
+    final platformMismatchArchiveFinal = await _runArchiveFinal(
+      platformMismatchDir,
+    );
+    _expect(
+      platformMismatchArchiveFinal.exitCode == 2 &&
+          platformMismatchArchiveFinal.stderr.contains('iOS 平台') &&
+          platformMismatchArchiveFinal.stderr.contains('Android 平台') &&
+          platformMismatchArchiveFinal.stderr.contains('当前提交完整通过'),
+      '旧提交平台 run 的 archive final 必须提示平台 smoke 不属于当前提交完整通过。',
     );
     stdout.writeln('V4 smoke artifact contract passed');
   } finally {
@@ -865,13 +885,23 @@ void _assertArchiveJson(Map<String, Object?> json) {
   _expect(blockers.contains('iOS 隧道'), 'archive blockers 必须包含 iOS 隧道。');
   _expect(blockers.contains('Android 准备'), 'archive blockers 必须包含 Android 准备。');
   _expect(blockers.contains('Appium'), 'archive blockers 必须包含 Appium。');
+  final latestIosSmoke = _mapAt(summary, 'latestIosSmoke');
+  _expect(latestIosSmoke['git'] is String, 'archive latestIosSmoke 必须保留提交号。');
+  _expect(
+    latestIosSmoke['fullPassed'] == false &&
+        '${latestIosSmoke['summary']}'.contains('无截图'),
+    'archive latestIosSmoke 必须保留未完整通过状态。',
+  );
 
   final warnings = _stringList(json['warnings']);
   _expect(warnings.isNotEmpty, 'archive 必须保留当前缺口提醒。');
   _expect(
-    !warnings.any((warning) => warning.contains('iOS 平台')) &&
+    warnings.any(
+          (warning) =>
+              warning.contains('iOS 平台') && warning.contains('当前提交完整通过'),
+        ) &&
         warnings.any((warning) => warning.contains('Android 平台')),
-    'archive 必须只提示缺少 Android 平台 run。',
+    'archive 必须提示 iOS 平台 run 未完整和缺少 Android 平台 run。',
   );
 
   final artifacts = _listAt(json, 'artifacts');
@@ -891,6 +921,8 @@ void _assertArchiveMarkdown(String markdown) {
     '# V4 Smoke Archive',
     '## 汇总',
     '## 最近报告',
+    'iOS smoke',
+    'Android smoke',
     '## 截图索引',
     '## 提醒',
   ]) {

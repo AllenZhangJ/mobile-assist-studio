@@ -20,6 +20,7 @@ Future<void> main() async {
     _assertReadinessMarkdown(artifacts.markdown);
     _assertNoSensitiveText(artifacts.allText);
     await _assertReadinessNextStepStateContracts();
+    await _assertReadinessNextStepSanitizer();
 
     await _seedArchiveFixture(tempDir);
     final archiveResult = await _runArchive(tempDir);
@@ -843,7 +844,7 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
         'offline': 0,
       },
     ],
-    'nextSteps': <String>['先连接设备。'],
+    'nextSteps': <String>['先连接设备，切勿运行 `rm -rf /tmp/ias-bad`。'],
   };
   await File(
     '${androidDir.path}/ANDROID_SMOKE_PREFLIGHT_2026-01-01T00-00-00-000000Z.json',
@@ -1343,6 +1344,14 @@ void _assertReadinessJson(Map<String, Object?> json) {
     _stringList(latestAndroidPreflight['blockers']).contains('驱动'),
     'latestAndroidPreflight.blockers 必须包含驱动。',
   );
+  final androidPreflightNextSteps = _stringList(
+    latestAndroidPreflight['nextSteps'],
+  ).join('\n');
+  _expect(
+    androidPreflightNextSteps.contains('命令已过滤') &&
+        !androidPreflightNextSteps.contains('rm -rf'),
+    'latestAndroidPreflight.nextSteps 必须过滤非白名单命令。',
+  );
   final latestFullSmoke = _mapAt(artifacts, 'latestFullSmoke');
   _expect(latestFullSmoke['git'] is String, 'latestFullSmoke 必须保留提交号。');
   _expect(
@@ -1380,6 +1389,10 @@ void _assertReadinessJson(Map<String, Object?> json) {
   final nextSteps = _listAt(json, 'nextSteps');
   _expect(nextSteps.isNotEmpty, 'nextSteps 必须给出下一步。');
   final nextStepText = nextSteps.map((step) => '$step').join('\n');
+  _assertCommandBackticksAreWhitelisted(
+    nextSteps.map((step) => '$step'),
+    'readiness nextSteps',
+  );
   _expect(
     nextStepText.contains('v4:ios-smoke:full:password-prompt') &&
         nextStepText.contains('USB iPhone') &&
@@ -1387,6 +1400,19 @@ void _assertReadinessJson(Map<String, Object?> json) {
         nextStepText.contains('未发现 Android 手机') &&
         nextStepText.contains('开启 USB 调试'),
     'readiness nextSteps 必须给出 iOS 密码版命令和 Android 状态驱动命令。',
+  );
+}
+
+// 断言 readiness 生成端会过滤 nextSteps 中的非白名单命令。
+Future<void> _assertReadinessNextStepSanitizer() async {
+  final sourceFile = File('tool/v4_smoke_readiness.dart');
+  _expect(await sourceFile.exists(), '必须存在 readiness 生成器。');
+  final source = await sourceFile.readAsString();
+  _expect(
+    source.contains('_safeReadinessInstructionText') &&
+        source.contains('_allowedReadinessCommands.contains(command)') &&
+        source.contains('命令已过滤'),
+    'readiness 生成端必须过滤 nextSteps 中的非白名单命令。',
   );
 }
 
@@ -1686,29 +1712,38 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   _expect(steps.length == 4, 'acceptance 必须包含 4 个固定步骤。');
 }
 
-// 断言最终验收 nextSteps 中的反引号命令也只能来自白名单。
-void _assertAcceptanceNextStepCommandsAreWhitelisted(List<String> steps) {
-  const allowed = <String>{
-    'npm run v4:ios-smoke:full',
-    'npm run v4:ios-smoke:full:password-prompt',
-    'npm run v4:android-smoke:full',
-    'npm run v4:smoke:full',
-    'npm run v4:smoke:full:password-prompt',
-    'npm run v4:smoke-readiness',
-    'npm run v4:smoke-archive',
-    'npm run v4:acceptance-audit',
-    'npm run v4:acceptance-final',
-  };
+const _allowedReportCommands = <String>{
+  'npm run v4:ios-smoke:full',
+  'npm run v4:ios-smoke:full:password-prompt',
+  'npm run v4:android-smoke:full',
+  'npm run v4:smoke:full',
+  'npm run v4:smoke:full:password-prompt',
+  'npm run v4:smoke-readiness',
+  'npm run v4:smoke-archive',
+  'npm run v4:acceptance-audit',
+  'npm run v4:acceptance-final',
+};
+
+// 断言可见文本中的反引号命令只能来自白名单。
+void _assertCommandBackticksAreWhitelisted(
+  Iterable<String> steps,
+  String field,
+) {
   final pattern = RegExp(r'`([^`]+)`');
   for (final step in steps) {
     for (final match in pattern.allMatches(step)) {
       final command = match.group(1)?.trim();
       _expect(
-        command != null && allowed.contains(command),
-        'acceptance nextSteps 不得输出非白名单命令：$command',
+        command != null && _allowedReportCommands.contains(command),
+        '$field 不得输出非白名单命令：$command',
       );
     }
   }
+}
+
+// 断言最终验收 nextSteps 中的反引号命令也只能来自白名单。
+void _assertAcceptanceNextStepCommandsAreWhitelisted(List<String> steps) {
+  _assertCommandBackticksAreWhitelisted(steps, 'acceptance nextSteps');
 }
 
 // 断言最终验收 JSON 只输出项目内安全 smoke / 终验命令。
@@ -1716,22 +1751,11 @@ void _assertAcceptanceCommandsAreWhitelisted(
   List<Object?> items,
   String field,
 ) {
-  const allowed = <String>{
-    'npm run v4:ios-smoke:full',
-    'npm run v4:ios-smoke:full:password-prompt',
-    'npm run v4:android-smoke:full',
-    'npm run v4:smoke:full',
-    'npm run v4:smoke:full:password-prompt',
-    'npm run v4:smoke-readiness',
-    'npm run v4:smoke-archive',
-    'npm run v4:acceptance-audit',
-    'npm run v4:acceptance-final',
-  };
   for (final item in items) {
     final command = _mapFrom(item)['command'];
     if (command == null) continue;
     _expect(
-      command is String && allowed.contains(command),
+      command is String && _allowedReportCommands.contains(command),
       'acceptance $field 不得输出非白名单命令：$command',
     );
   }

@@ -640,6 +640,31 @@ String _redactText(String value) {
       .replaceAll(RegExp(r'\b[0-9A-Fa-f]{24,}\b'), '<device-id>');
 }
 
+// readiness 报告只允许输出项目内 V4 smoke / 终验白名单命令。
+const _allowedReadinessCommands = <String>{
+  'npm run v4:ios-smoke:full',
+  'npm run v4:ios-smoke:full:password-prompt',
+  'npm run v4:android-smoke:full',
+  'npm run v4:smoke:full',
+  'npm run v4:smoke:full:password-prompt',
+  'npm run v4:smoke-readiness',
+  'npm run v4:smoke-archive',
+  'npm run v4:acceptance-audit',
+  'npm run v4:acceptance-final',
+};
+
+// 清洗可见步骤里的反引号命令；未知命令不进入报告。
+String _safeReadinessInstructionText(String value) {
+  final redacted = _redactText(value);
+  return redacted.replaceAllMapped(RegExp(r'`([^`]+)`'), (match) {
+    final command = match.group(1)?.trim();
+    if (command != null && _allowedReadinessCommands.contains(command)) {
+      return '`$command`';
+    }
+    return '`命令已过滤`';
+  });
+}
+
 // 生成文件名安全时间戳。
 String _safeTimestamp(DateTime value) {
   return value.toIso8601String().replaceAll(':', '-').replaceAll('.', '-');
@@ -919,7 +944,9 @@ final class _AndroidSmokePreflightSummary {
       ready: completion['ready'] == true,
       label: _redactText(completion['label']?.toString() ?? '未知'),
       blockers: _jsonStringList(completion['blockers']),
-      nextSteps: _jsonStringList(json['nextSteps']),
+      nextSteps: _jsonStringList(
+        json['nextSteps'],
+      ).map(_safeReadinessInstructionText).toList(growable: false),
     );
   }
 
@@ -1312,7 +1339,7 @@ final class _SmokeReadinessReport {
         markdownReportIncrement: 1,
         jsonReportIncrement: 1,
       ),
-      'nextSteps': _nextSteps(),
+      'nextSteps': _safeNextSteps(),
     };
   }
 
@@ -1380,7 +1407,7 @@ final class _SmokeReadinessReport {
       ..writeln('## 下一步')
       ..writeln();
 
-    for (final step in _nextSteps()) {
+    for (final step in _safeNextSteps()) {
       buffer.writeln('- $step');
     }
     return buffer.toString();
@@ -1473,6 +1500,12 @@ final class _SmokeReadinessReport {
       if (!iosFullSmokeReady) _iosNextStep(),
       if (!androidFullSmokeReady) _androidNextStep(),
     ];
+  }
+
+  List<String> _safeNextSteps() {
+    return _nextSteps()
+        .map(_safeReadinessInstructionText)
+        .toList(growable: false);
   }
 
   String _iosNextStep() {

@@ -513,6 +513,18 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
     'acceptance nextSteps 必须给出 Android、full smoke 和终验命令。',
   );
 
+  final evidence = _mapAt(json, 'evidence');
+  final readiness = _mapAt(evidence, 'readiness');
+  final localState = _mapAt(readiness, 'localState');
+  _expect(
+    localState['androidDevice'] is Map,
+    'acceptance evidence 必须嵌入 Android 本机状态。',
+  );
+  final archive = _mapAt(evidence, 'archive');
+  final counts = _mapAt(archive, 'counts');
+  _expect(counts['screenshots'] == 1, 'acceptance evidence 必须嵌入截图数量。');
+  _expect(counts['androidRuns'] == 0, 'fixture 下 Android 运行数量必须为 0。');
+
   final steps = _listAt(json, 'steps');
   _expect(steps.length == 4, 'acceptance 必须包含 4 个固定步骤。');
 }
@@ -523,6 +535,9 @@ void _assertAcceptanceMarkdown(String markdown) {
     '# V4 Final Acceptance',
     '## 步骤',
     '## 结论',
+    '## 现场摘要',
+    'Android 手机',
+    '留档数量',
     '## 下一步',
     '完成审计',
     '归档终验',

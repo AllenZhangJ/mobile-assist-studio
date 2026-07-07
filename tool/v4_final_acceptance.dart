@@ -26,6 +26,10 @@ Future<void> main(List<String> args) async {
     git: await _currentGitCommit(options.probeTimeout),
     requireComplete: options.requireComplete,
     outDir: _redactText(options.outDir.path),
+    evidence: await _AcceptanceEvidenceSummary.load(
+      outDir: options.outDir,
+      archiveDir: options.archiveDir,
+    ),
     results: results,
   );
   final base =
@@ -233,6 +237,22 @@ String _redactText(String value) {
       .replaceAll(RegExp(r'\b[0-9A-Fa-f]{24,}\b'), '<device-id>');
 }
 
+// 脱敏任意 JSON 值，保留结构以便最终报告嵌入上游报告摘要。
+Object? _redactJsonValue(Object? value) {
+  if (value is String) return _redactText(value);
+  if (value is num || value is bool || value == null) return value;
+  if (value is List) {
+    return value.map(_redactJsonValue).toList(growable: false);
+  }
+  if (value is Map) {
+    return <String, Object?>{
+      for (final entry in value.entries)
+        entry.key.toString(): _redactJsonValue(entry.value),
+    };
+  }
+  return _redactText(value.toString());
+}
+
 // 验收参数。
 final class _AcceptanceOptions {
   const _AcceptanceOptions({
@@ -398,6 +418,7 @@ final class _AcceptanceReport {
     required this.git,
     required this.requireComplete,
     required this.outDir,
+    required this.evidence,
     required this.results,
   });
 
@@ -405,6 +426,7 @@ final class _AcceptanceReport {
   final String git;
   final bool requireComplete;
   final String outDir;
+  final _AcceptanceEvidenceSummary evidence;
   final List<_AcceptanceStepResult> results;
 
   bool get auditOk {
@@ -453,6 +475,7 @@ final class _AcceptanceReport {
             : '基础审计失败',
         'failures': finalFailures,
       },
+      'evidence': evidence.toJsonObject(),
       'nextSteps': nextSteps,
       'steps': results.map((result) => result.toJsonObject()).toList(),
     };
@@ -489,6 +512,7 @@ final class _AcceptanceReport {
         buffer.writeln('- $failure');
       }
     }
+    buffer.write(evidence.toMarkdown());
     buffer
       ..writeln()
       ..writeln('## 下一步')
@@ -498,6 +522,161 @@ final class _AcceptanceReport {
     }
     return buffer.toString();
   }
+}
+
+// AcceptanceEvidenceSummary 汇总刚生成的 readiness 和 archive 脱敏摘要。
+final class _AcceptanceEvidenceSummary {
+  const _AcceptanceEvidenceSummary({
+    required this.readiness,
+    required this.archive,
+  });
+
+  final Map<String, Object?>? readiness;
+  final Map<String, Object?>? archive;
+
+  // 从本地报告目录读取最新 readiness / archive JSON，只读结构化摘要。
+  static Future<_AcceptanceEvidenceSummary> load({
+    required Directory outDir,
+    required Directory archiveDir,
+  }) async {
+    return _AcceptanceEvidenceSummary(
+      readiness: await _loadLatestReadiness(outDir),
+      archive: await _loadLatestArchive(archiveDir),
+    );
+  }
+
+  // 转为机器可读摘要，缺失报告时显式为 null。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{'readiness': readiness, 'archive': archive};
+  }
+
+  // 转为 Markdown 现场摘要，便于最终报告直接复盘。
+  String toMarkdown() {
+    final buffer = StringBuffer()
+      ..writeln()
+      ..writeln('## 现场摘要')
+      ..writeln();
+    if (readiness == null && archive == null) {
+      buffer.writeln('- 未读取到 readiness 或 archive 摘要。');
+      return buffer.toString();
+    }
+    if (readiness != null) {
+      final localState = _jsonMapAt(readiness!, 'localState');
+      buffer
+        ..writeln('### 本机状态')
+        ..writeln()
+        ..writeln('| 项目 | 摘要 |')
+        ..writeln('|---|---|');
+      for (final entry in <String, String>{
+        'Appium': 'appium',
+        'iOS 隧道': 'iosTunnel',
+        'iOS 手机': 'iosDevice',
+        'Android 手机': 'androidDevice',
+      }.entries) {
+        buffer.writeln(
+          '| ${entry.key} | ${_localStateLabel(localState[entry.value])} |',
+        );
+      }
+      buffer.writeln();
+    }
+    if (archive != null) {
+      final counts = _jsonMapAt(archive!, 'counts');
+      buffer
+        ..writeln('### 留档数量')
+        ..writeln()
+        ..writeln('| 项目 | 数量 |')
+        ..writeln('|---|---:|')
+        ..writeln('| 截图 | ${counts['screenshots'] ?? 0} |')
+        ..writeln('| iOS 运行 | ${counts['iosRuns'] ?? 0} |')
+        ..writeln('| Android 运行 | ${counts['androidRuns'] ?? 0} |')
+        ..writeln('| Full smoke | ${counts['fullSmokeReports'] ?? 0} |')
+        ..writeln();
+    }
+    return buffer.toString();
+  }
+}
+
+// 读取最新 readiness 报告的关键摘要。
+Future<Map<String, Object?>?> _loadLatestReadiness(Directory outDir) async {
+  final json = await _loadLatestJson(
+    outDir,
+    RegExp(r'^SMOKE_READINESS_.*\.json$'),
+  );
+  if (json == null) return null;
+  return <String, Object?>{
+    'completion': _redactJsonValue(_jsonMapAt(json, 'completion')),
+    'localState': _redactJsonValue(_jsonMapAt(json, 'localState')),
+    'nextSteps': _redactJsonValue(json['nextSteps']),
+  };
+}
+
+// 读取最新 archive 报告的关键摘要。
+Future<Map<String, Object?>?> _loadLatestArchive(Directory archiveDir) async {
+  final json = await _loadLatestJson(
+    archiveDir,
+    RegExp(r'^SMOKE_ARCHIVE_.*\.json$'),
+  );
+  if (json == null) return null;
+  final summary = _jsonMapAt(json, 'summary');
+  return <String, Object?>{
+    'counts': <String, Object?>{
+      'screenshots': summary['screenshots'] ?? 0,
+      'iosRuns': summary['iosRuns'] ?? 0,
+      'androidRuns': summary['androidRuns'] ?? 0,
+      'fullSmokeReports': summary['fullSmokeReports'] ?? 0,
+    },
+    'latestFullSmoke': _redactJsonValue(summary['latestFullSmoke']),
+    'warnings': _redactJsonValue(json['warnings']),
+  };
+}
+
+// 读取目录下最新匹配 JSON，按文件名时间戳倒序挑选。
+Future<Map<String, Object?>?> _loadLatestJson(
+  Directory dir,
+  RegExp namePattern,
+) async {
+  if (!await dir.exists()) return null;
+  final files = <File>[];
+  await for (final entity in dir.list(followLinks: false)) {
+    if (entity is! File) continue;
+    final name = entity.uri.pathSegments.last;
+    if (namePattern.hasMatch(name)) files.add(entity);
+  }
+  if (files.isEmpty) return null;
+  files.sort(
+    (left, right) =>
+        right.uri.pathSegments.last.compareTo(left.uri.pathSegments.last),
+  );
+  try {
+    final decoded = jsonDecode(await files.first.readAsString());
+    if (decoded is! Map) return null;
+    return Map<String, Object?>.from(decoded);
+  } on Object {
+    return null;
+  }
+}
+
+// 安全读取嵌套 Map。
+Map<String, Object?> _jsonMapAt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is Map<String, Object?>) return value;
+  if (value is Map) return Map<String, Object?>.from(value);
+  return const <String, Object?>{};
+}
+
+// 生成本机状态短摘要，避免 Markdown 报告铺满底层字段。
+String _localStateLabel(Object? value) {
+  if (value is! Map) return '未知';
+  final map = Map<String, Object?>.from(value);
+  final status = map['status']?.toString();
+  final detail = map['detail']?.toString();
+  if ((status == null || status.isEmpty) &&
+      (detail == null || detail.isEmpty)) {
+    return '未知';
+  }
+  if (detail == null || detail.isEmpty) return status ?? '未知';
+  if (status == null || status.isEmpty) return detail;
+  return '$status，$detail';
 }
 
 // 从失败文本中提炼下一步命令，保证最终报告能直接指导现场补验。

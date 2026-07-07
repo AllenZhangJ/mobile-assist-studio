@@ -457,6 +457,7 @@ final class _SmokeReadinessReport {
       ..writeln()
       ..writeln('- 时间：${timestamp.toIso8601String()}')
       ..writeln('- 提交：$git')
+      ..writeln('- 完成判定：${_completionLabel()}')
       ..writeln('- iOS 完整冒烟：${iosFullSmokeReady ? '可运行' : '未就绪'}')
       ..writeln('- Android 完整冒烟：${androidFullSmokeReady ? '可运行' : '未就绪'}')
       ..writeln()
@@ -472,6 +473,20 @@ final class _SmokeReadinessReport {
       ..writeln(
         '| Android 手机 | ${android.available ? '可用' : '未就绪'} | ${_androidDetail()} |',
       )
+      ..writeln()
+      ..writeln('## 批次验收索引')
+      ..writeln()
+      ..writeln('来源：`docs/V4.0-Development-Roadmap.md`。')
+      ..writeln()
+      ..writeln('| 批次 | 当前判定 | 主要证据 |')
+      ..writeln('|---|---|---|');
+    for (final row in _batchAcceptanceRows(
+      iosReady: iosFullSmokeReady,
+      androidReady: androidFullSmokeReady,
+    )) {
+      buffer.writeln('| ${row.name} | ${row.status} | ${row.evidence} |');
+    }
+    buffer
       ..writeln()
       ..writeln('## 本地证据')
       ..writeln()
@@ -516,6 +531,82 @@ final class _SmokeReadinessReport {
     if (android.detail != null) return android.detail!;
     return '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}';
   }
+
+  String _completionLabel() {
+    if (iosFullSmokeReady && androidFullSmokeReady) {
+      return '待执行完整 smoke';
+    }
+    return '未完成，等待现场 smoke 条件';
+  }
+}
+
+// 生成 Batch 0-8 的验收索引。
+// 表格只引用自动证据和现场条件，不替代 Roadmap 真源。
+List<_BatchAcceptanceRow> _batchAcceptanceRows({
+  required bool iosReady,
+  required bool androidReady,
+}) {
+  final smokeStatus = iosReady && androidReady ? '待完整 smoke' : '现场未就绪';
+  return <_BatchAcceptanceRow>[
+    const _BatchAcceptanceRow(
+      name: 'Batch 0 真源治理',
+      status: '已落地',
+      evidence: 'V4 文档、ADR、THIRD_PARTY_NOTICES、边界检查',
+    ),
+    const _BatchAcceptanceRow(
+      name: 'Batch 1 Runtime 基座',
+      status: '已落地',
+      evidence: 'V4 边界检查、Runtime contracts、fake driver tests',
+    ),
+    _BatchAcceptanceRow(
+      name: 'Batch 2 双平台 smoke',
+      status: smokeStatus,
+      evidence: 'iOS / Android smoke 命令、fake adapter、当前现场状态见上表',
+    ),
+    const _BatchAcceptanceRow(
+      name: 'Batch 3 Inspector',
+      status: '已落地',
+      evidence: 'Runtime Inspector tests、Device Inspector widget tests',
+    ),
+    const _BatchAcceptanceRow(
+      name: 'Batch 4 Target / Recorder',
+      status: '已落地',
+      evidence: 'Target library、targetRef、Recorder promote tests',
+    ),
+    const _BatchAcceptanceRow(
+      name: 'Batch 5 Vision Core',
+      status: '已落地',
+      evidence: 'Vision provider、低置信暂停、fixture / Python sidecar tests',
+    ),
+    const _BatchAcceptanceRow(
+      name: 'Batch 6 Workflow Canvas',
+      status: '已落地',
+      evidence: 'Canvas / Source / Validate / Inspector widget tests',
+    ),
+    const _BatchAcceptanceRow(
+      name: 'Batch 7 Evidence / Report',
+      status: '已落地',
+      evidence: 'RunLocalReport、导出脱敏、Monitor detail tests',
+    ),
+    const _BatchAcceptanceRow(
+      name: 'Batch 8 AI / MCP Core',
+      status: '已落地',
+      evidence: 'AI permission gate、draft-only、audit log runtime tests',
+    ),
+  ];
+}
+
+// 批次验收索引行。
+final class _BatchAcceptanceRow {
+  const _BatchAcceptanceRow({
+    required this.name,
+    required this.status,
+    required this.evidence,
+  });
+
+  final String name;
+  final String status;
+  final String evidence;
 }
 
 const _usage = '''

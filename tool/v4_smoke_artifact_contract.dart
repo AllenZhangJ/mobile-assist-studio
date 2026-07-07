@@ -80,6 +80,50 @@ Future<void> main() async {
           finalAcceptance.stderr.contains('先补齐单平台 smoke'),
       'acceptance final 必须提示最终验收缺口、现场补验清单和可执行门禁命令。',
     );
+    final currentGit = await _currentGitRevision();
+    final completeDir = Directory('${tempDir.path}/complete-current');
+    await _seedCompleteSmokeFixture(
+      completeDir,
+      fullSmokeGit: currentGit,
+      platformGit: currentGit,
+    );
+    final completeReadiness = await _runReadiness(
+      completeDir,
+      requireComplete: true,
+    );
+    _expect(
+      completeReadiness.exitCode == 0,
+      '当前提交完整 fixture 的 readiness final 应返回 0，实际 ${completeReadiness.exitCode}。',
+    );
+    final completeArtifacts = await _loadGeneratedArtifacts(completeDir);
+    _assertCompleteReadinessJson(completeArtifacts.json);
+    _assertNoSensitiveText(completeArtifacts.allText);
+    final completeArchiveFinal = await _runArchiveFinal(completeDir);
+    _expect(
+      completeArchiveFinal.exitCode == 0,
+      '当前提交完整 fixture 的 archive final 应返回 0，实际 ${completeArchiveFinal.exitCode}。',
+    );
+
+    final mismatchDir = Directory('${tempDir.path}/complete-old-full-smoke');
+    await _seedCompleteSmokeFixture(
+      mismatchDir,
+      fullSmokeGit: _differentGit(currentGit),
+      platformGit: currentGit,
+    );
+    final mismatchReadiness = await _runReadiness(
+      mismatchDir,
+      requireComplete: true,
+    );
+    _expect(
+      mismatchReadiness.exitCode == 2,
+      '旧提交 full smoke 的 readiness final 必须返回 2，实际 ${mismatchReadiness.exitCode}。',
+    );
+    final mismatchArchiveFinal = await _runArchiveFinal(mismatchDir);
+    _expect(
+      mismatchArchiveFinal.exitCode == 2 &&
+          mismatchArchiveFinal.stderr.contains('不属于当前提交'),
+      '旧提交 full smoke 的 archive final 必须提示不属于当前提交。',
+    );
     stdout.writeln('V4 smoke artifact contract passed');
   } finally {
     await tempDir.delete(recursive: true);
@@ -324,6 +368,97 @@ Future<void> _seedArchiveFixture(Directory outDir) async {
   ).writeAsBytes(<int>[0x89, 0x50, 0x4E, 0x47]);
 }
 
+// 写入当前提交完整 smoke fixture，验证严格门禁存在可通过路径。
+Future<void> _seedCompleteSmokeFixture(
+  Directory outDir, {
+  required String fullSmokeGit,
+  required String platformGit,
+}) async {
+  await outDir.create(recursive: true);
+  final timestamp = DateTime.utc(2026, 1, 2);
+  const encoder = JsonEncoder.withIndent('  ');
+  final base = '${outDir.path}/FULL_SMOKE_2026-01-02T00-00-00-000000Z';
+  final payload = <String, Object?>{
+    'schemaVersion': 1,
+    'kind': 'v4FullSmoke',
+    'timestamp': timestamp.toIso8601String(),
+    'git': fullSmokeGit,
+    'completion': <String, Object?>{
+      'complete': true,
+      'label': '完整通过',
+      'failedSteps': <String>[],
+    },
+    'preparation': <String, Object?>{
+      'skipped': false,
+      'status': '通过',
+      'hasBlockers': false,
+      'blockers': <String>[],
+      'items': <Map<String, Object?>>[],
+    },
+    'preflight': <String, Object?>{
+      'skipped': false,
+      'status': '通过',
+      'hasBlockers': false,
+      'blockers': <String>[],
+      'items': <Map<String, Object?>>[],
+    },
+    'steps': <Map<String, Object?>>[
+      <String, Object?>{
+        'step': <String, Object?>{'name': 'iOS smoke'},
+        'status': '通过',
+      },
+      <String, Object?>{
+        'step': <String, Object?>{'name': 'Android smoke'},
+        'status': '通过',
+      },
+    ],
+  };
+  await File('$base.json').writeAsString('${encoder.convert(payload)}\n');
+  await File('$base.md').writeAsString('# V4 Full Smoke\n\n- 完成：完整通过\n');
+  await File(
+    '${outDir.path}/studio-ui-fixture.png',
+  ).writeAsBytes(<int>[0x89, 0x50, 0x4E, 0x47]);
+  await _seedCompletePlatformRun(
+    Directory('${outDir.path}/ios/run-2026-01-02T00-00-00-000000Z'),
+    git: platformGit,
+    timestamp: timestamp,
+  );
+  await _seedCompletePlatformRun(
+    Directory('${outDir.path}/android/run-2026-01-02T00-00-00-000000Z'),
+    git: platformGit,
+    timestamp: timestamp,
+  );
+}
+
+// 写入单个平台完整 smoke run，覆盖截图、动作、workflow 和日志事件。
+Future<void> _seedCompletePlatformRun(
+  Directory runDir, {
+  required String git,
+  required DateTime timestamp,
+}) async {
+  await runDir.create(recursive: true);
+  const encoder = JsonEncoder.withIndent('  ');
+  await File('${runDir.path}/metadata.json').writeAsString(
+    '${encoder.convert(<String, Object?>{'workflowName': 'V4 Smoke', 'startedAt': timestamp.toIso8601String(), 'git': git})}\n',
+  );
+  await File('${runDir.path}/finished.json').writeAsString(
+    '${encoder.convert(<String, Object?>{'status': 'success', 'finishedAt': timestamp.toIso8601String(), 'git': git})}\n',
+  );
+  final events = <Map<String, Object?>>[
+    <String, Object?>{'type': 'smokeStart', 'actionsAllowed': true, 'git': git},
+    <String, Object?>{'type': 'smokeScreenshot'},
+    <String, Object?>{'type': 'smokeWorkflowStart'},
+    <String, Object?>{'type': 'smokeAction', 'action': 'tap'},
+    <String, Object?>{'type': 'smokeAction', 'action': 'swipe'},
+    <String, Object?>{'type': 'smokeAction', 'action': 'input'},
+    <String, Object?>{'type': 'smokeWorkflowStep', 'action': 'tap'},
+    <String, Object?>{'type': 'smokeLogs'},
+  ];
+  await File(
+    '${runDir.path}/events.jsonl',
+  ).writeAsString('${events.map(jsonEncode).join('\n')}\n');
+}
+
 // 当前短提交号用于 fixture 绑定 smoke 留档版本；失败时使用 unknown。
 Future<String> _currentGitRevision() async {
   try {
@@ -340,14 +475,25 @@ Future<String> _currentGitRevision() async {
   }
 }
 
+// 生成一个确定不同于当前提交的短 hash，用于验证旧证据不能通过门禁。
+String _differentGit(String currentGit) {
+  const first = 'deadbee';
+  if (currentGit.toLowerCase() != first) return first;
+  return 'badcafe';
+}
+
 // 调用现有 readiness 工具端到端生成报告，保持合同覆盖真实 CLI 输出。
-Future<_ProcessResult> _runReadiness(Directory outDir) async {
+Future<_ProcessResult> _runReadiness(
+  Directory outDir, {
+  bool requireComplete = false,
+}) async {
   return _runDartTool(<String>[
     'tool/v4_smoke_readiness.dart',
     '--out-dir',
     outDir.path,
     '--timeout',
     '1',
+    if (requireComplete) '--require-complete',
   ]);
 }
 
@@ -644,6 +790,42 @@ void _assertReadinessJson(Map<String, Object?> json) {
 
   final nextSteps = _listAt(json, 'nextSteps');
   _expect(nextSteps.isNotEmpty, 'nextSteps 必须给出下一步。');
+}
+
+// 断言完整 fixture 的 readiness 严格门禁能成功闭环。
+void _assertCompleteReadinessJson(Map<String, Object?> json) {
+  final git = json['git']?.toString();
+  _expect(git != null && git.isNotEmpty, '完整 readiness 必须保留当前提交号。');
+  final completion = _mapAt(json, 'completion');
+  _expect(completion['complete'] == true, '完整 fixture 必须通过 completion。');
+  _expect(
+    completion['latestIosFullPassed'] == true &&
+        completion['latestAndroidFullPassed'] == true &&
+        completion['latestFullSmokeComplete'] == true,
+    '完整 fixture 必须同时满足 iOS、Android 和 full smoke 完整通过。',
+  );
+  _expect(
+    completion['latestIosMatchesCurrentGit'] == true &&
+        completion['latestAndroidMatchesCurrentGit'] == true &&
+        completion['latestFullSmokeMatchesCurrentGit'] == true,
+    '完整 fixture 必须全部属于当前提交。',
+  );
+  final artifacts = _mapAt(json, 'artifacts');
+  _expect(
+    _mapAt(artifacts, 'latestIos')['git'] == git &&
+        _mapAt(artifacts, 'latestAndroid')['git'] == git &&
+        _mapAt(artifacts, 'latestFullSmoke')['git'] == git,
+    '完整 fixture 的三类 smoke 证据必须绑定同一当前提交。',
+  );
+  final batches = _listAt(json, 'batches').map(_mapFrom).toList();
+  _expect(
+    batches.any(
+      (batch) =>
+          batch['name'] == 'Batch 2 双平台 smoke' &&
+          batch['status'] == '已完成完整 smoke 留档',
+    ),
+    'Batch 2 必须在当前提交完整 smoke 后显示完成。',
+  );
 }
 
 // 断言 Markdown 留档包含人类复盘需要的 full smoke 索引区。

@@ -1089,6 +1089,9 @@ final class _SmokeReadinessReport {
   bool get _latestAndroidFullPassed =>
       artifacts.latestAndroid?.fullPassed ?? false;
 
+  bool get _latestFullSmokeComplete =>
+      artifacts.latestFullSmoke?.complete ?? false;
+
   bool get _latestIosMatchesCurrentGit =>
       _matchesCurrentGit(artifacts.latestIos?.gitRevision);
 
@@ -1105,8 +1108,10 @@ final class _SmokeReadinessReport {
   bool get isComplete =>
       _latestIosFullPassed &&
       _latestAndroidFullPassed &&
+      _latestFullSmokeComplete &&
       _latestIosMatchesCurrentGit &&
-      _latestAndroidMatchesCurrentGit;
+      _latestAndroidMatchesCurrentGit &&
+      _latestFullSmokeMatchesCurrentGit;
 
   List<_BatchAcceptanceRow> get _batchRows => _batchAcceptanceRows(
     iosReady: iosFullSmokeReady,
@@ -1114,6 +1119,7 @@ final class _SmokeReadinessReport {
     latestIos: artifacts.latestIos,
     latestAndroid: artifacts.latestAndroid,
     latestFullSmoke: artifacts.latestFullSmoke,
+    currentGit: git,
   );
 
   // 转成机器可读 JSON 字符串，供后续 AI / CI 审计使用。
@@ -1136,6 +1142,7 @@ final class _SmokeReadinessReport {
         'androidFullSmokeReady': androidFullSmokeReady,
         'latestIosFullPassed': _latestIosFullPassed,
         'latestAndroidFullPassed': _latestAndroidFullPassed,
+        'latestFullSmokeComplete': _latestFullSmokeComplete,
         'latestIosMatchesCurrentGit': _latestIosMatchesCurrentGit,
         'latestAndroidMatchesCurrentGit': _latestAndroidMatchesCurrentGit,
         'latestFullSmokeMatchesCurrentGit': _latestFullSmokeMatchesCurrentGit,
@@ -1246,7 +1253,9 @@ final class _SmokeReadinessReport {
     if (isComplete) {
       return '最近双平台完整 smoke 已成功留档';
     }
-    if (_latestIosFullPassed || _latestAndroidFullPassed) {
+    if (_latestIosFullPassed ||
+        _latestAndroidFullPassed ||
+        _latestFullSmokeComplete) {
       return '未完成，等待当前提交 smoke';
     }
     if (iosFullSmokeReady && androidFullSmokeReady) {
@@ -1314,16 +1323,23 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
   required _SmokeRunSummary? latestIos,
   required _SmokeRunSummary? latestAndroid,
   required _FullSmokeReportSummary? latestFullSmoke,
+  required String currentGit,
 }) {
   final latestFullPassed =
-      (latestIos?.fullPassed ?? false) && (latestAndroid?.fullPassed ?? false);
+      currentGit != 'unknown' &&
+      (latestIos?.fullPassed ?? false) &&
+      (latestAndroid?.fullPassed ?? false) &&
+      (latestFullSmoke?.complete ?? false) &&
+      latestIos?.gitRevision == currentGit &&
+      latestAndroid?.gitRevision == currentGit &&
+      latestFullSmoke?.gitRevision == currentGit;
   final smokeStatus = latestFullPassed
       ? '已完成完整 smoke 留档'
       : iosReady && androidReady
       ? '待完整 smoke'
       : '现场未就绪';
   final smokeEvidence =
-      'iOS 最近 ${_batchSmokeLabel(latestIos)}，Android 最近 ${_batchSmokeLabel(latestAndroid)}，full smoke 最近 ${_batchFullSmokeLabel(latestFullSmoke)}，当前现场状态见上表';
+      'iOS 最近 ${_batchSmokeLabel(latestIos, currentGit)}，Android 最近 ${_batchSmokeLabel(latestAndroid, currentGit)}，full smoke 最近 ${_batchFullSmokeLabel(latestFullSmoke, currentGit)}，当前现场状态见上表';
   return <_BatchAcceptanceRow>[
     const _BatchAcceptanceRow(
       name: 'Batch 0 真源治理',
@@ -1374,8 +1390,12 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
 }
 
 // 批次表里使用的最近 smoke 短状态。
-String _batchSmokeLabel(_SmokeRunSummary? summary) {
+String _batchSmokeLabel(_SmokeRunSummary? summary, String currentGit) {
   if (summary == null) return '无记录';
+  if (summary.fullPassed &&
+      (currentGit == 'unknown' || summary.gitRevision != currentGit)) {
+    return '提交不匹配';
+  }
   if (summary.fullPassed) return '完整通过';
   if (summary.passed) return '通过但未完整';
   if (summary.status == 'failed') return '失败';
@@ -1383,8 +1403,15 @@ String _batchSmokeLabel(_SmokeRunSummary? summary) {
 }
 
 // 批次表里使用的最近 full smoke 短状态。
-String _batchFullSmokeLabel(_FullSmokeReportSummary? summary) {
+String _batchFullSmokeLabel(
+  _FullSmokeReportSummary? summary,
+  String currentGit,
+) {
   if (summary == null) return '无记录';
+  if (summary.complete &&
+      (currentGit == 'unknown' || summary.gitRevision != currentGit)) {
+    return '提交不匹配';
+  }
   if (summary.complete) return '完整通过';
   if (summary.blockers.isNotEmpty) return '阻断 ${summary.blockers.join('/')}';
   if (summary.failedSteps.isNotEmpty)

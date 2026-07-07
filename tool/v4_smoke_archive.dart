@@ -25,7 +25,11 @@ Future<void> main(List<String> args) async {
     ..writeln('Smoke archive report: ${_redactText(markdownFile.path)}')
     ..writeln('Smoke archive json: ${_redactText(jsonFile.path)}');
 
-  final failures = _finalGateFailures(options, archive.summary);
+  final failures = _finalGateFailures(
+    options,
+    archive.summary,
+    currentGit: archive.git,
+  );
   if (failures.isNotEmpty) {
     stderr.writeln('V4 smoke archive failed:');
     for (final failure in failures) {
@@ -38,8 +42,9 @@ Future<void> main(List<String> args) async {
 // 根据严格参数生成最终验收缺口，避免一次只暴露一个问题。
 List<String> _finalGateFailures(
   _ArchiveOptions options,
-  _ArchiveSummary summary,
-) {
+  _ArchiveSummary summary, {
+  required String currentGit,
+}) {
   return <String>[
     if (options.requireScreenshot && summary.screenshots == 0) '未发现截图留档。',
     if (options.requirePlatformRuns && summary.iosRuns == 0)
@@ -48,6 +53,10 @@ List<String> _finalGateFailures(
       '未发现 Android 平台 smoke run。',
     if (options.requireComplete && !summary.latestFullSmokeComplete)
       '最近 full smoke 尚未完整通过。',
+    if (options.requireComplete &&
+        summary.latestFullSmokeComplete &&
+        !summary.latestFullSmokeMatchesGit(currentGit))
+      '最近 full smoke 不属于当前提交。',
   ];
 }
 
@@ -531,6 +540,12 @@ final class _ArchiveSummary {
 
   bool get latestFullSmokeComplete => latestFullSmoke?.complete ?? false;
 
+  // 完整 full smoke 必须和当前 archive 提交一致，避免误用旧留档。
+  bool latestFullSmokeMatchesGit(String git) {
+    final smokeGit = latestFullSmoke?.git;
+    return git != 'unknown' && smokeGit != null && smokeGit == git;
+  }
+
   // 从 artifact 列表生成汇总。
   factory _ArchiveSummary.fromArtifacts({
     required List<_ArtifactEntry> artifacts,
@@ -698,8 +713,7 @@ final class _SmokeArchiveReport {
 
   // 完整 full smoke 必须和当前 archive 提交一致，避免误用旧留档。
   bool _latestFullSmokeMatchesGit() {
-    final smokeGit = summary.latestFullSmoke?.git;
-    return git != 'unknown' && smokeGit != null && smokeGit == git;
+    return summary.latestFullSmokeMatchesGit(git);
   }
 }
 
@@ -726,7 +740,7 @@ V4 smoke archive
   --out-dir <path>          smoke 结果目录，默认 recordings/v4-smoke
   --archive-dir <path>      archive 输出目录，默认 <out-dir>/archives
   --timeout <seconds>       git 探测超时，默认 4
-  --require-complete        最近 full smoke 未完整通过时返回非 0
+  --require-complete        最近 full smoke 未完整通过或不属于当前提交时返回非 0
   --require-screenshot      未发现截图时返回非 0
   --require-platform-runs   未发现 iOS 或 Android 平台 run 时返回非 0
   --help                    查看帮助

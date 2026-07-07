@@ -196,11 +196,13 @@ Future<void> _assertFullSmokeDriverProbe() async {
 Future<void> _seedFullSmokeFixture(Directory outDir) async {
   await outDir.create(recursive: true);
   final timestamp = DateTime.utc(2026);
+  final git = await _currentGitRevision();
   final base = '${outDir.path}/FULL_SMOKE_2026-01-01T00-00-00-000000Z';
   final payload = <String, Object?>{
     'schemaVersion': 1,
     'kind': 'v4FullSmoke',
     'timestamp': timestamp.toIso8601String(),
+    'git': git,
     'completion': <String, Object?>{
       'complete': false,
       'label': '前置检查阻断',
@@ -268,7 +270,7 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
     '${encoder.convert(<String, Object?>{'status': 'failed', 'finishedAt': timestamp.toIso8601String()})}\n',
   );
   final iosEvents = <Map<String, Object?>>[
-    <String, Object?>{'type': 'smokeStart', 'actionsAllowed': true},
+    <String, Object?>{'type': 'smokeStart', 'actionsAllowed': true, 'git': git},
     <String, Object?>{'type': 'smokeWorkflowStart'},
     <String, Object?>{'type': 'smokeAction', 'action': 'tap'},
     <String, Object?>{'type': 'smokeFailure', 'message': 'WDA 会话失败'},
@@ -282,6 +284,7 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
     'schemaVersion': 1,
     'kind': 'v4AndroidSmokePreflight',
     'timestamp': timestamp.toIso8601String(),
+    'git': git,
     'completion': <String, Object?>{
       'ready': false,
       'label': '有阻断',
@@ -319,6 +322,22 @@ Future<void> _seedArchiveFixture(Directory outDir) async {
   await File(
     '${outDir.path}/studio-ui-fixture.png',
   ).writeAsBytes(<int>[0x89, 0x50, 0x4E, 0x47]);
+}
+
+// 当前短提交号用于 fixture 绑定 smoke 留档版本；失败时使用 unknown。
+Future<String> _currentGitRevision() async {
+  try {
+    final result = await Process.run('git', const [
+      'rev-parse',
+      '--short',
+      'HEAD',
+    ]).timeout(const Duration(seconds: 4));
+    if (result.exitCode != 0) return 'unknown';
+    final value = '${result.stdout}'.trim();
+    return value.isEmpty ? 'unknown' : value;
+  } on Object {
+    return 'unknown';
+  }
 }
 
 // 调用现有 readiness 工具端到端生成报告，保持合同覆盖真实 CLI 输出。
@@ -590,6 +609,7 @@ void _assertReadinessJson(Map<String, Object?> json) {
     'latestAndroidPreflight.blockers 必须包含驱动。',
   );
   final latestFullSmoke = _mapAt(artifacts, 'latestFullSmoke');
+  _expect(latestFullSmoke['git'] is String, 'latestFullSmoke 必须保留提交号。');
   _expect(
     latestFullSmoke['label'] == '前置检查阻断',
     'latestFullSmoke.label 必须保留阻断状态。',
@@ -612,6 +632,7 @@ void _assertReadinessJson(Map<String, Object?> json) {
     'latestFullSmoke.blockers 必须包含 Android 手机。',
   );
   final latestIos = _mapAt(artifacts, 'latestIos');
+  _expect(latestIos['git'] is String, 'latestIos 必须保留提交号。');
   _expect(
     latestIos['status'] == 'failed' && latestIos['fullPassed'] == false,
     'latestIos 必须保留最近失败且未完整通过的状态。',
@@ -652,6 +673,7 @@ void _assertArchiveJson(Map<String, Object?> json) {
   _expect(summary['androidRuns'] == 0, 'fixture 下 Android run 必须为 0。');
 
   final latestFullSmoke = _mapAt(summary, 'latestFullSmoke');
+  _expect(latestFullSmoke['git'] is String, 'archive latestFullSmoke 必须保留提交号。');
   _expect(
     latestFullSmoke['label'] == '前置检查阻断',
     'archive latestFullSmoke.label 必须保留阻断状态。',
@@ -832,6 +854,10 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   _expect(
     _mapAt(readinessArtifacts, 'latestIos')['fullPassed'] == false,
     'acceptance evidence 必须嵌入最近 iOS 未完整通过状态。',
+  );
+  _expect(
+    _mapAt(readinessArtifacts, 'latestIos')['git'] is String,
+    'acceptance evidence 必须嵌入最近 iOS 提交号。',
   );
   final archive = _mapAt(evidence, 'archive');
   final counts = _mapAt(archive, 'counts');

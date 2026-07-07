@@ -20,6 +20,7 @@ Future<void> main(List<String> args) async {
   }
 
   final timestamp = DateTime.now().toUtc();
+  final git = await _currentGitCommit(options.preflightTimeout);
   final steps = _buildSteps(options);
   if (options.dryRun) {
     _printDryRun(steps, options);
@@ -42,12 +43,14 @@ Future<void> main(List<String> args) async {
       await _tryWriteAndroidPreflightFromFullSmoke(
         options: options,
         timestamp: timestamp,
+        git: git,
         preparation: preparation,
         preflight: preflight,
       );
       final report = await _writeFullSmokeReport(
         outDir: options.outDir,
         timestamp: timestamp,
+        git: git,
         preparation: preparation,
         preflight: preflight,
         results: const <_FullSmokeResult>[],
@@ -70,6 +73,7 @@ Future<void> main(List<String> args) async {
       final report = await _writeFullSmokeReport(
         outDir: options.outDir,
         timestamp: timestamp,
+        git: git,
         preparation: preparation,
         preflight: preflight,
         results: results,
@@ -610,6 +614,7 @@ Future<_FullSmokePreflight> _runPreflight(_FullSmokeOptions options) async {
 Future<void> _tryWriteAndroidPreflightFromFullSmoke({
   required _FullSmokeOptions options,
   required DateTime timestamp,
+  required String git,
   required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
 }) async {
@@ -618,6 +623,7 @@ Future<void> _tryWriteAndroidPreflightFromFullSmoke({
     await _writeAndroidPreflightFromFullSmoke(
       outDir: Directory('${options.outDir.path}/android'),
       timestamp: timestamp,
+      git: git,
       preparation: preparation,
       preflight: preflight,
     );
@@ -630,6 +636,7 @@ Future<void> _tryWriteAndroidPreflightFromFullSmoke({
 Future<void> _writeAndroidPreflightFromFullSmoke({
   required Directory outDir,
   required DateTime timestamp,
+  required String git,
   required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
 }) async {
@@ -648,6 +655,7 @@ Future<void> _writeAndroidPreflightFromFullSmoke({
     'schemaVersion': 1,
     'kind': 'v4AndroidSmokePreflight',
     'timestamp': timestamp.toIso8601String(),
+    'git': git,
     'source': 'full-smoke',
     'completion': <String, Object?>{
       'ready': ready,
@@ -928,6 +936,18 @@ Future<_ProcessProbe> _runShortProcess(
   }
 }
 
+// 当前 git commit 只保留短 hash，用于绑定 full smoke 留档和当前代码。
+Future<String> _currentGitCommit(Duration timeout) async {
+  final result = await _runShortProcess('git', const [
+    'rev-parse',
+    '--short',
+    'HEAD',
+  ], timeout: timeout);
+  if (result.exitCode != 0) return 'unknown';
+  final value = result.stdout.trim();
+  return value.isEmpty ? 'unknown' : value;
+}
+
 // 从 appium driver list --installed 输出中提取 driver 名称。
 Set<String> _installedAppiumDriverNames(String output) {
   final names = <String>{};
@@ -1069,6 +1089,7 @@ void _printDryRun(List<_FullSmokeStep> steps, _FullSmokeOptions options) {
 Future<_FullSmokeReportFiles> _writeFullSmokeReport({
   required Directory outDir,
   required DateTime timestamp,
+  required String git,
   required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
@@ -1079,6 +1100,7 @@ Future<_FullSmokeReportFiles> _writeFullSmokeReport({
   await markdownFile.writeAsString(
     _summaryMarkdown(
       timestamp: timestamp,
+      git: git,
       preparation: preparation,
       preflight: preflight,
       results: results,
@@ -1088,6 +1110,7 @@ Future<_FullSmokeReportFiles> _writeFullSmokeReport({
   await jsonFile.writeAsString(
     _summaryJsonString(
       timestamp: timestamp,
+      git: git,
       preparation: preparation,
       preflight: preflight,
       results: results,
@@ -1100,6 +1123,7 @@ Future<_FullSmokeReportFiles> _writeFullSmokeReport({
 // 生成本地 Markdown 汇总，保留失败原因但脱敏路径、设备号和 session。
 String _summaryMarkdown({
   required DateTime timestamp,
+  required String git,
   required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
@@ -1108,6 +1132,7 @@ String _summaryMarkdown({
     ..writeln('# V4 Full Smoke')
     ..writeln()
     ..writeln('- 时间：${timestamp.toIso8601String()}')
+    ..writeln('- 提交：$git')
     ..writeln('- 动作：真实 Tap / Swipe / Input + 基础 Project DSL workflow')
     ..writeln('- 自动准备：${preparation.statusLabel}')
     ..writeln('- 前置检查：${preflight.statusLabel}')
@@ -1177,6 +1202,7 @@ String _summaryMarkdown({
 // 生成机器可读的 full smoke JSON，输出同样经过脱敏和裁剪。
 String _summaryJsonString({
   required DateTime timestamp,
+  required String git,
   required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
@@ -1191,6 +1217,7 @@ String _summaryJsonString({
     'schemaVersion': 1,
     'kind': 'v4FullSmoke',
     'timestamp': timestamp.toIso8601String(),
+    'git': git,
     'completion': <String, Object?>{
       'complete': complete,
       'label': complete

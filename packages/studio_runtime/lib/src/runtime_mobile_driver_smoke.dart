@@ -11,6 +11,7 @@ final class MobileDriverSmokePlan {
     this.workflow,
     this.useBasicWorkflow = false,
     this.maxWait = const Duration(seconds: 1),
+    this.gitRevision,
   }) : assert(
          workflow == null || !useBasicWorkflow,
          'workflow 和 useBasicWorkflow 不能同时启用。',
@@ -22,6 +23,7 @@ final class MobileDriverSmokePlan {
   final WorkflowDefinition? workflow;
   final bool useBasicWorkflow;
   final Duration maxWait;
+  final String? gitRevision;
 }
 
 // MobileDriverSmokeReport 是一次冒烟运行的脱敏摘要。
@@ -77,6 +79,7 @@ final class MobileDriverSmokeRunner {
       await _record(runId, 'smokeStart', {
         'platform': _driver.platform.name,
         'actionsAllowed': plan.allowActions,
+        if (plan.gitRevision != null) 'git': plan.gitRevision,
       });
       final capabilities = await _driver.capabilityReport();
       await _record(runId, 'smokeCapabilities', _capabilityJson(capabilities));

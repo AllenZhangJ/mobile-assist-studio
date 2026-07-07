@@ -558,6 +558,7 @@ final class _AcceptanceReport {
       failures: finalFailures,
       auditOk: auditOk,
       evidence: evidence,
+      currentGit: gitStatus.revision,
     );
   }
 
@@ -574,7 +575,7 @@ final class _AcceptanceReport {
   List<_AcceptanceGateGap> get gateGaps {
     return <_AcceptanceGateGap>[
       ...gitStatus.gateGaps,
-      ..._gateGapsFromEvidence(evidence),
+      ..._gateGapsFromEvidence(evidence, currentGit: gitStatus.revision),
     ];
   }
 
@@ -1022,8 +1023,9 @@ String _latestFullSmokeLine(Map<String, Object?> summary) {
 
 // 从 archive warnings 和 readiness 最近平台状态生成终验门禁缺口。
 List<_AcceptanceGateGap> _gateGapsFromEvidence(
-  _AcceptanceEvidenceSummary evidence,
-) {
+  _AcceptanceEvidenceSummary evidence, {
+  required String currentGit,
+}) {
   final archive = evidence.archive;
   final readinessArtifacts = _jsonMapAt(
     evidence.readiness ?? const <String, Object?>{},
@@ -1058,13 +1060,14 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
 
   if (readinessArtifacts.isNotEmpty) {
     final latestIos = _jsonMapAt(readinessArtifacts, 'latestIos');
-    if (_platformSmokeNeedsGap(latestIos)) {
+    if (_platformSmokeNeedsGap(latestIos, currentGit: currentGit)) {
       addOrReplace(
         _platformSmokeGateGap(
           title: 'iOS smoke',
           platformLabel: 'iOS',
           latest: latestIos,
           localDevice: _jsonMapAt(localState, 'iosDevice'),
+          currentGit: currentGit,
           command: iosTunnelNeeded
               ? 'npm run v4:ios-smoke:full:password-prompt'
               : 'npm run v4:ios-smoke:full',
@@ -1073,13 +1076,14 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
     }
 
     final latestAndroid = _jsonMapAt(readinessArtifacts, 'latestAndroid');
-    if (_platformSmokeNeedsGap(latestAndroid)) {
+    if (_platformSmokeNeedsGap(latestAndroid, currentGit: currentGit)) {
       addOrReplace(
         _platformSmokeGateGap(
           title: 'Android smoke',
           platformLabel: 'Android',
           latest: latestAndroid,
           localDevice: _jsonMapAt(localState, 'androidDevice'),
+          currentGit: currentGit,
           command: 'npm run v4:android-smoke:full',
         ),
       );
@@ -1089,9 +1093,14 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
   return gaps;
 }
 
-// 判断最近平台 smoke 是否缺失或未完整通过。
-bool _platformSmokeNeedsGap(Map<String, Object?> latest) {
-  return latest.isEmpty || latest['fullPassed'] != true;
+// 判断最近平台 smoke 是否缺失、未完整通过或不属于当前提交。
+bool _platformSmokeNeedsGap(
+  Map<String, Object?> latest, {
+  required String currentGit,
+}) {
+  return latest.isEmpty ||
+      latest['fullPassed'] != true ||
+      !_reportMatchesGit(latest, currentGit);
 }
 
 // 将最近平台 smoke 状态转成终验门禁项。
@@ -1100,21 +1109,40 @@ _AcceptanceGateGap _platformSmokeGateGap({
   required String platformLabel,
   required Map<String, Object?> latest,
   required Map<String, Object?> localDevice,
+  required String currentGit,
   required String command,
 }) {
   final currentParts = <String>[
     if (localDevice.isNotEmpty)
       '$platformLabel 当前状态：${_localStateLabel(localDevice)}',
-    latest.isEmpty
-        ? '未发现 $platformLabel 平台 smoke run。'
-        : '$platformLabel 最近未完整通过：${_plainText(latest['summary']?.toString() ?? latest['status']?.toString() ?? '无摘要')}',
+    _platformSmokeIssueText(platformLabel, latest, currentGit: currentGit),
   ];
   return _AcceptanceGateGap(
     title: title,
     current: currentParts.join('；'),
-    required: '$platformLabel 真机 smoke run 完整通过',
+    required: '$platformLabel 当前提交真机 smoke run 完整通过',
     command: command,
   );
+}
+
+// 生成人类可读的平台 smoke 当前问题。
+String _platformSmokeIssueText(
+  String platformLabel,
+  Map<String, Object?> latest, {
+  required String currentGit,
+}) {
+  if (latest.isEmpty) return '未发现 $platformLabel 平台 smoke run。';
+  if (latest['fullPassed'] != true) {
+    return '$platformLabel 最近未完整通过：${_plainText(latest['summary']?.toString() ?? latest['status']?.toString() ?? '无摘要')}';
+  }
+  final git = _plainText(latest['git']?.toString() ?? '未知');
+  return '$platformLabel 最近 smoke 属于提交 $git，当前提交 $currentGit。';
+}
+
+// 平台或 full smoke 报告必须带当前短提交号。
+bool _reportMatchesGit(Map<String, Object?> latest, String currentGit) {
+  final git = latest['git']?.toString().trim();
+  return currentGit != 'unknown' && git != null && git == currentGit;
 }
 
 // 将 archive 提醒映射成用户能执行的门禁项。
@@ -1310,6 +1338,7 @@ List<String> _nextStepsForFailures({
   required List<String> failures,
   required bool auditOk,
   required _AcceptanceEvidenceSummary evidence,
+  required String currentGit,
 }) {
   final joined = failures.join('\n');
   final steps = <String>[];
@@ -1328,11 +1357,17 @@ List<String> _nextStepsForFailures({
   final needsIosSmoke =
       joined.contains('iOS 平台') ||
       (counts.isNotEmpty && (counts['iosRuns'] ?? 0) == 0) ||
-      _reportIsNotFullPassed(readinessArtifacts['latestIos']);
+      _reportIsNotCurrentFullPassed(
+        readinessArtifacts['latestIos'],
+        currentGit: currentGit,
+      );
   final needsAndroidSmoke =
       joined.contains('Android 平台') ||
       (counts.isNotEmpty && (counts['androidRuns'] ?? 0) == 0) ||
-      _reportIsNotFullPassed(readinessArtifacts['latestAndroid']);
+      _reportIsNotCurrentFullPassed(
+        readinessArtifacts['latestAndroid'],
+        currentGit: currentGit,
+      );
   final needsFullSmoke =
       joined.contains('full smoke') ||
       joined.contains('双平台完整 smoke') ||
@@ -1546,13 +1581,19 @@ final class _ChecklistLocalState {
   final String label;
 }
 
-// 判断单平台 smoke 摘要是否存在但尚未完整通过。
-bool _reportIsNotFullPassed(Object? value) {
+// 判断单平台 smoke 摘要是否不是当前提交的完整通过。
+bool _reportIsNotCurrentFullPassed(
+  Object? value, {
+  required String currentGit,
+}) {
   if (value == null) return false;
-  if (value is Map<String, Object?>) return value['fullPassed'] != true;
-  if (value is Map)
-    return Map<String, Object?>.from(value)['fullPassed'] != true;
-  return false;
+  final map = value is Map<String, Object?>
+      ? value
+      : value is Map
+      ? Map<String, Object?>.from(value)
+      : null;
+  if (map == null) return false;
+  return map['fullPassed'] != true || !_reportMatchesGit(map, currentGit);
 }
 
 const _usage = '''

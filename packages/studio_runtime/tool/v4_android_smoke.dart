@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -46,6 +47,7 @@ Future<void> main(List<String> args) async {
       client: client,
     );
     final evidenceStore = LocalRunEvidenceStore(rootDirectory: options.outDir);
+    final gitRevision = await _currentGitCommit();
     final report =
         await MobileDriverSmokeRunner(
           driver: driver,
@@ -56,6 +58,7 @@ Future<void> main(List<String> args) async {
             allowActions: options.allowActions,
             inputText: options.inputText,
             useBasicWorkflow: options.useBasicWorkflow,
+            gitRevision: gitRevision,
           ),
         );
 
@@ -70,6 +73,22 @@ Future<void> main(List<String> args) async {
     _fail('Android 冒烟失败：$error');
   } finally {
     client.close(force: true);
+  }
+}
+
+// 读取当前短提交号，用于把 Android smoke 证据绑定到代码版本。
+Future<String?> _currentGitCommit() async {
+  try {
+    final result = await Process.run('git', const [
+      'rev-parse',
+      '--short',
+      'HEAD',
+    ]).timeout(const Duration(seconds: 4));
+    if (result.exitCode != 0) return null;
+    final value = '${result.stdout}'.trim();
+    return value.isEmpty ? null : value;
+  } on Object {
+    return null;
   }
 }
 

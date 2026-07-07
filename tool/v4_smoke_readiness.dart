@@ -312,6 +312,7 @@ Future<_SmokeRunSummary> _readSmokeRunSummary(Directory dir) async {
     workflowName: _redactText(
       metadata?['workflowName']?.toString() ?? 'V4 Smoke',
     ),
+    gitRevision: _smokeRunGitRevision(metadata, finished, events),
     status: finished?['status']?.toString() ?? 'running',
     startedAt: _parseDate(metadata?['startedAt']),
     finishedAt: _parseDate(finished?['finishedAt']),
@@ -323,6 +324,40 @@ Future<_SmokeRunSummary> _readSmokeRunSummary(Directory dir) async {
     logsCollected: eventTypes.contains('smokeLogs'),
     failureSummary: failure == null ? null : _shortText(_redactText(failure)),
   );
+}
+
+// 从 metadata / finished / smokeStart 事件中提取短提交号，兼容旧 run 缺字段。
+String? _smokeRunGitRevision(
+  Map<String, Object?>? metadata,
+  Map<String, Object?>? finished,
+  List<Map<String, Object?>> events,
+) {
+  return _shortGitRevision(
+    metadata?['git'] ??
+        finished?['git'] ??
+        _firstEventField(events, 'smokeStart', 'git'),
+  );
+}
+
+// 读取第一条指定类型事件的字段。
+Object? _firstEventField(
+  List<Map<String, Object?>> events,
+  String type,
+  String field,
+) {
+  for (final event in events) {
+    if (event['type'] == type && event.containsKey(field)) return event[field];
+  }
+  return null;
+}
+
+// 只接受短 hash 或 unknown，避免报告吸入长输出。
+String? _shortGitRevision(Object? value) {
+  final raw = value?.toString().trim();
+  if (raw == null || raw.isEmpty) return null;
+  if (raw == 'unknown') return raw;
+  final match = RegExp(r'^[0-9a-fA-F]{7,12}$').firstMatch(raw);
+  return match == null ? null : raw;
 }
 
 // 从 smoke 事件里提取已执行的关键动作，用于判断是否完整冒烟。
@@ -811,6 +846,7 @@ final class _AndroidSmokePreflightSummary {
 final class _FullSmokeReportSummary {
   const _FullSmokeReportSummary({
     required this.reportName,
+    required this.gitRevision,
     required this.timestamp,
     required this.complete,
     required this.label,
@@ -822,6 +858,7 @@ final class _FullSmokeReportSummary {
   });
 
   final String reportName;
+  final String? gitRevision;
   final DateTime? timestamp;
   final bool complete;
   final String label;
@@ -853,6 +890,7 @@ final class _FullSmokeReportSummary {
     }
     return _FullSmokeReportSummary(
       reportName: reportName,
+      gitRevision: _shortGitRevision(json['git']),
       timestamp: _parseDate(json['timestamp']),
       complete: completion['complete'] == true,
       label: _redactText(completion['label']?.toString() ?? '未知'),
@@ -867,6 +905,7 @@ final class _FullSmokeReportSummary {
   String get summaryLabel {
     final parts = <String>[
       complete ? '完整通过' : label,
+      if (gitRevision case final git?) '提交 $git',
       '前置 $preflightStatus',
       if (blockers.isNotEmpty) '阻断 ${blockers.join('/')}',
       if (failedSteps.isNotEmpty) '失败 ${failedSteps.join('/')}',
@@ -882,6 +921,7 @@ final class _FullSmokeReportSummary {
   Map<String, Object?> toJsonObject() {
     return <String, Object?>{
       'reportName': reportName,
+      'git': gitRevision,
       'timestamp': timestamp?.toUtc().toIso8601String(),
       'complete': complete,
       'label': label,
@@ -900,6 +940,7 @@ final class _SmokeRunSummary {
   const _SmokeRunSummary({
     required this.runName,
     required this.workflowName,
+    required this.gitRevision,
     required this.status,
     required this.startedAt,
     required this.finishedAt,
@@ -914,6 +955,7 @@ final class _SmokeRunSummary {
 
   final String runName;
   final String workflowName;
+  final String? gitRevision;
   final String status;
   final DateTime? startedAt;
   final DateTime? finishedAt;
@@ -961,6 +1003,7 @@ final class _SmokeRunSummary {
           : status == 'failed'
           ? '失败'
           : '运行中',
+      if (gitRevision case final git?) '提交 $git',
       actionsAllowed == true ? '允许动作' : '动作未授权',
       actionSummary,
       workflowExecuted ? '含流程' : '无流程',
@@ -983,6 +1026,7 @@ final class _SmokeRunSummary {
     return <String, Object?>{
       'runName': runName,
       'workflowName': workflowName,
+      'git': gitRevision,
       'status': status,
       'startedAt': startedAt?.toUtc().toIso8601String(),
       'finishedAt': finishedAt?.toUtc().toIso8601String(),
@@ -1045,7 +1089,24 @@ final class _SmokeReadinessReport {
   bool get _latestAndroidFullPassed =>
       artifacts.latestAndroid?.fullPassed ?? false;
 
-  bool get isComplete => _latestIosFullPassed && _latestAndroidFullPassed;
+  bool get _latestIosMatchesCurrentGit =>
+      _matchesCurrentGit(artifacts.latestIos?.gitRevision);
+
+  bool get _latestAndroidMatchesCurrentGit =>
+      _matchesCurrentGit(artifacts.latestAndroid?.gitRevision);
+
+  bool get _latestFullSmokeMatchesCurrentGit =>
+      _matchesCurrentGit(artifacts.latestFullSmoke?.gitRevision);
+
+  bool _matchesCurrentGit(String? revision) {
+    return git != 'unknown' && revision != null && revision == git;
+  }
+
+  bool get isComplete =>
+      _latestIosFullPassed &&
+      _latestAndroidFullPassed &&
+      _latestIosMatchesCurrentGit &&
+      _latestAndroidMatchesCurrentGit;
 
   List<_BatchAcceptanceRow> get _batchRows => _batchAcceptanceRows(
     iosReady: iosFullSmokeReady,
@@ -1075,6 +1136,9 @@ final class _SmokeReadinessReport {
         'androidFullSmokeReady': androidFullSmokeReady,
         'latestIosFullPassed': _latestIosFullPassed,
         'latestAndroidFullPassed': _latestAndroidFullPassed,
+        'latestIosMatchesCurrentGit': _latestIosMatchesCurrentGit,
+        'latestAndroidMatchesCurrentGit': _latestAndroidMatchesCurrentGit,
+        'latestFullSmokeMatchesCurrentGit': _latestFullSmokeMatchesCurrentGit,
       },
       'localState': <String, Object?>{
         'appium': appium.toJsonObject(detail: _appiumDetail()),
@@ -1182,6 +1246,9 @@ final class _SmokeReadinessReport {
     if (isComplete) {
       return '最近双平台完整 smoke 已成功留档';
     }
+    if (_latestIosFullPassed || _latestAndroidFullPassed) {
+      return '未完成，等待当前提交 smoke';
+    }
     if (iosFullSmokeReady && androidFullSmokeReady) {
       return '待执行完整 smoke';
     }
@@ -1190,6 +1257,9 @@ final class _SmokeReadinessReport {
 
   String _latestSmokeLabel(_SmokeRunSummary? summary) {
     if (summary == null) return '无记录';
+    if (summary.fullPassed && !_matchesCurrentGit(summary.gitRevision)) {
+      return '提交不匹配';
+    }
     return summary.fullPassed
         ? '完整通过'
         : summary.passed
@@ -1211,6 +1281,9 @@ final class _SmokeReadinessReport {
 
   String _latestFullSmokeLabel(_FullSmokeReportSummary? summary) {
     if (summary == null) return '无记录';
+    if (summary.complete && !_matchesCurrentGit(summary.gitRevision)) {
+      return '提交不匹配';
+    }
     return summary.complete ? '完整通过' : summary.label;
   }
 

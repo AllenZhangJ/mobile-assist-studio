@@ -187,6 +187,14 @@ String? _runNameFromPath(String relativePath) {
   return null;
 }
 
+// 只接受短 hash 或 unknown，避免 archive 报告吸入长命令输出。
+String? _shortGitRevision(Object? value) {
+  final raw = value?.toString().trim();
+  if (raw == null || raw.isEmpty) return null;
+  if (raw == 'unknown') return raw;
+  return RegExp(r'^[0-9a-fA-F]{7,12}$').hasMatch(raw) ? raw : null;
+}
+
 // 读取最新 JSON 摘要，只读取结构化报告，不读取截图或事件隐私内容。
 Future<_ReportJsonSummary?> _latestJsonSummary({
   required Directory outDir,
@@ -439,6 +447,7 @@ final class _ArtifactEntry {
 final class _ReportJsonSummary {
   const _ReportJsonSummary({
     required this.kind,
+    required this.git,
     required this.timestamp,
     required this.complete,
     required this.label,
@@ -447,6 +456,7 @@ final class _ReportJsonSummary {
   });
 
   final String kind;
+  final String? git;
   final String? timestamp;
   final bool complete;
   final String label;
@@ -461,6 +471,7 @@ final class _ReportJsonSummary {
     final steps = json['steps'];
     return _ReportJsonSummary(
       kind: _redactText(json['kind']?.toString() ?? 'unknown'),
+      git: _shortGitRevision(json['git']),
       timestamp: json['timestamp']?.toString(),
       complete: completion['complete'] == true,
       label: _redactText(completion['label']?.toString() ?? '未知'),
@@ -473,6 +484,7 @@ final class _ReportJsonSummary {
   Map<String, Object?> toJsonObject() {
     return <String, Object?>{
       'kind': kind,
+      'git': git,
       'timestamp': timestamp,
       'complete': complete,
       'label': label,
@@ -484,6 +496,7 @@ final class _ReportJsonSummary {
   String get markdownLabel {
     final parts = <String>[
       complete ? '完整通过' : label,
+      if (git != null) '提交 $git',
       if (blockers.isNotEmpty) '阻断 ${blockers.join('/')}',
       if (stepCount > 0) '步骤 $stepCount',
       if (timestamp != null) '时间 $timestamp',
@@ -678,7 +691,15 @@ final class _SmokeArchiveReport {
       if (summary.iosRuns == 0) '缺少 iOS 平台 smoke run。',
       if (summary.androidRuns == 0) '缺少 Android 平台 smoke run。',
       if (!summary.latestFullSmokeComplete) '最近 full smoke 尚未完整通过。',
+      if (summary.latestFullSmokeComplete && !_latestFullSmokeMatchesGit())
+        '最近 full smoke 不属于当前提交。请重新运行 `npm run v4:smoke:full`。',
     ];
+  }
+
+  // 完整 full smoke 必须和当前 archive 提交一致，避免误用旧留档。
+  bool _latestFullSmokeMatchesGit() {
+    final smokeGit = summary.latestFullSmoke?.git;
+    return git != 'unknown' && smokeGit != null && smokeGit == git;
   }
 }
 

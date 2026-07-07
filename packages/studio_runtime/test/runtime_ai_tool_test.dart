@@ -25,6 +25,37 @@ void main() {
     expect(runConfirmed.status, AiToolDecisionStatus.allowed);
   });
 
+  test('default ai registry tools all have runtime handlers', () async {
+    final controller = StudioRuntimeController(
+      runReportReader: _FakeRunReportReader({'run-1': _failedVisualReport()}),
+    );
+    final statuses = <String, AiToolInvocationStatus>{};
+
+    for (final tool in AiToolRegistry.v4Default.tools) {
+      final result = await controller.invokeAiTool(
+        _requestForDefaultTool(tool.id),
+      );
+      statuses[tool.id] = result.status;
+      expect(
+        result.message,
+        isNot(anyOf(contains('尚未实现'), contains('未接入运行时'))),
+        reason: '${tool.id} 已登记但没有运行时处理分支。',
+      );
+      expect(
+        result.status,
+        isNot(AiToolInvocationStatus.blocked),
+        reason: '${tool.id} 不应落入未知或未实现兜底。',
+      );
+    }
+    await controller.dispose();
+
+    expect(
+      statuses.keys,
+      containsAll(AiToolRegistry.v4Default.tools.map((e) => e.id)),
+    );
+    expect(statuses['runWorkflow'], AiToolInvocationStatus.handoffRequired);
+  });
+
   test('ai screen summary never exposes screenshot base64', () async {
     final actions = FakeDeviceActionExecutor(
       screenshotBase64: 'raw-base64-image',
@@ -226,6 +257,30 @@ void main() {
     expect(result.output.toString(), contains('login_button'));
     expect(controller.snapshot.workflow.id, before.id);
   });
+}
+
+// 为默认工具生成最小安全请求，确保注册表和运行时分支不会漂移。
+AiToolInvocationRequest _requestForDefaultTool(String toolId) {
+  switch (toolId) {
+    case 'explainRunFailure':
+    case 'suggestTemplateFix':
+      return AiToolInvocationRequest(
+        toolId: toolId,
+        arguments: const {'runId': 'run-1'},
+      );
+    case 'proposeWorkflowDraft':
+      return const AiToolInvocationRequest(
+        toolId: 'proposeWorkflowDraft',
+        arguments: {'targetRef': 'login_button'},
+      );
+    case 'runWorkflow':
+      return const AiToolInvocationRequest(
+        toolId: 'runWorkflow',
+        userConfirmed: true,
+      );
+    default:
+      return AiToolInvocationRequest(toolId: toolId);
+  }
 }
 
 // 构造一个带视觉失败和敏感文本的本地报告。

@@ -1,5 +1,16 @@
 part of '../studio_runtime.dart';
 
+// Runtime 已接入的 AI 工具清单，防止注册表和执行分支漂移。
+const _implementedAiToolIds = <String>{
+  'readCurrentScreenSummary',
+  'proposeWorkflowDraft',
+  'explainRunFailure',
+  'suggestTarget',
+  'suggestLocator',
+  'suggestTemplateFix',
+  'runWorkflow',
+};
+
 // StudioRuntimeAiToolCommands 暴露 Batch 8 受控 AI / MCP 工具入口。
 // 它只读 Runtime 状态或生成草稿，不直接点击、不运行、不写 workflow。
 extension StudioRuntimeAiToolCommands on StudioRuntimeController {
@@ -19,8 +30,16 @@ extension StudioRuntimeAiToolCommands on StudioRuntimeController {
         message: decision.message,
       );
     }
+    if (!_implementedAiToolIds.contains(tool!.id)) {
+      return _finishAiTool(
+        request: request,
+        tool: tool,
+        status: AiToolInvocationStatus.blocked,
+        message: '工具未接入运行时，已阻止。',
+      );
+    }
 
-    switch (tool!.id) {
+    switch (tool.id) {
       case 'readCurrentScreenSummary':
         return _finishAiTool(
           request: request,
@@ -73,7 +92,7 @@ extension StudioRuntimeAiToolCommands on StudioRuntimeController {
           request: request,
           tool: tool,
           status: AiToolInvocationStatus.blocked,
-          message: '工具尚未实现。',
+          message: '工具未接入运行时，已阻止。',
         );
     }
   }

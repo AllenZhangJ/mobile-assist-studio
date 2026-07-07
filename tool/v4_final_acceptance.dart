@@ -51,6 +51,12 @@ Future<void> main(List<String> args) async {
     for (final failure in report.finalFailures) {
       stderr.writeln('- $failure');
     }
+    if (report.gateGaps.isNotEmpty) {
+      stderr.writeln('终验门禁缺口：');
+      for (final gap in report.gateGaps) {
+        stderr.writeln('- ${gap.stderrLine}');
+      }
+    }
     exit(2);
   }
 }
@@ -588,6 +594,12 @@ final class _AcceptanceGateGap {
     final value = command;
     if (value == null || value.isEmpty) return '-';
     return '`$value`';
+  }
+
+  String get stderrLine {
+    final value = command;
+    final suffix = value == null || value.isEmpty ? '' : '；建议命令：$value';
+    return '$title：$current；通过标准：$required$suffix';
   }
 
   // 转为 JSON，保持短命令和脱敏短文案。

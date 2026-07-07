@@ -14,11 +14,15 @@ Future<void> main(List<String> args) async {
   final timestamp = DateTime.now().toUtc();
   final report = await _collectReadiness(options, timestamp);
   await options.outDir.create(recursive: true);
-  final file = File(
-    '${options.outDir.path}/SMOKE_READINESS_${_safeTimestamp(timestamp)}.md',
-  );
-  await file.writeAsString(report.toMarkdown(), flush: true);
-  stdout.writeln('Smoke readiness report: ${file.path}');
+  final reportBase =
+      '${options.outDir.path}/SMOKE_READINESS_${_safeTimestamp(timestamp)}';
+  final markdownFile = File('$reportBase.md');
+  final jsonFile = File('$reportBase.json');
+  await markdownFile.writeAsString(report.toMarkdown(), flush: true);
+  await jsonFile.writeAsString(report.toJsonString(), flush: true);
+  stdout
+    ..writeln('Smoke readiness report: ${_redactText(markdownFile.path)}')
+    ..writeln('Smoke readiness json: ${_redactText(jsonFile.path)}');
   if (options.requireComplete && !report.isComplete) {
     stderr.writeln('V4 smoke completion audit failed: 双平台完整 smoke 尚未成功留档。');
     exit(2);
@@ -165,6 +169,10 @@ Future<_ArtifactProbe> _probeArtifacts(Directory outDir) async {
   final iosRuns = await _countRunDirs(iosDir);
   final androidRuns = await _countRunDirs(androidDir);
   final markdownReports = await _countMatchingFiles(outDir, RegExp(r'\.md$'));
+  final jsonReports = await _countMatchingFiles(
+    outDir,
+    RegExp(r'^SMOKE_READINESS_.*\.json$'),
+  );
   final latestIos = await _probeLatestSmokeRun(iosDir);
   final latestAndroid = await _probeLatestSmokeRun(androidDir);
   return _ArtifactProbe(
@@ -172,6 +180,7 @@ Future<_ArtifactProbe> _probeArtifacts(Directory outDir) async {
     iosRuns: iosRuns,
     androidRuns: androidRuns,
     markdownReports: markdownReports,
+    jsonReports: jsonReports,
     latestIos: latestIos,
     latestAndroid: latestAndroid,
   );
@@ -182,7 +191,9 @@ Future<int> _countMatchingFiles(Directory dir, RegExp pattern) async {
   if (!await dir.exists()) return 0;
   var count = 0;
   await for (final entity in dir.list(recursive: false, followLinks: false)) {
-    if (entity is File && pattern.hasMatch(entity.path)) count += 1;
+    if (entity is File && pattern.hasMatch(entity.uri.pathSegments.last)) {
+      count += 1;
+    }
   }
   return count;
 }
@@ -403,6 +414,10 @@ String _shortProcessIssue(_ProcessProbe result) {
 String _redactText(String value) {
   return value
       .replaceAll(RegExp(r'/Users/[^/\s]+'), '<home>')
+      .replaceAll(RegExp(r'/private/tmp/[^\s`)]+'), '<tmp>')
+      .replaceAll(RegExp(r'/tmp/[^\s`)]+'), '<tmp>')
+      .replaceAll(RegExp(r'/var/folders/[^\s`)]+'), '<tmp>')
+      .replaceAll(RegExp(r'/private/var/folders/[^\s`)]+'), '<tmp>')
       .replaceAll(
         RegExp(
           r'[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}',
@@ -515,6 +530,17 @@ final class _HttpProbe {
     if (count != null) return count! > 0 ? '有隧道' : '无隧道';
     return statusCode == null ? '未知' : 'HTTP $statusCode';
   }
+
+  // 转成机器可读状态，不暴露本机 endpoint。
+  Map<String, Object?> toJsonObject({required String detail}) {
+    return <String, Object?>{
+      'reachable': reachable,
+      'status': statusLabel,
+      'detail': detail,
+      'ready': ready,
+      'count': count,
+    };
+  }
 }
 
 // iOS 设备探测结果。
@@ -530,6 +556,17 @@ final class _IosProbe {
   final int connected;
   final int unavailable;
   final String? detail;
+
+  // 转成机器可读状态，不写设备标识。
+  Map<String, Object?> toJsonObject({required String detail}) {
+    return <String, Object?>{
+      'available': available,
+      'status': available ? '可用' : '未就绪',
+      'detail': detail,
+      'connected': connected,
+      'unavailable': unavailable,
+    };
+  }
 }
 
 // Android 设备探测结果。
@@ -547,6 +584,18 @@ final class _AndroidProbe {
   final int unauthorized;
   final int offline;
   final String? detail;
+
+  // 转成机器可读状态，不写 Android serial。
+  Map<String, Object?> toJsonObject({required String detail}) {
+    return <String, Object?>{
+      'available': available,
+      'status': available ? '可用' : '未就绪',
+      'detail': detail,
+      'ready': ready,
+      'unauthorized': unauthorized,
+      'offline': offline,
+    };
+  }
 }
 
 // 本地 smoke 产物统计。
@@ -556,6 +605,7 @@ final class _ArtifactProbe {
     required this.iosRuns,
     required this.androidRuns,
     required this.markdownReports,
+    required this.jsonReports,
     this.latestIos,
     this.latestAndroid,
   });
@@ -564,8 +614,25 @@ final class _ArtifactProbe {
   final int iosRuns;
   final int androidRuns;
   final int markdownReports;
+  final int jsonReports;
   final _SmokeRunSummary? latestIos;
   final _SmokeRunSummary? latestAndroid;
+
+  // 转成机器可读且脱敏的证据计数。
+  Map<String, Object?> toJsonObject({
+    int markdownReportIncrement = 0,
+    int jsonReportIncrement = 0,
+  }) {
+    return <String, Object?>{
+      'uiScreenshots': uiScreenshots,
+      'iosRuns': iosRuns,
+      'androidRuns': androidRuns,
+      'markdownReports': markdownReports + markdownReportIncrement,
+      'jsonReports': jsonReports + jsonReportIncrement,
+      'latestIos': latestIos?.toJsonObject(),
+      'latestAndroid': latestAndroid?.toJsonObject(),
+    };
+  }
 }
 
 // 最近一次平台 smoke 的脱敏摘要。
@@ -650,6 +717,26 @@ final class _SmokeRunSummary {
     }
     return parts.join('，');
   }
+
+  // 转成机器可读摘要，不包含运行目录路径。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'runName': runName,
+      'workflowName': workflowName,
+      'status': status,
+      'startedAt': startedAt?.toUtc().toIso8601String(),
+      'finishedAt': finishedAt?.toUtc().toIso8601String(),
+      'actionsAllowed': actionsAllowed,
+      'hasScreenshot': hasScreenshot,
+      'actionsExecuted': actionsExecuted,
+      'actions': actionNames.toList()..sort(),
+      'workflowExecuted': workflowExecuted,
+      'logsCollected': logsCollected,
+      'fullPassed': fullPassed,
+      'summary': summaryLabel,
+      'failureSummary': failureSummary,
+    };
+  }
 }
 
 // 进程探测结果。
@@ -700,6 +787,49 @@ final class _SmokeReadinessReport {
 
   bool get isComplete => _latestIosFullPassed && _latestAndroidFullPassed;
 
+  List<_BatchAcceptanceRow> get _batchRows => _batchAcceptanceRows(
+    iosReady: iosFullSmokeReady,
+    androidReady: androidFullSmokeReady,
+    latestIos: artifacts.latestIos,
+    latestAndroid: artifacts.latestAndroid,
+  );
+
+  // 转成机器可读 JSON 字符串，供后续 AI / CI 审计使用。
+  String toJsonString() {
+    const encoder = JsonEncoder.withIndent('  ');
+    return '${encoder.convert(toJsonObject())}\n';
+  }
+
+  // 转成脱敏 JSON 对象，不包含本机路径、完整设备号或 endpoint。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'schemaVersion': 1,
+      'kind': 'v4SmokeReadiness',
+      'timestamp': timestamp.toIso8601String(),
+      'git': git,
+      'completion': <String, Object?>{
+        'complete': isComplete,
+        'label': _completionLabel(),
+        'iosFullSmokeReady': iosFullSmokeReady,
+        'androidFullSmokeReady': androidFullSmokeReady,
+        'latestIosFullPassed': _latestIosFullPassed,
+        'latestAndroidFullPassed': _latestAndroidFullPassed,
+      },
+      'localState': <String, Object?>{
+        'appium': appium.toJsonObject(detail: _appiumDetail()),
+        'iosTunnel': tunnel.toJsonObject(detail: _tunnelDetail()),
+        'iosDevice': ios.toJsonObject(detail: _iosDetail()),
+        'androidDevice': android.toJsonObject(detail: _androidDetail()),
+      },
+      'batches': _batchRows.map((row) => row.toJsonObject()).toList(),
+      'artifacts': artifacts.toJsonObject(
+        markdownReportIncrement: 1,
+        jsonReportIncrement: 1,
+      ),
+      'nextSteps': _nextSteps(),
+    };
+  }
+
   // 转成可留档的脱敏 Markdown。
   String toMarkdown() {
     final buffer = StringBuffer()
@@ -734,12 +864,7 @@ final class _SmokeReadinessReport {
       ..writeln()
       ..writeln('| 批次 | 当前判定 | 主要证据 |')
       ..writeln('|---|---|---|');
-    for (final row in _batchAcceptanceRows(
-      iosReady: iosFullSmokeReady,
-      androidReady: androidFullSmokeReady,
-      latestIos: artifacts.latestIos,
-      latestAndroid: artifacts.latestAndroid,
-    )) {
+    for (final row in _batchRows) {
       buffer.writeln('| ${row.name} | ${row.status} | ${row.evidence} |');
     }
     buffer
@@ -752,20 +877,13 @@ final class _SmokeReadinessReport {
       ..writeln('- Android smoke 记录：${artifacts.androidRuns}')
       ..writeln('  - 最近：${_latestSmokeDetail(artifacts.latestAndroid)}')
       ..writeln('- Markdown 报告：${artifacts.markdownReports + 1}')
+      ..writeln('- JSON 摘要：${artifacts.jsonReports + 1}')
       ..writeln()
       ..writeln('## 下一步')
       ..writeln();
 
-    if (!iosFullSmokeReady) {
-      buffer.writeln('- iOS：先打开 Mac App 点“连接设备”，输入 Mac 密码，并在手机点允许。');
-    }
-    if (!androidFullSmokeReady) {
-      buffer.writeln('- Android：连接一台已开启 USB 调试的手机，再运行 Android smoke。');
-    }
-    if (iosFullSmokeReady && androidFullSmokeReady) {
-      buffer.writeln(
-        '- 可继续运行 `npm run v4:ios-smoke` 和 `npm run v4:android-smoke`。',
-      );
+    for (final step in _nextSteps()) {
+      buffer.writeln('- $step');
     }
     return buffer.toString();
   }
@@ -814,6 +932,19 @@ final class _SmokeReadinessReport {
   String _latestSmokeDetail(_SmokeRunSummary? summary) {
     if (summary == null) return '无记录';
     return '${summary.workflowName} / ${summary.summaryLabel}';
+  }
+
+  List<String> _nextSteps() {
+    if (iosFullSmokeReady && androidFullSmokeReady) {
+      return const <String>[
+        '可继续运行 `npm run v4:ios-smoke` 和 `npm run v4:android-smoke`。',
+      ];
+    }
+    return <String>[
+      if (!iosFullSmokeReady) 'iOS：先打开 Mac App 点“连接设备”，输入 Mac 密码，并在手机点允许。',
+      if (!androidFullSmokeReady)
+        'Android：连接一台已开启 USB 调试的手机，再运行 Android smoke。',
+    ];
   }
 }
 
@@ -903,6 +1034,15 @@ final class _BatchAcceptanceRow {
   final String name;
   final String status;
   final String evidence;
+
+  // 转成机器可读验收索引行。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'name': name,
+      'status': status,
+      'evidence': evidence,
+    };
+  }
 }
 
 const _usage = '''

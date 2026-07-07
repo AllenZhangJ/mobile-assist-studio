@@ -377,27 +377,48 @@ Future<_FullSmokePreparationItem> _prepareAndroidForSmoke(
     return _FullSmokePreparationItem(
       name: 'Android 手机',
       ok: false,
-      detail:
-          '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
-      nextStep: '只保留一台已授权 Android 手机后重试。',
+      detail: _androidStateDetail(
+        ready: android.ready,
+        unauthorized: android.unauthorized,
+        offline: android.offline,
+      ),
+      nextStep: _androidNextStep(
+        ready: android.ready,
+        unauthorized: android.unauthorized,
+        offline: android.offline,
+      ),
     );
   }
   if (android.unauthorized > 0) {
     return _FullSmokePreparationItem(
       name: 'Android 手机',
       ok: false,
-      detail:
-          '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
-      nextStep: '在 Android 手机上允许 USB 调试后重试。',
+      detail: _androidStateDetail(
+        ready: android.ready,
+        unauthorized: android.unauthorized,
+        offline: android.offline,
+      ),
+      nextStep: _androidNextStep(
+        ready: android.ready,
+        unauthorized: android.unauthorized,
+        offline: android.offline,
+      ),
     );
   }
   if (android.offline > 0) {
     return _FullSmokePreparationItem(
       name: 'Android 手机',
       ok: false,
-      detail:
-          '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
-      nextStep: '重插数据线并保持 Android 手机亮屏。',
+      detail: _androidStateDetail(
+        ready: android.ready,
+        unauthorized: android.unauthorized,
+        offline: android.offline,
+      ),
+      nextStep: _androidNextStep(
+        ready: android.ready,
+        unauthorized: android.unauthorized,
+        offline: android.offline,
+      ),
     );
   }
   return _FullSmokePreparationItem(
@@ -405,9 +426,38 @@ Future<_FullSmokePreparationItem> _prepareAndroidForSmoke(
     ok: false,
     detail:
         android.detail ??
-        '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
-    nextStep: '连接一台开启 USB 调试的 Android 手机，并在手机上允许调试。',
+        _androidStateDetail(
+          ready: android.ready,
+          unauthorized: android.unauthorized,
+          offline: android.offline,
+        ),
+    nextStep: _androidNextStep(
+      ready: android.ready,
+      unauthorized: android.unauthorized,
+      offline: android.offline,
+    ),
   );
+}
+
+// 把 ADB 状态计数转成统一短说明，供 full smoke 和 Android preflight 共用。
+String _androidStateDetail({
+  required int ready,
+  required int unauthorized,
+  required int offline,
+}) {
+  return '可用 $ready，未授权 $unauthorized，离线 $offline';
+}
+
+// 生成 Android 下一步，避免无设备、未授权、离线和多设备使用同一句泛化提示。
+String _androidNextStep({
+  required int ready,
+  required int unauthorized,
+  required int offline,
+}) {
+  if (ready > 1) return '只保留一台已授权 Android 手机后重试。';
+  if (unauthorized > 0) return '在 Android 手机上允许 USB 调试后重试。';
+  if (offline > 0) return '重插数据线并保持 Android 手机亮屏。';
+  return '开启 USB 调试，插线并在手机上点允许。';
 }
 
 // 等待 HTTP ready，供自动准备后的 Appium 服务复核。
@@ -601,8 +651,16 @@ Future<_FullSmokePreflight> _runPreflight(_FullSmokeOptions options) async {
         ok: android.available,
         detail:
             android.detail ??
-            '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
-        nextStep: '连接一台已开启 USB 调试的 Android 手机，并在手机上允许调试。',
+            _androidStateDetail(
+              ready: android.ready,
+              unauthorized: android.unauthorized,
+              offline: android.offline,
+            ),
+        nextStep: _androidNextStep(
+          ready: android.ready,
+          unauthorized: android.unauthorized,
+          offline: android.offline,
+        ),
       ),
     );
   }

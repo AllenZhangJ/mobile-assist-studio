@@ -152,20 +152,47 @@ Future<_AndroidSmokeDeviceCheck> _checkAndroid(
 ) async {
   try {
     final discovery = await adb.discover();
-    final device = discovery.requireSingleReadyDevice();
+    final ready = _androidStateCount(discovery, AndroidAdbDeviceState.ready);
+    final unauthorized = _androidStateCount(
+      discovery,
+      AndroidAdbDeviceState.unauthorized,
+    );
+    final offline = _androidStateCount(
+      discovery,
+      AndroidAdbDeviceState.offline,
+    );
+    final readyDevices = discovery.readyDevices;
+    if (readyDevices.length == 1) {
+      final device = readyDevices.single;
+      return _AndroidSmokeDeviceCheck(
+        name: '安卓手机',
+        ok: true,
+        detail: '${device.displayName} ${device.maskedSerial}',
+        nextStep: '-',
+        ready: ready,
+        unauthorized: unauthorized,
+        offline: offline,
+        discovery: discovery,
+        device: device,
+      );
+    }
     return _AndroidSmokeDeviceCheck(
       name: '安卓手机',
-      ok: true,
-      detail: '${device.displayName} ${device.maskedSerial}',
-      nextStep: '-',
-      ready: _androidStateCount(discovery, AndroidAdbDeviceState.ready),
-      unauthorized: _androidStateCount(
-        discovery,
-        AndroidAdbDeviceState.unauthorized,
+      ok: false,
+      detail: _androidStateDetail(
+        ready: ready,
+        unauthorized: unauthorized,
+        offline: offline,
       ),
-      offline: _androidStateCount(discovery, AndroidAdbDeviceState.offline),
+      nextStep: _androidNextStep(
+        ready: ready,
+        unauthorized: unauthorized,
+        offline: offline,
+      ),
+      ready: ready,
+      unauthorized: unauthorized,
+      offline: offline,
       discovery: discovery,
-      device: device,
     );
   } on AndroidDeviceDiscoveryException catch (error) {
     return _AndroidSmokeDeviceCheck(
@@ -182,6 +209,27 @@ Future<_AndroidSmokeDeviceCheck> _checkAndroid(
       nextStep: '确认 ADB 可用，并连接一台已开启 USB 调试的手机。',
     );
   }
+}
+
+// 把 ADB 状态计数转为稳定诊断，避免无设备时只显示泛化错误。
+String _androidStateDetail({
+  required int ready,
+  required int unauthorized,
+  required int offline,
+}) {
+  return '可用 $ready，未授权 $unauthorized，离线 $offline';
+}
+
+// 根据 ADB 状态生成下一步，确保未授权、离线、多设备和无设备不混淆。
+String _androidNextStep({
+  required int ready,
+  required int unauthorized,
+  required int offline,
+}) {
+  if (ready > 1) return '只保留一台已授权 Android 手机后重试。';
+  if (unauthorized > 0) return '在 Android 手机上允许 USB 调试后重试。';
+  if (offline > 0) return '重插数据线并保持 Android 手机亮屏。';
+  return '开启 USB 调试，插线并在手机上点允许。';
 }
 
 // 统计一次 ADB 发现中的指定状态数量。

@@ -25,17 +25,30 @@ Future<void> main(List<String> args) async {
   }
 
   await options.outDir.create(recursive: true);
+  final preflight = options.skipPreflight
+      ? _FullSmokePreflight.skipped()
+      : await _runPreflight(options);
+  if (preflight.hasBlockers) {
+    final report = await _writeFullSmokeReport(
+      outDir: options.outDir,
+      timestamp: timestamp,
+      preflight: preflight,
+      results: const <_FullSmokeResult>[],
+    );
+    stdout.writeln('\nFull smoke report: ${_redactText(report.path)}');
+    _fail('V4 full smoke 前置检查未通过：${preflight.blockerNames.join('、')}。');
+  }
+
   final results = <_FullSmokeResult>[];
   for (final step in steps) {
     results.add(await _runStep(step, options.stepTimeout));
   }
 
-  final report = File(
-    '${options.outDir.path}/FULL_SMOKE_${_safeTimestamp(timestamp)}.md',
-  );
-  await report.writeAsString(
-    _summaryMarkdown(timestamp: timestamp, results: results),
-    flush: true,
+  final report = await _writeFullSmokeReport(
+    outDir: options.outDir,
+    timestamp: timestamp,
+    preflight: preflight,
+    results: results,
   );
   stdout.writeln('\nFull smoke report: ${_redactText(report.path)}');
 
@@ -110,6 +123,190 @@ String _trimTrailingSlash(String value) {
     result = result.substring(0, result.length - 1);
   }
   return result.isEmpty ? '.' : result;
+}
+
+// 只读前置检查，避免现场条件不足时进入真实动作。
+Future<_FullSmokePreflight> _runPreflight(_FullSmokeOptions options) async {
+  final needsAppium = !options.skipIos || !options.skipAndroid;
+  final items = <_FullSmokePreflightItem>[];
+
+  final appium = needsAppium
+      ? await _probeHttpJson(
+          Uri(scheme: 'http', host: '127.0.0.1', port: 4723, path: '/status'),
+          timeout: options.preflightTimeout,
+        )
+      : const _HttpProbe(reachable: true, ready: true);
+  if (needsAppium) {
+    items.add(
+      _FullSmokePreflightItem(
+        name: 'Appium',
+        ok: appium.reachable && appium.ready == true,
+        detail: appium.statusLabel,
+        nextStep: appium.reachable
+            ? '确认 4723 服务 ready 后重试。'
+            : '先在 Mac App 点“连接设备”，或启动本机 Appium 后重试。',
+      ),
+    );
+  }
+
+  if (!options.skipIos) {
+    final ios = await _probeIosDevices(options.preflightTimeout);
+    final tunnel = await _probeHttpJson(
+      Uri(
+        scheme: 'http',
+        host: '127.0.0.1',
+        port: 42314,
+        path: '/remotexpc/tunnels',
+      ),
+      timeout: options.preflightTimeout,
+    );
+    items
+      ..add(
+        _FullSmokePreflightItem(
+          name: 'iOS 手机',
+          ok: ios.available,
+          detail: ios.detail ?? '可用 ${ios.connected}，不可用 ${ios.unavailable}',
+          nextStep: '连接并解锁一台 USB iPhone，再点 Mac App 的“连接设备”。',
+        ),
+      )
+      ..add(
+        _FullSmokePreflightItem(
+          name: 'iOS 隧道',
+          ok: tunnel.reachable && (tunnel.count ?? 0) > 0,
+          detail: tunnel.count == null
+              ? tunnel.statusLabel
+              : '隧道数量 ${tunnel.count}',
+          nextStep: '在 Mac App 点“连接设备”，输入 Mac 密码，并在手机提示时点允许。',
+        ),
+      );
+  }
+
+  if (!options.skipAndroid) {
+    final android = await _probeAndroidDevices(options.preflightTimeout);
+    items.add(
+      _FullSmokePreflightItem(
+        name: 'Android 手机',
+        ok: android.available,
+        detail:
+            android.detail ??
+            '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
+        nextStep: '连接一台已开启 USB 调试的 Android 手机，并在手机上允许调试。',
+      ),
+    );
+  }
+
+  return _FullSmokePreflight(items: items);
+}
+
+// 探测 HTTP JSON 端点，保持短超时，避免 preflight 卡住。
+Future<_HttpProbe> _probeHttpJson(Uri uri, {required Duration timeout}) async {
+  final client = HttpClient()..connectionTimeout = timeout;
+  try {
+    final request = await client.getUrl(uri).timeout(timeout);
+    final response = await request.close().timeout(timeout);
+    final body = await utf8.decodeStream(response).timeout(timeout);
+    final decoded = _safeJsonDecode(body);
+    return _HttpProbe(
+      reachable: true,
+      statusCode: response.statusCode,
+      ready: _jsonLooksReady(decoded),
+      count: _jsonTunnelCount(decoded),
+    );
+  } on Object {
+    return const _HttpProbe(reachable: false);
+  } finally {
+    client.close(force: true);
+  }
+}
+
+// 探测当前 iOS 设备数量，只保留状态统计，不写设备标识。
+Future<_IosProbe> _probeIosDevices(Duration timeout) async {
+  final result = await _runShortProcess('xcrun', const [
+    'devicectl',
+    'list',
+    'devices',
+  ], timeout: timeout);
+  if (result.exitCode != 0) {
+    return _IosProbe(available: false, detail: _shortProcessIssue(result));
+  }
+  final lines = result.stdout
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList(growable: false);
+  final deviceLines = lines
+      .where((line) => line.contains('iPhone') || line.contains('iPad'))
+      .toList(growable: false);
+  final connected = deviceLines
+      .where(
+        (line) => line.contains(' connected ') || line.contains(' available '),
+      )
+      .length;
+  final unavailable = deviceLines.length - connected;
+  return _IosProbe(
+    available: connected > 0,
+    connected: connected,
+    unavailable: unavailable < 0 ? 0 : unavailable,
+  );
+}
+
+// 探测当前 Android 设备数量，只保留状态统计，不写 serial。
+Future<_AndroidProbe> _probeAndroidDevices(Duration timeout) async {
+  final result = await _runShortProcess('adb', const [
+    'devices',
+  ], timeout: timeout);
+  if (result.exitCode != 0) {
+    return _AndroidProbe(available: false, detail: _shortProcessIssue(result));
+  }
+  var ready = 0;
+  var unauthorized = 0;
+  var offline = 0;
+  for (final line in result.stdout.split('\n').skip(1)) {
+    final parts = line.trim().split(RegExp(r'\s+'));
+    if (parts.length < 2) continue;
+    switch (parts[1]) {
+      case 'device':
+        ready += 1;
+      case 'unauthorized':
+        unauthorized += 1;
+      case 'offline':
+        offline += 1;
+    }
+  }
+  return _AndroidProbe(
+    available: ready > 0,
+    ready: ready,
+    unauthorized: unauthorized,
+    offline: offline,
+  );
+}
+
+// 执行短命令并裁剪输出，用于 preflight 只读探测。
+Future<_ProcessProbe> _runShortProcess(
+  String executable,
+  List<String> arguments, {
+  required Duration timeout,
+}) async {
+  try {
+    final result = await Process.run(
+      executable,
+      arguments,
+      environment: {
+        ...Platform.environment,
+        'DART_SUPPRESS_ANALYTICS': 'true',
+        'FLUTTER_SUPPRESS_ANALYTICS': 'true',
+      },
+    ).timeout(timeout);
+    return _ProcessProbe(
+      exitCode: result.exitCode,
+      stdout: _redactText('${result.stdout}'),
+      stderr: _redactText('${result.stderr}'),
+    );
+  } on TimeoutException {
+    return const _ProcessProbe(exitCode: 124, stderr: 'timeout');
+  } on Object catch (error) {
+    return _ProcessProbe(exitCode: 1, stderr: _redactText('$error'));
+  }
 }
 
 // 执行单个步骤并捕获输出，超时也会形成可写入报告的结果。
@@ -219,9 +416,31 @@ void _printDryRun(List<_FullSmokeStep> steps) {
   }
 }
 
+// 写入 full smoke 汇总报告，调用方负责按结果决定退出码。
+Future<File> _writeFullSmokeReport({
+  required Directory outDir,
+  required DateTime timestamp,
+  required _FullSmokePreflight preflight,
+  required List<_FullSmokeResult> results,
+}) async {
+  final report = File(
+    '${outDir.path}/FULL_SMOKE_${_safeTimestamp(timestamp)}.md',
+  );
+  await report.writeAsString(
+    _summaryMarkdown(
+      timestamp: timestamp,
+      preflight: preflight,
+      results: results,
+    ),
+    flush: true,
+  );
+  return report;
+}
+
 // 生成本地 Markdown 汇总，保留失败原因但脱敏路径、设备号和 session。
 String _summaryMarkdown({
   required DateTime timestamp,
+  required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
 }) {
   final buffer = StringBuffer()
@@ -229,13 +448,36 @@ String _summaryMarkdown({
     ..writeln()
     ..writeln('- 时间：${timestamp.toIso8601String()}')
     ..writeln('- 动作：真实 Tap / Swipe / Input + 基础 Project DSL workflow')
+    ..writeln('- 前置检查：${preflight.statusLabel}')
+    ..writeln()
+    ..writeln('## 前置检查')
+    ..writeln();
+  if (preflight.skipped) {
+    buffer.writeln('- 已跳过前置检查。');
+  } else {
+    buffer
+      ..writeln('| 项目 | 结果 | 说明 | 下一步 |')
+      ..writeln('|---|---|---|---|');
+    for (final item in preflight.items) {
+      buffer.writeln(
+        '| ${item.name} | ${item.ok ? '通过' : '阻断'} | ${item.detail} | ${item.ok ? '-' : item.nextStep} |',
+      );
+    }
+  }
+  buffer
+    ..writeln()
+    ..writeln('## 执行步骤')
     ..writeln()
     ..writeln('| 步骤 | 结果 | 退出码 | 耗时 |')
     ..writeln('|---|---|---:|---:|');
-  for (final result in results) {
-    buffer.writeln(
-      '| ${result.step.name} | ${result.statusLabel} | ${result.exitCode} | ${result.duration.inSeconds}s |',
-    );
+  if (results.isEmpty) {
+    buffer.writeln('| 未执行 | 前置检查未通过 | 0 | 0s |');
+  } else {
+    for (final result in results) {
+      buffer.writeln(
+        '| ${result.step.name} | ${result.statusLabel} | ${result.exitCode} | ${result.duration.inSeconds}s |',
+      );
+    }
   }
   buffer.writeln();
 
@@ -276,6 +518,41 @@ String _shortBlock(String value, {int limit = 2200}) {
   return '$head\n...\n$tail';
 }
 
+// 安全 JSON 解析，失败时返回 null。
+Object? _safeJsonDecode(String body) {
+  try {
+    return jsonDecode(body);
+  } on Object {
+    return null;
+  }
+}
+
+// 判断 Appium status 是否 ready。
+bool? _jsonLooksReady(Object? decoded) {
+  if (decoded is! Map) return null;
+  final value = decoded['value'];
+  if (value is Map && value['ready'] is bool) return value['ready'] as bool;
+  if (decoded['ready'] is bool) return decoded['ready'] as bool;
+  return null;
+}
+
+// 读取 XCUITest tunnel registry 里的隧道数量。
+int? _jsonTunnelCount(Object? decoded) {
+  if (decoded is! Map) return null;
+  final tunnels = decoded['tunnels'];
+  if (tunnels is Map) return tunnels.length;
+  return null;
+}
+
+// 裁剪进程问题说明，避免报告过长。
+String _shortProcessIssue(_ProcessProbe result) {
+  final raw = result.stderr.trim().isEmpty ? result.stdout : result.stderr;
+  if (raw.trim().isEmpty) return 'exit ${result.exitCode}';
+  final compact = raw.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (compact.length <= 120) return compact;
+  return '${compact.substring(0, 120)}...';
+}
+
 // 脱敏本机路径、长设备号和 UUID。
 String _redactText(String value) {
   return value
@@ -298,23 +575,137 @@ String _safeTimestamp(DateTime value) {
   return value.toIso8601String().replaceAll(':', '-').replaceAll('.', '-');
 }
 
+// full smoke 前置检查集合。
+final class _FullSmokePreflight {
+  const _FullSmokePreflight({required this.items, this.skipped = false});
+
+  factory _FullSmokePreflight.skipped() {
+    return const _FullSmokePreflight(
+      items: <_FullSmokePreflightItem>[],
+      skipped: true,
+    );
+  }
+
+  final List<_FullSmokePreflightItem> items;
+  final bool skipped;
+
+  bool get hasBlockers => !skipped && items.any((item) => !item.ok);
+
+  Iterable<String> get blockerNames sync* {
+    for (final item in items) {
+      if (!item.ok) yield item.name;
+    }
+  }
+
+  String get statusLabel {
+    if (skipped) return '已跳过';
+    return hasBlockers ? '有阻断' : '通过';
+  }
+}
+
+// full smoke 前置检查单项。
+final class _FullSmokePreflightItem {
+  const _FullSmokePreflightItem({
+    required this.name,
+    required this.ok,
+    required this.detail,
+    required this.nextStep,
+  });
+
+  final String name;
+  final bool ok;
+  final String detail;
+  final String nextStep;
+}
+
+// HTTP 探测结果。
+final class _HttpProbe {
+  const _HttpProbe({
+    required this.reachable,
+    this.statusCode,
+    this.ready,
+    this.count,
+  });
+
+  final bool reachable;
+  final int? statusCode;
+  final bool? ready;
+  final int? count;
+
+  String get statusLabel {
+    if (!reachable) return '不可达';
+    if (ready != null) return ready! ? '就绪' : '未就绪';
+    if (count != null) return count! > 0 ? '有隧道' : '无隧道';
+    return statusCode == null ? '未知' : 'HTTP $statusCode';
+  }
+}
+
+// iOS 设备探测结果。
+final class _IosProbe {
+  const _IosProbe({
+    required this.available,
+    this.connected = 0,
+    this.unavailable = 0,
+    this.detail,
+  });
+
+  final bool available;
+  final int connected;
+  final int unavailable;
+  final String? detail;
+}
+
+// Android 设备探测结果。
+final class _AndroidProbe {
+  const _AndroidProbe({
+    required this.available,
+    this.ready = 0,
+    this.unauthorized = 0,
+    this.offline = 0,
+    this.detail,
+  });
+
+  final bool available;
+  final int ready;
+  final int unauthorized;
+  final int offline;
+  final String? detail;
+}
+
+// 进程探测结果。
+final class _ProcessProbe {
+  const _ProcessProbe({
+    required this.exitCode,
+    this.stdout = '',
+    this.stderr = '',
+  });
+
+  final int exitCode;
+  final String stdout;
+  final String stderr;
+}
+
 // V4 full smoke 参数。
 final class _FullSmokeOptions {
   const _FullSmokeOptions({
     required this.outDir,
     required this.stepTimeout,
+    required this.preflightTimeout,
     required this.confirmActions,
     required this.skipIos,
     required this.skipAndroid,
+    required this.skipPreflight,
     required this.dryRun,
     required this.help,
   });
 
   final Directory outDir;
   final Duration stepTimeout;
+  final Duration preflightTimeout;
   final bool confirmActions;
   final bool skipIos;
   final bool skipAndroid;
+  final bool skipPreflight;
   final bool dryRun;
   final bool help;
 
@@ -322,9 +713,11 @@ final class _FullSmokeOptions {
   static _FullSmokeOptions parse(List<String> args) {
     var outDir = Directory('recordings/v4-smoke');
     var stepTimeoutSeconds = 300;
+    var preflightTimeoutSeconds = 4;
     var confirmActions = false;
     var skipIos = false;
     var skipAndroid = false;
+    var skipPreflight = false;
     var dryRun = false;
     var help = false;
 
@@ -340,12 +733,17 @@ final class _FullSmokeOptions {
         case '--step-timeout':
           stepTimeoutSeconds = int.parse(_nextValue(args, index, arg));
           index += 1;
+        case '--preflight-timeout':
+          preflightTimeoutSeconds = int.parse(_nextValue(args, index, arg));
+          index += 1;
         case '--confirm-actions':
           confirmActions = true;
         case '--skip-ios':
           skipIos = true;
         case '--skip-android':
           skipAndroid = true;
+        case '--skip-preflight':
+          skipPreflight = true;
         case '--dry-run':
           dryRun = true;
         default:
@@ -356,9 +754,11 @@ final class _FullSmokeOptions {
     return _FullSmokeOptions(
       outDir: outDir,
       stepTimeout: Duration(seconds: stepTimeoutSeconds),
+      preflightTimeout: Duration(seconds: preflightTimeoutSeconds),
       confirmActions: confirmActions,
       skipIos: skipIos,
       skipAndroid: skipAndroid,
+      skipPreflight: skipPreflight,
       dryRun: dryRun,
       help: help,
     );
@@ -437,9 +837,11 @@ V4 full smoke
 选项：
   --out-dir <path>          结果目录，默认 recordings/v4-smoke
   --step-timeout <seconds>  单个平台 smoke 超时，默认 300
+  --preflight-timeout <s>   单项前置检查超时，默认 4
   --confirm-actions         确认执行真实 Tap / Swipe / Input
   --skip-ios                跳过 iOS 完整冒烟
   --skip-android            跳过 Android 完整冒烟
+  --skip-preflight          跳过只读前置检查
   --dry-run                 只展示命令，不执行
   --help                    查看帮助
 ''';

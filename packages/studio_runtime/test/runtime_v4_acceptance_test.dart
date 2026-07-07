@@ -82,6 +82,35 @@ void main() {
     expect(summary.gitRevision, 'good');
     expect(summary.androidRuns, 1);
   });
+
+  test('local v4 acceptance reader redacts visible report text', () async {
+    final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
+    addTearDown(() async {
+      if (temp.existsSync()) await temp.delete(recursive: true);
+    });
+    await File(
+      '${temp.path}/FINAL_ACCEPTANCE_2026-01-02T00-00-00Z.json',
+    ).writeAsString(_acceptanceJsonWithSensitiveText());
+
+    final summary = await LocalV4AcceptanceSummaryReader(
+      directory: temp,
+    ).readLatest();
+    final visibleText = [
+      summary.statusLabel,
+      summary.androidStatus,
+      summary.androidDetail,
+      summary.latestFullSmokeLabel,
+      ...summary.failures,
+      ...summary.nextSteps,
+    ].join(' ');
+
+    expect(visibleText, contains('[本机路径]'));
+    expect(visibleText, contains('[本机地址]'));
+    expect(visibleText, contains('[标识]'));
+    expect(visibleText, isNot(contains('/Users/example')));
+    expect(visibleText, isNot(contains('00008110-000A01E03C3B801E')));
+    expect(visibleText, isNot(contains('http://127.0.0.1:4723')));
+  });
 }
 
 String _acceptanceJson({required String git, required int androidRuns}) {
@@ -120,6 +149,49 @@ String _acceptanceJson({required String git, required int androidRuns}) {
   },
   "nextSteps": [
     "Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。"
+  ]
+}
+''';
+}
+
+String _acceptanceJsonWithSensitiveText() {
+  return '''
+{
+  "schemaVersion": 1,
+  "kind": "v4FinalAcceptance",
+  "timestamp": "2026-01-02T00:00:00.000000Z",
+  "git": "abcdef12",
+  "completion": {
+    "auditOk": true,
+    "complete": false,
+    "label": "最终验收未完成 /Users/example/project",
+    "failures": [
+      "设备 00008110-000A01E03C3B801E 在 http://127.0.0.1:4723/session 失败"
+    ]
+  },
+  "evidence": {
+    "readiness": {
+      "localState": {
+        "androidDevice": {
+          "status": "未就绪 /Users/example/status",
+          "detail": "路径 /Users/example/project 设备 00008110-000A01E03C3B801E"
+        }
+      }
+    },
+    "archive": {
+      "counts": {
+        "screenshots": 1,
+        "iosRuns": 1,
+        "androidRuns": 0,
+        "fullSmokeReports": 7
+      },
+      "latestFullSmoke": {
+        "label": "前置检查阻断 http://127.0.0.1:4723/status"
+      }
+    }
+  },
+  "nextSteps": [
+    "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E"
   ]
 }
 ''';

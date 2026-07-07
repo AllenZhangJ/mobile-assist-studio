@@ -68,18 +68,19 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
     hasReport: true,
     auditOk: _boolAt(completion, 'auditOk') ?? false,
     complete: _boolAt(completion, 'complete') ?? false,
-    statusLabel: _stringAt(completion, 'label') ?? '终验未知',
+    statusLabel: _safeAcceptanceTextAt(completion, 'label') ?? '终验未知',
     checkedAt: checkedAt,
     gitRevision: _shortGitRevision(_stringAt(json, 'git')),
-    androidStatus: _stringAt(androidDevice, 'status') ?? '未知',
-    androidDetail: _stringAt(androidDevice, 'detail') ?? '无安卓状态。',
+    androidStatus: _safeAcceptanceTextAt(androidDevice, 'status') ?? '未知',
+    androidDetail: _safeAcceptanceTextAt(androidDevice, 'detail') ?? '无安卓状态。',
     screenshots: _intAt(counts, 'screenshots'),
     iosRuns: _intAt(counts, 'iosRuns'),
     androidRuns: _intAt(counts, 'androidRuns'),
     fullSmokeReports: _intAt(counts, 'fullSmokeReports'),
-    latestFullSmokeLabel: _stringAt(latestFullSmoke, 'label') ?? '暂无',
-    failures: _stringListAt(completion, 'failures'),
-    nextSteps: _stringListAt(json, 'nextSteps'),
+    latestFullSmokeLabel:
+        _safeAcceptanceTextAt(latestFullSmoke, 'label') ?? '暂无',
+    failures: _safeAcceptanceTextListAt(completion, 'failures'),
+    nextSteps: _safeAcceptanceTextListAt(json, 'nextSteps'),
   );
 }
 
@@ -105,6 +106,12 @@ String? _stringAt(Map<String, Object?> json, String key) {
   return null;
 }
 
+// 安全读取用户可见文本，并复用连接详情脱敏规则。
+String? _safeAcceptanceTextAt(Map<String, Object?> json, String key) {
+  final value = _stringAt(json, key);
+  return value == null ? null : _redactConnectionDetail(value);
+}
+
 // 安全读取 bool 字段。
 bool? _boolAt(Map<String, Object?> json, String key) {
   final value = json[key];
@@ -120,13 +127,14 @@ int _intAt(Map<String, Object?> json, String key) {
 }
 
 // 安全读取字符串列表，并限制长度。
-List<String> _stringListAt(Map<String, Object?> json, String key) {
+List<String> _safeAcceptanceTextListAt(Map<String, Object?> json, String key) {
   final value = json[key];
   if (value is! List) return const <String>[];
   return value
       .whereType<String>()
       .map((entry) => entry.trim())
       .where((entry) => entry.isNotEmpty)
+      .map(_redactConnectionDetail)
       .take(6)
       .toList(growable: false);
 }

@@ -154,11 +154,11 @@ npm run v4:android-smoke -- --allow-actions
 npm run v4:android-smoke -- --workflow-basic --allow-actions
 ```
 
-`npm run v4:smoke:full` 是最终现场验收入口，会先做只读前置检查，再顺序执行 iOS 与 Android 的真实 Tap、Swipe、Input 和基础 Project DSL workflow，并在最后生成 full smoke Markdown / JSON、readiness / completion audit 留档。`npm run v4:smoke:full:dry-run` 只展示命令，不执行真实动作。
+`npm run v4:smoke:full` 是最终现场验收入口，会先做只读前置检查，再顺序执行 iOS 与 Android 的真实 Tap、Swipe、Input 和基础 Project DSL workflow，并在最后生成 full smoke Markdown / JSON、readiness / completion audit 留档。`npm run v4:ios-smoke:full` 和 `npm run v4:android-smoke:full` 也走同一个编排器，只跳过另一个平台，适合单平台排障。`npm run v4:smoke:full:dry-run` 只展示命令，不执行真实动作。
 
 full smoke 编排器会为每个平台设置步骤超时；超时后会终止子进程并继续生成脱敏汇总，避免现场验证卡死或留下孤儿进程。
 
-不带 `--allow-actions` 时只创建会话、截图并写入本地 evidence；加上后会在当前手机屏幕上执行真实 Tap、Swipe 和 Input。`--workflow-basic` 会把动作冒烟切换为基础 Project DSL workflow，用于验证 DSL、driver 和 evidence 是同一条链路。单平台排障优先使用 `npm run v4:ios-smoke:full` 或 `npm run v4:android-smoke:full`。
+不带 `--allow-actions` 时只创建会话、截图并写入本地 evidence；加上后会在当前手机屏幕上执行真实 Tap、Swipe 和 Input。`--workflow-basic` 会把动作冒烟切换为基础 Project DSL workflow，用于验证 DSL、driver 和 evidence 是同一条链路。单平台完整排障优先使用 `npm run v4:ios-smoke:full` 或 `npm run v4:android-smoke:full`，它们会自动准备本机驱动和对应平台前置条件。
 
 Android 单平台 smoke 在驱动不可达、无手机、未授权、离线或多设备时会失败退出，并在输出目录写入 `ANDROID_SMOKE_PREFLIGHT` 脱敏 Markdown / JSON。该文件用于排障和 readiness 索引，不会计作一次真实 Android run。
 

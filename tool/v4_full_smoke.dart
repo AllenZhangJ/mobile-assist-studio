@@ -51,10 +51,10 @@ Future<void> main(List<String> args) async {
           '\nFull smoke report: ${_redactText(report.markdownFile.path)}',
         )
         ..writeln('Full smoke json: ${_redactText(report.jsonFile.path)}');
-      final blockers = <String>[
+      final blockers = _uniqueStrings(<String>[
         ...preparation.blockerNames,
         ...preflight.blockerNames,
-      ];
+      ]);
       failureMessage = 'V4 full smoke 前置准备未通过：${blockers.join('、')}。';
     } else {
       for (final step in steps) {
@@ -730,11 +730,17 @@ String _stderrWithTimeoutNote(StringBuffer buffer, bool timedOut) {
   return '$note\n$stderrText';
 }
 
+// 保留顺序去重，避免同一阻断在自动准备和前置检查中重复展示。
+List<String> _uniqueStrings(Iterable<String> values) {
+  final seen = <String>{};
+  return values.where(seen.add).toList(growable: false);
+}
+
 // dry-run 只展示将要执行的命令，用于本地确认和 CI 语法检查。
 void _printDryRun(List<_FullSmokeStep> steps, _FullSmokeOptions options) {
   stdout.writeln('V4 full smoke dry-run');
   stdout.writeln('- 自动准备: ${options.autoPrepare ? '启用' : '跳过'}');
-  if (options.autoPrepare && !options.adminPasswordStdin) {
+  if (options.autoPrepare && !options.skipIos && !options.adminPasswordStdin) {
     stdout.writeln(
       '- iOS 隧道密码: 未从 stdin 读取，需要 Mac App 已连接或改用 password-stdin 入口',
     );

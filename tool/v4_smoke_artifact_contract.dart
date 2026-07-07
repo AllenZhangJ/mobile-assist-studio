@@ -51,6 +51,7 @@ Future<void> main() async {
     _assertAcceptanceJson(acceptanceArtifacts.json);
     _assertAcceptanceMarkdown(acceptanceArtifacts.markdown);
     _assertNoSensitiveText(acceptanceArtifacts.allText);
+    await _assertPackageSmokeScripts();
 
     final finalAcceptance = await _runFinalAcceptance(
       tempDir,
@@ -70,6 +71,41 @@ Future<void> main() async {
   } finally {
     await tempDir.delete(recursive: true);
   }
+}
+
+// 断言 npm 单平台 full smoke 入口复用 full smoke 编排器，保留自动准备能力。
+Future<void> _assertPackageSmokeScripts() async {
+  final packageFile = File('package.json');
+  _expect(await packageFile.exists(), '必须存在 package.json。');
+  final decoded = jsonDecode(await packageFile.readAsString());
+  _expect(decoded is Map, 'package.json 必须是 JSON 对象。');
+  final scripts = _mapAt(Map<String, Object?>.from(decoded as Map), 'scripts');
+  _assertFullSmokeScript(
+    scripts,
+    name: 'v4:ios-smoke:full',
+    requiredSkipFlag: '--skip-android',
+  );
+  _assertFullSmokeScript(
+    scripts,
+    name: 'v4:android-smoke:full',
+    requiredSkipFlag: '--skip-ios',
+  );
+}
+
+// 断言单条 full smoke 脚本包含自动准备、动作确认和单平台跳过参数。
+void _assertFullSmokeScript(
+  Map<String, Object?> scripts, {
+  required String name,
+  required String requiredSkipFlag,
+}) {
+  final command = scripts[name]?.toString() ?? '';
+  _expect(
+    command.contains('tool/v4_full_smoke.dart'),
+    '$name 必须使用 full smoke 编排器。',
+  );
+  _expect(command.contains('--confirm-actions'), '$name 必须显式确认真实动作。');
+  _expect(command.contains('--auto-prepare'), '$name 必须自动准备本机环境。');
+  _expect(command.contains(requiredSkipFlag), '$name 必须包含 $requiredSkipFlag。');
 }
 
 // 写入最小 full smoke fixture，用于验证 readiness 能索引最近编排报告。

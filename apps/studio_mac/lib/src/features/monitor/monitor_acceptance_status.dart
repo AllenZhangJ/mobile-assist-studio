@@ -42,6 +42,11 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             tone: summary.batchProgressTone,
           ),
           _V4AcceptanceFact(
+            label: '代码',
+            value: summary.worktreeLabel,
+            tone: summary.worktreeTone,
+          ),
+          _V4AcceptanceFact(
             label: '安卓留档',
             value: summary.androidRunLabel,
             tone: summary.androidRunTone,
@@ -282,6 +287,8 @@ final class _V4AcceptanceStatusSummary {
     required this.localRunTone,
     required this.batchProgressLabel,
     required this.batchProgressTone,
+    required this.worktreeLabel,
+    required this.worktreeTone,
     required this.androidRunLabel,
     required this.androidRunTone,
     required this.issueLabel,
@@ -302,6 +309,8 @@ final class _V4AcceptanceStatusSummary {
   final StudioStatusTone localRunTone;
   final String batchProgressLabel;
   final StudioStatusTone batchProgressTone;
+  final String worktreeLabel;
+  final StudioStatusTone worktreeTone;
   final String androidRunLabel;
   final StudioStatusTone androidRunTone;
   final String issueLabel;
@@ -345,6 +354,8 @@ final class _V4AcceptanceStatusSummary {
             : StudioStatusTone.warning,
         batchProgressLabel: acceptance.batchProgressLabel,
         batchProgressTone: _v4BatchProgressTone(acceptance),
+        worktreeLabel: acceptance.gitWorktreeLabel,
+        worktreeTone: _v4WorktreeTone(acceptance),
         androidRunLabel: '安卓 ${acceptance.androidRuns}',
         androidRunTone: acceptance.androidRuns > 0
             ? StudioStatusTone.ready
@@ -380,6 +391,8 @@ final class _V4AcceptanceStatusSummary {
           : StudioStatusTone.offline,
       batchProgressLabel: '未读',
       batchProgressTone: StudioStatusTone.offline,
+      worktreeLabel: '未知',
+      worktreeTone: StudioStatusTone.offline,
       androidRunLabel: '未知',
       androidRunTone: StudioStatusTone.offline,
       issueLabel: issueRuns > 0 ? '$issueRuns 条' : '无',
@@ -401,6 +414,15 @@ StudioStatusTone _v4BatchProgressTone(V4AcceptanceSummary acceptance) {
     return StudioStatusTone.ready;
   }
   return StudioStatusTone.warning;
+}
+
+// 根据终验报告里的 Git 干净度映射版本可追溯状态。
+StudioStatusTone _v4WorktreeTone(V4AcceptanceSummary acceptance) {
+  return switch (acceptance.gitDirty) {
+    false => StudioStatusTone.ready,
+    true => StudioStatusTone.warning,
+    null => StudioStatusTone.offline,
+  };
 }
 
 // 将 iOS / Android readiness 状态压成一个短标签，避免验收卡过高。

@@ -11,6 +11,8 @@ final class V4AcceptanceSummary {
     required this.statusLabel,
     required this.checkedAt,
     required this.gitRevision,
+    this.gitBranch,
+    this.gitDirty,
     required this.iosStatus,
     required this.iosDetail,
     required this.androidStatus,
@@ -33,6 +35,8 @@ final class V4AcceptanceSummary {
   final String statusLabel;
   final DateTime? checkedAt;
   final String? gitRevision;
+  final String? gitBranch;
+  final bool? gitDirty;
   final String iosStatus;
   final String iosDetail;
   final String androidStatus;
@@ -102,6 +106,15 @@ final class V4AcceptanceSummary {
       if (!batch.isComplete) return batch;
     }
     return null;
+  }
+
+  // 工作区干净度短文案，供 Monitor 展示版本证据链。
+  String get gitWorktreeLabel {
+    return switch (gitDirty) {
+      true => '有改动',
+      false => '干净',
+      null => '未知',
+    };
   }
 }
 

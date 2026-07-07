@@ -63,6 +63,7 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
   final androidDevice = _acceptanceMapAt(localState, 'androidDevice');
   final counts = _acceptanceMapAt(archive, 'counts');
   final latestFullSmoke = _acceptanceMapAt(archive, 'latestFullSmoke');
+  final gitStatus = _acceptanceMapAt(json, 'gitStatus');
   final timestamp = _stringAt(json, 'timestamp');
   final checkedAt = timestamp == null ? null : DateTime.tryParse(timestamp);
   return V4AcceptanceSummary(
@@ -71,7 +72,11 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
     complete: _boolAt(completion, 'complete') ?? false,
     statusLabel: _safeAcceptanceTextAt(completion, 'label') ?? '终验未知',
     checkedAt: checkedAt,
-    gitRevision: _shortGitRevision(_stringAt(json, 'git')),
+    gitRevision: _shortGitRevision(
+      _stringAt(gitStatus, 'revision') ?? _stringAt(json, 'git'),
+    ),
+    gitBranch: _safeGitBranch(_stringAt(gitStatus, 'branch')),
+    gitDirty: _boolAt(gitStatus, 'dirty'),
     iosStatus: _safeAcceptanceTextAt(iosDevice, 'status') ?? '未知',
     iosDetail: _safeAcceptanceTextAt(iosDevice, 'detail') ?? '无 iOS 状态。',
     androidStatus: _safeAcceptanceTextAt(androidDevice, 'status') ?? '未知',
@@ -250,4 +255,12 @@ List<V4AcceptanceBatchSummary> _batchSummariesAt(
 String? _shortGitRevision(String? value) {
   if (value == null || value.isEmpty) return null;
   return value.length <= 8 ? value : value.substring(0, 8);
+}
+
+// Git 分支仅作为短版本线索展示，同样应用脱敏和长度限制。
+String? _safeGitBranch(String? value) {
+  if (value == null || value.isEmpty) return null;
+  final safe = _redactConnectionDetail(value);
+  if (safe.isEmpty) return null;
+  return safe.length <= 48 ? safe : '${safe.substring(0, 48)}...';
 }

@@ -28,6 +28,9 @@ void main() {
       expect(summary.complete, isFalse);
       expect(summary.statusLabel, '最终验收未完成');
       expect(summary.gitRevision, '12345678');
+      expect(summary.gitBranch, 'main');
+      expect(summary.gitDirty, isFalse);
+      expect(summary.gitWorktreeLabel, '干净');
       expect(summary.iosStatus, '未就绪');
       expect(summary.iosDetail, '可用 0，不可用 1');
       expect(summary.androidStatus, '未就绪');
@@ -98,6 +101,7 @@ void main() {
 
     expect(summary.hasReport, isTrue);
     expect(summary.gitRevision, 'good');
+    expect(summary.gitDirty, isFalse);
     expect(summary.androidRuns, 1);
   });
 
@@ -115,6 +119,8 @@ void main() {
     ).readLatest();
     final visibleText = [
       summary.statusLabel,
+      summary.gitBranch ?? '',
+      summary.gitWorktreeLabel,
       summary.iosStatus,
       summary.iosDetail,
       summary.androidStatus,
@@ -158,6 +164,12 @@ String _acceptanceJson({required String git, required int androidRuns}) {
   "kind": "v4FinalAcceptance",
   "timestamp": "2026-01-02T00:00:00.000000Z",
   "git": "$git",
+  "gitStatus": {
+    "revision": "$git",
+    "branch": "main",
+    "dirty": false,
+    "worktree": "干净"
+  },
   "completion": {
     "auditOk": true,
     "complete": false,
@@ -238,6 +250,12 @@ String _acceptanceJsonWithSensitiveText() {
   "kind": "v4FinalAcceptance",
   "timestamp": "2026-01-02T00:00:00.000000Z",
   "git": "abcdef12",
+  "gitStatus": {
+    "revision": "abcdef12",
+    "branch": "/Users/example/project",
+    "dirty": true,
+    "worktree": "有未提交改动"
+  },
   "completion": {
     "auditOk": true,
     "complete": false,

@@ -112,7 +112,10 @@ void main() {
     expect(find.text('跑安卓'), findsWidgets);
     expect(find.text('终验'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('monitor-copy-v4-route')));
+    final routeButton = find.byKey(const ValueKey('monitor-copy-v4-route'));
+    await tester.ensureVisible(routeButton);
+    await tester.pumpAndSettle();
+    await tester.tap(routeButton);
     await tester.pumpAndSettle();
     expect(copiedCommand, contains('npm run v4:android-smoke:full'));
     expect(copiedCommand, contains('npm run v4:smoke:full'));
@@ -169,6 +172,8 @@ void main() {
         statusLabel: '最终验收未完成',
         checkedAt: DateTime.utc(2026, 1, 9),
         gitRevision: '12345678',
+        gitBranch: 'main',
+        gitDirty: false,
         iosStatus: '未就绪',
         iosDetail: '可用 0，不可用 1',
         androidStatus: '未就绪',
@@ -207,6 +212,8 @@ void main() {
     expect(find.text('都未就绪'), findsOneWidget);
     expect(find.text('iOS 1'), findsOneWidget);
     expect(find.text('8/9'), findsOneWidget);
+    expect(find.text('代码'), findsOneWidget);
+    expect(find.text('干净'), findsOneWidget);
     expect(find.text('安卓 0'), findsOneWidget);
     expect(find.text('补安卓'), findsOneWidget);
     expect(find.text('可用 0，未授权 0，离线 0'), findsOneWidget);
@@ -242,6 +249,8 @@ void main() {
         statusLabel: '最终验收未完成',
         checkedAt: DateTime.utc(2026, 1, 9),
         gitRevision: '12345678',
+        gitBranch: 'main',
+        gitDirty: false,
         iosStatus: '未就绪',
         iosDetail: '可用 0，不可用 1',
         androidStatus: '未就绪',
@@ -320,7 +329,10 @@ void main() {
     expect(find.text('跑全量'), findsOneWidget);
     expect(find.text('终验'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('monitor-copy-v4-route')));
+    final routeButton = find.byKey(const ValueKey('monitor-copy-v4-route'));
+    await tester.ensureVisible(routeButton);
+    await tester.pumpAndSettle();
+    await tester.tap(routeButton);
     await tester.pumpAndSettle();
     expect(
       copiedCommand,

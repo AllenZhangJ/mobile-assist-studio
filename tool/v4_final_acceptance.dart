@@ -23,7 +23,7 @@ Future<void> main(List<String> args) async {
 
   final report = _AcceptanceReport(
     timestamp: timestamp,
-    git: await _currentGitCommit(options.probeTimeout),
+    gitStatus: await _currentGitStatus(options.probeTimeout),
     requireComplete: options.requireComplete,
     outDir: _redactText(options.outDir.path),
     evidence: await _AcceptanceEvidenceSummary.load(
@@ -202,7 +202,16 @@ Future<void> _settleOutput(
   }
 }
 
-// 当前 git commit 只保留短 hash。
+// 当前 Git 状态只保留短提交、分支和干净度，不保存文件列表。
+Future<_GitStatus> _currentGitStatus(Duration timeout) async {
+  return _GitStatus(
+    revision: await _currentGitCommit(timeout),
+    branch: await _currentGitBranch(timeout),
+    dirty: await _currentGitDirty(timeout),
+  );
+}
+
+// 当前 Git commit 只保留短 hash。
 Future<String> _currentGitCommit(Duration timeout) async {
   try {
     final result = await Process.run('git', const <String>[
@@ -215,6 +224,45 @@ Future<String> _currentGitCommit(Duration timeout) async {
     return value.isEmpty ? 'unknown' : value;
   } on Object {
     return 'unknown';
+  }
+}
+
+// 当前 Git 分支只保留分支名；detached HEAD 用固定短文案。
+Future<String> _currentGitBranch(Duration timeout) async {
+  final current = await _runGitProbe(const <String>[
+    'branch',
+    '--show-current',
+  ], timeout);
+  if (current != null && current.trim().isNotEmpty) return current.trim();
+  final fallback = await _runGitProbe(const <String>[
+    'rev-parse',
+    '--abbrev-ref',
+    'HEAD',
+  ], timeout);
+  final value = fallback?.trim();
+  if (value == null || value.isEmpty) return 'unknown';
+  return value == 'HEAD' ? 'detached' : value;
+}
+
+// 判断工作区是否有未提交改动；未知时返回 null。
+Future<bool?> _currentGitDirty(Duration timeout) async {
+  final status = await _runGitProbe(const <String>[
+    'status',
+    '--porcelain',
+    '--untracked-files=all',
+  ], timeout);
+  if (status == null) return null;
+  return status.trim().isNotEmpty;
+}
+
+// 执行只读 Git 探针并脱敏输出。
+Future<String?> _runGitProbe(List<String> arguments, Duration timeout) async {
+  try {
+    final result = await Process.run('git', arguments).timeout(timeout);
+    if (result.exitCode != 0) return null;
+    return _redactText('${result.stdout}');
+  } on Object {
+    return null;
   }
 }
 
@@ -427,7 +475,7 @@ final class _AcceptanceStepResult {
 final class _AcceptanceReport {
   const _AcceptanceReport({
     required this.timestamp,
-    required this.git,
+    required this.gitStatus,
     required this.requireComplete,
     required this.outDir,
     required this.evidence,
@@ -435,7 +483,7 @@ final class _AcceptanceReport {
   });
 
   final DateTime timestamp;
-  final String git;
+  final _GitStatus gitStatus;
   final bool requireComplete;
   final String outDir;
   final _AcceptanceEvidenceSummary evidence;
@@ -492,7 +540,8 @@ final class _AcceptanceReport {
       'schemaVersion': 1,
       'kind': 'v4FinalAcceptance',
       'timestamp': timestamp.toIso8601String(),
-      'git': git,
+      'git': gitStatus.revision,
+      'gitStatus': gitStatus.toJsonObject(),
       'requireComplete': requireComplete,
       'outDir': outDir,
       'completion': <String, Object?>{
@@ -522,7 +571,9 @@ final class _AcceptanceReport {
       ..writeln('# V4 Final Acceptance')
       ..writeln()
       ..writeln('- 时间：${timestamp.toIso8601String()}')
-      ..writeln('- 提交：$git')
+      ..writeln('- 提交：${gitStatus.revision}')
+      ..writeln('- 分支：${gitStatus.branch}')
+      ..writeln('- 工作区：${gitStatus.worktreeLabel}')
       ..writeln('- 来源：`$outDir`')
       ..writeln('- 完成：${complete ? '通过' : '未完成'}')
       ..writeln('- 基础审计：${auditOk ? '通过' : '失败'}')
@@ -583,6 +634,37 @@ final class _AcceptanceReport {
       buffer.writeln('- $step');
     }
     return buffer.toString();
+  }
+}
+
+// GitStatus 是终验报告的代码版本指纹，不包含具体文件列表。
+final class _GitStatus {
+  const _GitStatus({
+    required this.revision,
+    required this.branch,
+    required this.dirty,
+  });
+
+  final String revision;
+  final String branch;
+  final bool? dirty;
+
+  String get worktreeLabel {
+    return switch (dirty) {
+      true => '有未提交改动',
+      false => '干净',
+      null => '未知',
+    };
+  }
+
+  // 转为 JSON，保持旧顶层 git 字段之外的扩展指纹。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'revision': revision,
+      'branch': branch,
+      'dirty': dirty,
+      'worktree': worktreeLabel,
+    };
   }
 }
 

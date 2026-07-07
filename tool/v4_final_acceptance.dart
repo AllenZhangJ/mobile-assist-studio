@@ -1040,9 +1040,10 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
     archive ?? const <String, Object?>{},
     'latestFullSmoke',
   );
-  final iosTunnelNeeded = _jsonStringList(
-    latestFullSmoke['blockers'],
-  ).any((blocker) => blocker.contains('iOS 隧道'));
+  final iosTunnelNeeded = _iosPasswordPromptNeeded(
+    latestFullSmoke: latestFullSmoke,
+    localState: localState,
+  );
   final gaps = <_AcceptanceGateGap>[
     if (archive != null)
       ..._jsonStringList(
@@ -1151,6 +1152,26 @@ String _platformSmokeIssueText(
 bool _reportMatchesGit(Map<String, Object?> latest, String currentGit) {
   final git = latest['git']?.toString().trim();
   return currentGit != 'unknown' && git != null && git == currentGit;
+}
+
+// 判断 iOS smoke 命令是否应使用密码版；同时看历史阻断和当前本机隧道状态。
+bool _iosPasswordPromptNeeded({
+  required Map<String, Object?> latestFullSmoke,
+  required Map<String, Object?> localState,
+}) {
+  final blockedByLatestFullSmoke = _jsonStringList(
+    latestFullSmoke['blockers'],
+  ).any((blocker) => blocker.contains('iOS 隧道'));
+  if (blockedByLatestFullSmoke) return true;
+
+  final iosTunnel = _jsonMapAt(localState, 'iosTunnel');
+  if (iosTunnel.isEmpty) return false;
+  if (iosTunnel['reachable'] == false) return true;
+  if (iosTunnel['ready'] == false) return true;
+  final count = iosTunnel['count'];
+  if (count is int && count <= 0) return true;
+  final status = iosTunnel['status']?.toString() ?? '';
+  return status.contains('不可达') || status.contains('未发现');
 }
 
 // 将 archive 提醒映射成用户能执行的门禁项。
@@ -1407,9 +1428,9 @@ List<String> _nextStepsForFailures({
       joined.contains('full smoke') ||
       joined.contains('双平台完整 smoke') ||
       (latestFullSmoke.isNotEmpty && latestFullSmoke['complete'] != true);
-  final latestFullSmokeBlockers = _jsonStringList(latestFullSmoke['blockers']);
-  final latestFullSmokeNeedsIosTunnel = latestFullSmokeBlockers.any(
-    (blocker) => blocker.contains('iOS 隧道'),
+  final latestFullSmokeNeedsIosTunnel = _iosPasswordPromptNeeded(
+    latestFullSmoke: latestFullSmoke,
+    localState: localState,
   );
   if (!auditOk) {
     steps.add(

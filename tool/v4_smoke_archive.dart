@@ -267,6 +267,18 @@ List<String> _jsonStringList(Object? value) {
       .toList(growable: false);
 }
 
+// 合并自动准备与前置检查阻断项，保持顺序并去重。
+List<String> _combinedBlockers(
+  Map<String, Object?> preparation,
+  Map<String, Object?> preflight,
+) {
+  final seen = <String>{};
+  return <String>[
+    ..._jsonStringList(preparation['blockers']),
+    ..._jsonStringList(preflight['blockers']),
+  ].where(seen.add).toList(growable: false);
+}
+
 // 生成文件名安全时间戳。
 String _safeTimestamp(DateTime value) {
   return value.toIso8601String().replaceAll(':', '-').replaceAll('.', '-');
@@ -444,6 +456,7 @@ final class _ReportJsonSummary {
   // 从报告 JSON 解析统一摘要。
   factory _ReportJsonSummary.fromJson(Map<String, Object?> json) {
     final completion = _jsonMapAt(json, 'completion');
+    final preparation = _jsonMapAt(json, 'preparation');
     final preflight = _jsonMapAt(json, 'preflight');
     final steps = json['steps'];
     return _ReportJsonSummary(
@@ -451,7 +464,7 @@ final class _ReportJsonSummary {
       timestamp: json['timestamp']?.toString(),
       complete: completion['complete'] == true,
       label: _redactText(completion['label']?.toString() ?? '未知'),
-      blockers: _jsonStringList(preflight['blockers']),
+      blockers: _combinedBlockers(preparation, preflight),
       stepCount: steps is Iterable ? steps.length : 0,
     );
   }

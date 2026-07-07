@@ -40,7 +40,10 @@ abstract interface class ProcessHandle {
 }
 
 final class DartProcessHandle implements ProcessHandle {
-  DartProcessHandle(this._process);
+  DartProcessHandle(this._process) {
+    unawaited(_process.stdout.drain<void>());
+    unawaited(_process.stderr.drain<void>());
+  }
 
   final Process _process;
 

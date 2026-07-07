@@ -86,6 +86,20 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
       'label': '前置检查阻断',
       'failedSteps': <String>[],
     },
+    'preparation': <String, Object?>{
+      'skipped': false,
+      'status': '有阻断',
+      'hasBlockers': true,
+      'blockers': <String>['自动准备'],
+      'items': <Map<String, Object?>>[
+        <String, Object?>{
+          'name': '自动准备',
+          'ok': false,
+          'detail': '缺少密码',
+          'nextStep': '输入密码后重试。',
+        },
+      ],
+    },
     'preflight': <String, Object?>{
       'skipped': false,
       'status': '有阻断',
@@ -386,6 +400,7 @@ void _assertReadinessJson(Map<String, Object?> json) {
   );
   _expect(latestFullSmoke['stepCount'] == 0, '前置阻断时 stepCount 必须为 0。');
   final blockers = _stringList(latestFullSmoke['blockers']);
+  _expect(blockers.contains('自动准备'), 'latestFullSmoke.blockers 必须包含自动准备。');
   _expect(blockers.contains('Appium'), 'latestFullSmoke.blockers 必须包含 Appium。');
   _expect(
     blockers.contains('Android 手机'),
@@ -427,6 +442,7 @@ void _assertArchiveJson(Map<String, Object?> json) {
     'archive latestFullSmoke.label 必须保留阻断状态。',
   );
   final blockers = _stringList(latestFullSmoke['blockers']);
+  _expect(blockers.contains('自动准备'), 'archive blockers 必须包含自动准备。');
   _expect(blockers.contains('Appium'), 'archive blockers 必须包含 Appium。');
 
   final warnings = _stringList(json['warnings']);

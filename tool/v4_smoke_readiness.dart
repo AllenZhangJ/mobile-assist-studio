@@ -398,6 +398,18 @@ List<String> _jsonStringList(Object? value) {
       .toList(growable: false);
 }
 
+// 合并自动准备与前置检查阻断项，保持顺序并去重。
+List<String> _combinedBlockers(
+  Map<String, Object?> preparation,
+  Map<String, Object?> preflight,
+) {
+  final seen = <String>{};
+  return <String>[
+    ..._jsonStringList(preparation['blockers']),
+    ..._jsonStringList(preflight['blockers']),
+  ].where(seen.add).toList(growable: false);
+}
+
 // 执行短命令并裁剪输出。
 Future<_ProcessProbe> _runProcess(
   String executable,
@@ -722,6 +734,7 @@ final class _FullSmokeReportSummary {
     required Map<String, Object?> json,
   }) {
     final completion = _jsonMapAt(json, 'completion');
+    final preparation = _jsonMapAt(json, 'preparation');
     final preflight = _jsonMapAt(json, 'preflight');
     final steps = json['steps'] is Iterable
         ? json['steps'] as Iterable
@@ -741,7 +754,7 @@ final class _FullSmokeReportSummary {
       complete: completion['complete'] == true,
       label: _redactText(completion['label']?.toString() ?? '未知'),
       preflightStatus: _redactText(preflight['status']?.toString() ?? '未知'),
-      blockers: _jsonStringList(preflight['blockers']),
+      blockers: _combinedBlockers(preparation, preflight),
       failedSteps: _jsonStringList(completion['failedSteps']),
       stepCount: stepStatuses.length,
       stepStatuses: stepStatuses,

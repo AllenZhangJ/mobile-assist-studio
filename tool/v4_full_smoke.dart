@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:studio_runtime/studio_runtime.dart';
+
 // V4 full smoke 编排 iOS 与 Android 完整真机冒烟，并始终生成汇总留档。
 // 它只调用既有 Dart smoke 入口，不引入 Node 中间层，也不直接操作设备。
 Future<void> main(List<String> args) async {
@@ -20,48 +22,298 @@ Future<void> main(List<String> args) async {
   final timestamp = DateTime.now().toUtc();
   final steps = _buildSteps(options);
   if (options.dryRun) {
-    _printDryRun(steps);
+    _printDryRun(steps, options);
     return;
   }
 
   await options.outDir.create(recursive: true);
-  final preflight = options.skipPreflight
-      ? _FullSmokePreflight.skipped()
-      : await _runPreflight(options);
-  if (preflight.hasBlockers) {
-    final report = await _writeFullSmokeReport(
-      outDir: options.outDir,
-      timestamp: timestamp,
-      preflight: preflight,
-      results: const <_FullSmokeResult>[],
+  final resources = _FullSmokeManagedResources();
+  String? failureMessage;
+  try {
+    final preparation = options.autoPrepare
+        ? await _runAutoPreparation(options, resources)
+        : _FullSmokePreparation.skipped();
+    final preflight = options.skipPreflight
+        ? _FullSmokePreflight.skipped()
+        : await _runPreflight(options);
+    final results = <_FullSmokeResult>[];
+
+    if (preflight.hasBlockers || preparation.hasBlockers) {
+      final report = await _writeFullSmokeReport(
+        outDir: options.outDir,
+        timestamp: timestamp,
+        preparation: preparation,
+        preflight: preflight,
+        results: const <_FullSmokeResult>[],
+      );
+      stdout
+        ..writeln(
+          '\nFull smoke report: ${_redactText(report.markdownFile.path)}',
+        )
+        ..writeln('Full smoke json: ${_redactText(report.jsonFile.path)}');
+      final blockers = <String>[
+        ...preparation.blockerNames,
+        ...preflight.blockerNames,
+      ];
+      failureMessage = 'V4 full smoke 前置准备未通过：${blockers.join('、')}。';
+    } else {
+      for (final step in steps) {
+        results.add(await _runStep(step, options.stepTimeout));
+      }
+
+      final report = await _writeFullSmokeReport(
+        outDir: options.outDir,
+        timestamp: timestamp,
+        preparation: preparation,
+        preflight: preflight,
+        results: results,
+      );
+      stdout
+        ..writeln(
+          '\nFull smoke report: ${_redactText(report.markdownFile.path)}',
+        )
+        ..writeln('Full smoke json: ${_redactText(report.jsonFile.path)}');
+
+      final failed = results.where((result) => result.exitCode != 0).toList();
+      if (failed.isNotEmpty) {
+        failureMessage =
+            'V4 full smoke 未完成：${failed.map((item) => item.step.name).join('、')}。';
+      }
+    }
+  } finally {
+    await resources.stopAll();
+  }
+  if (failureMessage != null) {
+    _fail(failureMessage);
+  }
+}
+
+// 自动准备本机驱动和必要的 iOS 本机隧道。
+// 该步骤只托管本次 smoke 自己启动的进程，不接管外部服务。
+Future<_FullSmokePreparation> _runAutoPreparation(
+  _FullSmokeOptions options,
+  _FullSmokeManagedResources resources,
+) async {
+  final items = <_FullSmokePreparationItem>[];
+  StudioProjectConfig config;
+  try {
+    config = StudioProjectConfig.discover();
+    items.add(
+      const _FullSmokePreparationItem(
+        name: '项目配置',
+        ok: true,
+        detail: '已读取本地项目配置',
+        nextStep: '-',
+      ),
     );
-    stdout
-      ..writeln('\nFull smoke report: ${_redactText(report.markdownFile.path)}')
-      ..writeln('Full smoke json: ${_redactText(report.jsonFile.path)}');
-    _fail('V4 full smoke 前置检查未通过：${preflight.blockerNames.join('、')}。');
+  } on StudioProjectConfigDiscoveryException catch (error) {
+    return _FullSmokePreparation(
+      items: <_FullSmokePreparationItem>[
+        _FullSmokePreparationItem(
+          name: '项目配置',
+          ok: false,
+          detail: '${error.summary} ${error.nextStep}',
+          nextStep: error.nextStep,
+        ),
+      ],
+    );
+  } on Object catch (error) {
+    return _FullSmokePreparation(
+      items: <_FullSmokePreparationItem>[
+        _FullSmokePreparationItem(
+          name: '项目配置',
+          ok: false,
+          detail: _redactText('$error'),
+          nextStep: '确认配置文件可读后重试。',
+        ),
+      ],
+    );
   }
 
-  final results = <_FullSmokeResult>[];
-  for (final step in steps) {
-    results.add(await _runStep(step, options.stepTimeout));
+  items.add(await _prepareAppiumForSmoke(config, options, resources));
+  if (!options.skipIos && config.deviceSession.requiresAppiumTunnel) {
+    items.add(await _prepareIosTunnelForSmoke(config, options, resources));
+  } else if (!options.skipIos) {
+    items.add(
+      const _FullSmokePreparationItem(
+        name: 'iOS 隧道',
+        ok: true,
+        detail: '当前绑定手机无需本机隧道',
+        nextStep: '-',
+      ),
+    );
   }
 
-  final report = await _writeFullSmokeReport(
-    outDir: options.outDir,
-    timestamp: timestamp,
-    preflight: preflight,
-    results: results,
+  return _FullSmokePreparation(items: items);
+}
+
+// 准备 Appium 主服务；已有外部服务时只复用，不停止。
+Future<_FullSmokePreparationItem> _prepareAppiumForSmoke(
+  StudioProjectConfig config,
+  _FullSmokeOptions options,
+  _FullSmokeManagedResources resources,
+) async {
+  final statusUri = Uri(
+    scheme: 'http',
+    host: config.appiumServer.host,
+    port: config.appiumServer.port,
+    path: '/status',
   );
-  stdout
-    ..writeln('\nFull smoke report: ${_redactText(report.markdownFile.path)}')
-    ..writeln('Full smoke json: ${_redactText(report.jsonFile.path)}');
-
-  final failed = results.where((result) => result.exitCode != 0).toList();
-  if (failed.isNotEmpty) {
-    _fail(
-      'V4 full smoke 未完成：${failed.map((item) => item.step.name).join('、')}。',
+  final existing = await _probeHttpJson(
+    statusUri,
+    timeout: options.preflightTimeout,
+  );
+  if (existing.reachable && existing.ready == true) {
+    return const _FullSmokePreparationItem(
+      name: 'Appium',
+      ok: true,
+      detail: '已复用外部驱动服务',
+      nextStep: '-',
     );
   }
+
+  final manager = AppiumProcessManager(config: config.appiumProcess);
+  resources.appium = manager;
+  try {
+    await manager.start();
+    final ready = await _waitForHttpReady(
+      statusUri,
+      timeout: options.appiumPrepareTimeout,
+      interval: const Duration(milliseconds: 300),
+    );
+    if (!ready) {
+      return const _FullSmokePreparationItem(
+        name: 'Appium',
+        ok: false,
+        detail: '驱动启动后仍未就绪',
+        nextStep: '检查驱动安装、端口占用和 XCUITest driver 后重试。',
+      );
+    }
+    return const _FullSmokePreparationItem(
+      name: 'Appium',
+      ok: true,
+      detail: '已启动本次 smoke 托管驱动',
+      nextStep: '-',
+    );
+  } on Object catch (error) {
+    return _FullSmokePreparationItem(
+      name: 'Appium',
+      ok: false,
+      detail: _redactText('$error'),
+      nextStep: '确认驱动工具可用后重试。',
+    );
+  }
+}
+
+// 准备 iOS 18+ 所需的 XCUITest 本机隧道。
+// 密码只从 stdin 读一行并写入 sudo stdin，不写入报告。
+Future<_FullSmokePreparationItem> _prepareIosTunnelForSmoke(
+  StudioProjectConfig config,
+  _FullSmokeOptions options,
+  _FullSmokeManagedResources resources,
+) async {
+  final udid = config.deviceSession.udid;
+  if (udid == null) {
+    return const _FullSmokePreparationItem(
+      name: 'iOS 隧道',
+      ok: false,
+      detail: '手机绑定缺失',
+      nextStep: '先在 Mac App 点连接设备，或更新本地项目配置。',
+    );
+  }
+
+  final tunnelConfig = AppiumTunnelProcessConfig(
+    appiumExecutable: config.appiumProcess.executable,
+    workingDirectory: _projectDirectoryForConfig(config).path,
+    environment: config.appiumProcess.environment,
+    udid: udid,
+  );
+  final existing = await _readTunnelDevices(tunnelConfig);
+  if (existing.contains(udid)) {
+    return const _FullSmokePreparationItem(
+      name: 'iOS 隧道',
+      ok: true,
+      detail: '已复用外部本机隧道',
+      nextStep: '-',
+    );
+  }
+
+  if (!options.adminPasswordStdin) {
+    return const _FullSmokePreparationItem(
+      name: 'iOS 隧道',
+      ok: false,
+      detail: '缺少启动隧道所需的本机密码',
+      nextStep: '用 Mac App 点连接设备，或使用 --admin-password-stdin 后重试。',
+    );
+  }
+
+  final password = await _readAdminPasswordFromStdin();
+  final manager = AppiumTunnelProcessManager(config: tunnelConfig);
+  resources.tunnel = manager;
+  try {
+    await manager.start(adminPassword: password);
+    return const _FullSmokePreparationItem(
+      name: 'iOS 隧道',
+      ok: true,
+      detail: '已启动本次 smoke 托管隧道',
+      nextStep: '-',
+    );
+  } on Object catch (error) {
+    return _FullSmokePreparationItem(
+      name: 'iOS 隧道',
+      ok: false,
+      detail: _redactText('$error'),
+      nextStep: '解锁手机，点允许；若失败请重试密码。',
+    );
+  }
+}
+
+// 等待 HTTP ready，供自动准备后的 Appium 服务复核。
+Future<bool> _waitForHttpReady(
+  Uri uri, {
+  required Duration timeout,
+  required Duration interval,
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!DateTime.now().isAfter(deadline)) {
+    final probe = await _probeHttpJson(
+      uri,
+      timeout: const Duration(seconds: 1),
+    );
+    if (probe.reachable && probe.ready == true) return true;
+    if (interval > Duration.zero) {
+      await Future<void>.delayed(interval);
+    }
+  }
+  return false;
+}
+
+// 从 tunnel registry 读取设备集合；失败按空集合处理。
+Future<Set<String>> _readTunnelDevices(AppiumTunnelProcessConfig config) async {
+  try {
+    return await defaultAppiumTunnelRegistryReader(config);
+  } on Object {
+    return const <String>{};
+  }
+}
+
+// 从 stdin 读取一次性本机密码。
+// 调用方不得打印返回值，也不得把它写入任何报告。
+Future<String> _readAdminPasswordFromStdin() async {
+  final line = await stdin
+      .transform(utf8.decoder)
+      .transform(const LineSplitter())
+      .first;
+  return line.trimRight();
+}
+
+// 根据配置文件位置推导项目目录。
+Directory _projectDirectoryForConfig(StudioProjectConfig config) {
+  final configFile = File(config.sourcePath);
+  final configDirectory = configFile.parent;
+  return configDirectory.path.endsWith('/config')
+      ? configDirectory.parent
+      : Directory.current;
 }
 
 // 根据选项生成稳定的执行步骤，两个平台失败互不阻断，最后仍跑完成审计。
@@ -413,8 +665,14 @@ String _stderrWithTimeoutNote(StringBuffer buffer, bool timedOut) {
 }
 
 // dry-run 只展示将要执行的命令，用于本地确认和 CI 语法检查。
-void _printDryRun(List<_FullSmokeStep> steps) {
+void _printDryRun(List<_FullSmokeStep> steps, _FullSmokeOptions options) {
   stdout.writeln('V4 full smoke dry-run');
+  stdout.writeln('- 自动准备: ${options.autoPrepare ? '启用' : '跳过'}');
+  if (options.autoPrepare && !options.adminPasswordStdin) {
+    stdout.writeln(
+      '- iOS 隧道密码: 未从 stdin 读取，需要 Mac App 已连接或改用 password-stdin 入口',
+    );
+  }
   for (final step in steps) {
     stdout.writeln('- ${step.name}: ${_redactText(step.commandLine)}');
   }
@@ -424,6 +682,7 @@ void _printDryRun(List<_FullSmokeStep> steps) {
 Future<_FullSmokeReportFiles> _writeFullSmokeReport({
   required Directory outDir,
   required DateTime timestamp,
+  required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
 }) async {
@@ -433,6 +692,7 @@ Future<_FullSmokeReportFiles> _writeFullSmokeReport({
   await markdownFile.writeAsString(
     _summaryMarkdown(
       timestamp: timestamp,
+      preparation: preparation,
       preflight: preflight,
       results: results,
     ),
@@ -441,6 +701,7 @@ Future<_FullSmokeReportFiles> _writeFullSmokeReport({
   await jsonFile.writeAsString(
     _summaryJsonString(
       timestamp: timestamp,
+      preparation: preparation,
       preflight: preflight,
       results: results,
     ),
@@ -452,6 +713,7 @@ Future<_FullSmokeReportFiles> _writeFullSmokeReport({
 // 生成本地 Markdown 汇总，保留失败原因但脱敏路径、设备号和 session。
 String _summaryMarkdown({
   required DateTime timestamp,
+  required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
 }) {
@@ -460,7 +722,24 @@ String _summaryMarkdown({
     ..writeln()
     ..writeln('- 时间：${timestamp.toIso8601String()}')
     ..writeln('- 动作：真实 Tap / Swipe / Input + 基础 Project DSL workflow')
+    ..writeln('- 自动准备：${preparation.statusLabel}')
     ..writeln('- 前置检查：${preflight.statusLabel}')
+    ..writeln()
+    ..writeln('## 自动准备')
+    ..writeln();
+  if (preparation.skipped) {
+    buffer.writeln('- 已跳过自动准备。');
+  } else {
+    buffer
+      ..writeln('| 项目 | 结果 | 说明 | 下一步 |')
+      ..writeln('|---|---|---|---|');
+    for (final item in preparation.items) {
+      buffer.writeln(
+        '| ${item.name} | ${item.ok ? '通过' : '阻断'} | ${item.detail} | ${item.ok ? '-' : item.nextStep} |',
+      );
+    }
+  }
+  buffer
     ..writeln()
     ..writeln('## 前置检查')
     ..writeln();
@@ -511,12 +790,16 @@ String _summaryMarkdown({
 // 生成机器可读的 full smoke JSON，输出同样经过脱敏和裁剪。
 String _summaryJsonString({
   required DateTime timestamp,
+  required _FullSmokePreparation preparation,
   required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
 }) {
   final failed = results.where((result) => result.exitCode != 0).toList();
   final complete =
-      !preflight.hasBlockers && results.isNotEmpty && failed.isEmpty;
+      !preparation.hasBlockers &&
+      !preflight.hasBlockers &&
+      results.isNotEmpty &&
+      failed.isEmpty;
   final payload = <String, Object?>{
     'schemaVersion': 1,
     'kind': 'v4FullSmoke',
@@ -525,11 +808,12 @@ String _summaryJsonString({
       'complete': complete,
       'label': complete
           ? '完整通过'
-          : preflight.hasBlockers
+          : preparation.hasBlockers || preflight.hasBlockers
           ? '前置检查阻断'
           : '执行未完成',
       'failedSteps': failed.map((result) => result.step.name).toList(),
     },
+    'preparation': preparation.toJsonObject(),
     'preflight': preflight.toJsonObject(),
     'steps': results.map((result) => result.toJsonObject()).toList(),
   };
@@ -655,6 +939,82 @@ final class _FullSmokePreflight {
   }
 }
 
+// full smoke 自动准备集合。
+final class _FullSmokePreparation {
+  const _FullSmokePreparation({required this.items, this.skipped = false});
+
+  factory _FullSmokePreparation.skipped() {
+    return const _FullSmokePreparation(
+      items: <_FullSmokePreparationItem>[],
+      skipped: true,
+    );
+  }
+
+  final List<_FullSmokePreparationItem> items;
+  final bool skipped;
+
+  bool get hasBlockers => !skipped && items.any((item) => !item.ok);
+
+  Iterable<String> get blockerNames sync* {
+    for (final item in items) {
+      if (!item.ok) yield item.name;
+    }
+  }
+
+  String get statusLabel {
+    if (skipped) return '已跳过';
+    return hasBlockers ? '有阻断' : '通过';
+  }
+
+  // 转成机器可读自动准备结果。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'skipped': skipped,
+      'status': statusLabel,
+      'hasBlockers': hasBlockers,
+      'blockers': blockerNames.toList(),
+      'items': items.map((item) => item.toJsonObject()).toList(),
+    };
+  }
+}
+
+// full smoke 自动准备单项。
+final class _FullSmokePreparationItem {
+  const _FullSmokePreparationItem({
+    required this.name,
+    required this.ok,
+    required this.detail,
+    required this.nextStep,
+  });
+
+  final String name;
+  final bool ok;
+  final String detail;
+  final String nextStep;
+
+  // 转成机器可读自动准备单项。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'name': name,
+      'ok': ok,
+      'detail': detail,
+      'nextStep': ok ? null : nextStep,
+    };
+  }
+}
+
+// full smoke 托管资源集合，只释放本工具启动的进程。
+final class _FullSmokeManagedResources {
+  AppiumProcessManager? appium;
+  AppiumTunnelProcessManager? tunnel;
+
+  // 停止本次 full smoke 自动准备启动的进程。
+  Future<void> stopAll() async {
+    await tunnel?.stop();
+    await appium?.stop();
+  }
+}
+
 // full smoke 前置检查单项。
 final class _FullSmokePreflightItem {
   const _FullSmokePreflightItem({
@@ -764,7 +1124,10 @@ final class _FullSmokeOptions {
     required this.outDir,
     required this.stepTimeout,
     required this.preflightTimeout,
+    required this.appiumPrepareTimeout,
     required this.confirmActions,
+    required this.autoPrepare,
+    required this.adminPasswordStdin,
     required this.skipIos,
     required this.skipAndroid,
     required this.skipPreflight,
@@ -775,7 +1138,10 @@ final class _FullSmokeOptions {
   final Directory outDir;
   final Duration stepTimeout;
   final Duration preflightTimeout;
+  final Duration appiumPrepareTimeout;
   final bool confirmActions;
+  final bool autoPrepare;
+  final bool adminPasswordStdin;
   final bool skipIos;
   final bool skipAndroid;
   final bool skipPreflight;
@@ -787,7 +1153,10 @@ final class _FullSmokeOptions {
     var outDir = Directory('recordings/v4-smoke');
     var stepTimeoutSeconds = 300;
     var preflightTimeoutSeconds = 4;
+    var appiumPrepareTimeoutSeconds = 15;
     var confirmActions = false;
+    var autoPrepare = false;
+    var adminPasswordStdin = false;
     var skipIos = false;
     var skipAndroid = false;
     var skipPreflight = false;
@@ -809,8 +1178,15 @@ final class _FullSmokeOptions {
         case '--preflight-timeout':
           preflightTimeoutSeconds = int.parse(_nextValue(args, index, arg));
           index += 1;
+        case '--appium-prepare-timeout':
+          appiumPrepareTimeoutSeconds = int.parse(_nextValue(args, index, arg));
+          index += 1;
         case '--confirm-actions':
           confirmActions = true;
+        case '--auto-prepare':
+          autoPrepare = true;
+        case '--admin-password-stdin':
+          adminPasswordStdin = true;
         case '--skip-ios':
           skipIos = true;
         case '--skip-android':
@@ -828,7 +1204,10 @@ final class _FullSmokeOptions {
       outDir: outDir,
       stepTimeout: Duration(seconds: stepTimeoutSeconds),
       preflightTimeout: Duration(seconds: preflightTimeoutSeconds),
+      appiumPrepareTimeout: Duration(seconds: appiumPrepareTimeoutSeconds),
       confirmActions: confirmActions,
+      autoPrepare: autoPrepare,
+      adminPasswordStdin: adminPasswordStdin,
       skipIos: skipIos,
       skipAndroid: skipAndroid,
       skipPreflight: skipPreflight,
@@ -931,7 +1310,11 @@ V4 full smoke
   --out-dir <path>          结果目录，默认 recordings/v4-smoke
   --step-timeout <seconds>  单个平台 smoke 超时，默认 300
   --preflight-timeout <s>   单项前置检查超时，默认 4
+  --appium-prepare-timeout <s>
+                          自动等待驱动就绪超时，默认 15
   --confirm-actions         确认执行真实 Tap / Swipe / Input
+  --auto-prepare            先自动准备本机驱动和必要隧道
+  --admin-password-stdin    从 stdin 读取一次性 Mac 密码用于启动隧道
   --skip-ios                跳过 iOS 完整冒烟
   --skip-android            跳过 Android 完整冒烟
   --skip-preflight          跳过只读前置检查

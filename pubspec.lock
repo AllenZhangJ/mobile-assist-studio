@@ -9,6 +9,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.3.2+1"
+  appium_client:
+    dependency: transitive
+    description:
+      path: "packages/appium_client"
+      relative: true
+    source: path
+    version: "1.0.0"
   args:
     dependency: transitive
     description:
@@ -241,6 +248,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.4.1"
+  studio_runtime:
+    dependency: "direct main"
+    description:
+      path: "packages/studio_runtime"
+      relative: true
+    source: path
+    version: "1.0.0"
   term_glyph:
     dependency: transitive
     description:
@@ -265,6 +279,13 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.1"
+  workflow_dsl:
+    dependency: transitive
+    description:
+      path: "packages/workflow_dsl"
+      relative: true
+    source: path
+    version: "1.0.0"
   yaml:
     dependency: transitive
     description:

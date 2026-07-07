@@ -36,10 +36,9 @@ Future<void> main() async {
       'archive final 在 fixture 未完整时必须返回 2，实际 ${finalArchive.exitCode}。',
     );
     _expect(
-      finalArchive.stderr.contains('iOS 平台') &&
-          finalArchive.stderr.contains('Android 平台') &&
+      finalArchive.stderr.contains('Android 平台') &&
           finalArchive.stderr.contains('full smoke'),
-      'archive final 必须一次性提示平台 run 和 full smoke 缺口。',
+      'archive final 必须提示缺失平台 run 和 full smoke 缺口。',
     );
 
     final acceptance = await _runFinalAcceptance(tempDir);
@@ -66,6 +65,10 @@ Future<void> main() async {
           finalAcceptance.stderr.contains('完成审计') &&
           finalAcceptance.stderr.contains('归档终验') &&
           finalAcceptance.stderr.contains('终验门禁缺口') &&
+          finalAcceptance.stderr.contains('iOS smoke') &&
+          finalAcceptance.stderr.contains(
+            'npm run v4:ios-smoke:full:password-prompt',
+          ) &&
           finalAcceptance.stderr.contains('Android smoke') &&
           finalAcceptance.stderr.contains('npm run v4:android-smoke:full') &&
           finalAcceptance.stderr.contains(
@@ -250,6 +253,25 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
   const encoder = JsonEncoder.withIndent('  ');
   await File('$base.json').writeAsString('${encoder.convert(payload)}\n');
   await File('$base.md').writeAsString('# V4 Full Smoke\n\n- 前置检查：有阻断\n');
+  final iosRunDir = Directory(
+    '${outDir.path}/ios/run-2026-01-01T00-00-00-000000Z',
+  );
+  await iosRunDir.create(recursive: true);
+  await File('${iosRunDir.path}/metadata.json').writeAsString(
+    '${encoder.convert(<String, Object?>{'workflowName': 'V4 Smoke', 'startedAt': timestamp.toIso8601String()})}\n',
+  );
+  await File('${iosRunDir.path}/finished.json').writeAsString(
+    '${encoder.convert(<String, Object?>{'status': 'failed', 'finishedAt': timestamp.toIso8601String()})}\n',
+  );
+  final iosEvents = <Map<String, Object?>>[
+    <String, Object?>{'type': 'smokeStart', 'actionsAllowed': true},
+    <String, Object?>{'type': 'smokeWorkflowStart'},
+    <String, Object?>{'type': 'smokeAction', 'action': 'tap'},
+    <String, Object?>{'type': 'smokeFailure', 'message': 'WDA 会话失败'},
+  ];
+  await File(
+    '${iosRunDir.path}/events.jsonl',
+  ).writeAsString('${iosEvents.map(jsonEncode).join('\n')}\n');
   final androidDir = Directory('${outDir.path}/android');
   await androidDir.create(recursive: true);
   final preflightPayload = <String, Object?>{
@@ -585,6 +607,15 @@ void _assertReadinessJson(Map<String, Object?> json) {
     blockers.contains('Android 手机'),
     'latestFullSmoke.blockers 必须包含 Android 手机。',
   );
+  final latestIos = _mapAt(artifacts, 'latestIos');
+  _expect(
+    latestIos['status'] == 'failed' && latestIos['fullPassed'] == false,
+    'latestIos 必须保留最近失败且未完整通过的状态。',
+  );
+  _expect(
+    '${latestIos['summary']}'.contains('失败'),
+    'latestIos.summary 必须包含失败摘要。',
+  );
 
   final nextSteps = _listAt(json, 'nextSteps');
   _expect(nextSteps.isNotEmpty, 'nextSteps 必须给出下一步。');
@@ -613,7 +644,7 @@ void _assertArchiveJson(Map<String, Object?> json) {
   _expect(summary['readinessReports'] == 1, 'archive 必须索引 readiness JSON。');
   _expect(summary['fullSmokeReports'] == 1, 'archive 必须索引 full smoke JSON。');
   _expect(summary['screenshots'] == 1, 'archive 必须索引截图。');
-  _expect(summary['iosRuns'] == 0, 'fixture 下 iOS run 必须为 0。');
+  _expect(summary['iosRuns'] == 1, 'fixture 下 iOS run 必须为 1。');
   _expect(summary['androidRuns'] == 0, 'fixture 下 Android run 必须为 0。');
 
   final latestFullSmoke = _mapAt(summary, 'latestFullSmoke');
@@ -630,9 +661,9 @@ void _assertArchiveJson(Map<String, Object?> json) {
   final warnings = _stringList(json['warnings']);
   _expect(warnings.isNotEmpty, 'archive 必须保留当前缺口提醒。');
   _expect(
-    warnings.any((warning) => warning.contains('iOS 平台')) &&
+    !warnings.any((warning) => warning.contains('iOS 平台')) &&
         warnings.any((warning) => warning.contains('Android 平台')),
-    'archive 必须提示缺少双平台 run。',
+    'archive 必须只提示缺少 Android 平台 run。',
   );
 
   final artifacts = _listAt(json, 'artifacts');
@@ -681,6 +712,12 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   _expect(
     gateGaps.any(
           (gap) =>
+              _mapFrom(gap)['title'] == 'iOS smoke' &&
+              _mapFrom(gap)['command'] ==
+                  'npm run v4:ios-smoke:full:password-prompt',
+        ) &&
+        gateGaps.any(
+          (gap) =>
               _mapFrom(gap)['title'] == 'Android smoke' &&
               _mapFrom(gap)['command'] == 'npm run v4:android-smoke:full',
         ) &&
@@ -690,7 +727,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
               _mapFrom(gap)['command'] ==
                   'npm run v4:smoke:full:password-prompt',
         ),
-    'acceptance gateGaps 必须包含 Android 和密码版 full smoke 缺口。',
+    'acceptance gateGaps 必须包含 iOS、Android 和密码版 full smoke 缺口。',
   );
   final nextSteps = _stringList(json['nextSteps']);
   _expect(
@@ -754,9 +791,14 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
     _mapAt(readinessArtifacts, 'latestAndroidPreflight')['label'] == '有阻断',
     'acceptance evidence 必须嵌入最近 Android 前置诊断。',
   );
+  _expect(
+    _mapAt(readinessArtifacts, 'latestIos')['fullPassed'] == false,
+    'acceptance evidence 必须嵌入最近 iOS 未完整通过状态。',
+  );
   final archive = _mapAt(evidence, 'archive');
   final counts = _mapAt(archive, 'counts');
   _expect(counts['screenshots'] == 1, 'acceptance evidence 必须嵌入截图数量。');
+  _expect(counts['iosRuns'] == 1, 'fixture 下 iOS 运行数量必须为 1。');
   _expect(counts['androidRuns'] == 0, 'fixture 下 Android 运行数量必须为 0。');
   final screenshotArtifacts = _listAt(archive, 'screenshotArtifacts');
   _expect(screenshotArtifacts.length == 1, 'acceptance evidence 必须嵌入截图索引。');

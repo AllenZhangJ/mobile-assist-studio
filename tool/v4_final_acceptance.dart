@@ -789,21 +789,86 @@ String _latestFullSmokeLine(Map<String, Object?> summary) {
   return '$label，时间 $timestamp';
 }
 
-// 从 archive warnings 生成终验门禁缺口，避免缺口只藏在子报告中。
+// 从 archive warnings 和 readiness 最近平台状态生成终验门禁缺口。
 List<_AcceptanceGateGap> _gateGapsFromEvidence(
   _AcceptanceEvidenceSummary evidence,
 ) {
   final archive = evidence.archive;
-  if (archive == null) return const <_AcceptanceGateGap>[];
-  final warnings = _jsonStringList(archive['warnings']);
-  if (warnings.isEmpty) return const <_AcceptanceGateGap>[];
-  final latestFullSmoke = _jsonMapAt(archive, 'latestFullSmoke');
+  final readinessArtifacts = _jsonMapAt(
+    evidence.readiness ?? const <String, Object?>{},
+    'artifacts',
+  );
+  final latestFullSmoke = _jsonMapAt(
+    archive ?? const <String, Object?>{},
+    'latestFullSmoke',
+  );
   final iosTunnelNeeded = _jsonStringList(
     latestFullSmoke['blockers'],
   ).any((blocker) => blocker.contains('iOS 隧道'));
-  return warnings
-      .map((warning) => _gateGapFromWarning(warning, iosTunnelNeeded))
-      .toList(growable: false);
+  final gaps = <_AcceptanceGateGap>[
+    if (archive != null)
+      ..._jsonStringList(
+        archive['warnings'],
+      ).map((warning) => _gateGapFromWarning(warning, iosTunnelNeeded)),
+  ];
+
+  void addIfMissing(_AcceptanceGateGap gap) {
+    if (gaps.any((item) => item.title == gap.title)) return;
+    gaps.add(gap);
+  }
+
+  if (readinessArtifacts.isNotEmpty) {
+    final latestIos = _jsonMapAt(readinessArtifacts, 'latestIos');
+    if (_platformSmokeNeedsGap(latestIos)) {
+      addIfMissing(
+        _platformSmokeGateGap(
+          title: 'iOS smoke',
+          platformLabel: 'iOS',
+          latest: latestIos,
+          command: iosTunnelNeeded
+              ? 'npm run v4:ios-smoke:full:password-prompt'
+              : 'npm run v4:ios-smoke:full',
+        ),
+      );
+    }
+
+    final latestAndroid = _jsonMapAt(readinessArtifacts, 'latestAndroid');
+    if (_platformSmokeNeedsGap(latestAndroid)) {
+      addIfMissing(
+        _platformSmokeGateGap(
+          title: 'Android smoke',
+          platformLabel: 'Android',
+          latest: latestAndroid,
+          command: 'npm run v4:android-smoke:full',
+        ),
+      );
+    }
+  }
+
+  return gaps;
+}
+
+// 判断最近平台 smoke 是否缺失或未完整通过。
+bool _platformSmokeNeedsGap(Map<String, Object?> latest) {
+  return latest.isEmpty || latest['fullPassed'] != true;
+}
+
+// 将最近平台 smoke 状态转成终验门禁项。
+_AcceptanceGateGap _platformSmokeGateGap({
+  required String title,
+  required String platformLabel,
+  required Map<String, Object?> latest,
+  required String command,
+}) {
+  final current = latest.isEmpty
+      ? '未发现 $platformLabel 平台 smoke run。'
+      : '$platformLabel 最近未完整通过：${_plainText(latest['summary']?.toString() ?? latest['status']?.toString() ?? '无摘要')}';
+  return _AcceptanceGateGap(
+    title: title,
+    current: current,
+    required: '$platformLabel 真机 smoke run 完整通过',
+    command: command,
+  );
 }
 
 // 将 archive 提醒映射成用户能执行的门禁项。

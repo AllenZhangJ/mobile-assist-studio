@@ -1384,6 +1384,7 @@ List<String> _nextStepsForFailures({
     'localState',
   );
   final iosUsbMux = _jsonMapAt(localState, 'iosUsbMux');
+  final androidDevice = _jsonMapAt(localState, 'androidDevice');
   final latestFullSmoke = _jsonMapAt(
     evidence.archive ?? const <String, Object?>{},
     'latestFullSmoke',
@@ -1430,7 +1431,7 @@ List<String> _nextStepsForFailures({
     );
   }
   if (needsAndroidSmoke) {
-    steps.add('Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。');
+    steps.add(_androidNextStepForFailures(androidDevice));
   }
   if (joined.contains('截图') ||
       (counts.isNotEmpty && (counts['screenshots'] ?? 0) == 0)) {
@@ -1462,6 +1463,31 @@ String _iosNextStepForFailures({
     return 'iOS：先用 Mac App 点连接设备，或运行 `$command` 输入 Mac 密码后补验。';
   }
   return 'iOS：连接并信任一台 iPhone，运行 `$command`。';
+}
+
+// 生成最终报告里的 Android 下一步，优先解释 ADB 当前可见状态。
+String _androidNextStepForFailures(Map<String, Object?> androidDevice) {
+  const command = 'npm run v4:android-smoke:full';
+  final state = _localChecklistState(androidDevice);
+  if (state == null) {
+    return 'Android：连接一台已开启 USB 调试的手机，运行 `$command`。';
+  }
+  if (state.available) {
+    return 'Android：当前手机可用（${state.label}），运行 `$command`。';
+  }
+  final unauthorized = androidDevice['unauthorized'] is int
+      ? androidDevice['unauthorized'] as int
+      : 0;
+  final offline = androidDevice['offline'] is int
+      ? androidDevice['offline'] as int
+      : 0;
+  if (unauthorized > 0) {
+    return 'Android：当前手机未授权（${state.label}）。请在手机上允许 USB 调试，再运行 `$command`。';
+  }
+  if (offline > 0) {
+    return 'Android：当前手机离线（${state.label}）。请重新插线或重启 ADB，再运行 `$command`。';
+  }
+  return 'Android：当前未发现 Android 手机（${state.label}）。先插线、开启 USB 调试并点允许，再运行 `$command`。';
 }
 
 // 根据下一步生成现场执行顺序，避免用户在多条命令间来回试错。

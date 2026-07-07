@@ -1167,6 +1167,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
           (step) => step.contains('v4:ios-smoke:full:password-prompt'),
         ) &&
         nextSteps.any((step) => step.contains('v4:android-smoke:full')) &&
+        nextSteps.any((step) => step.contains('当前未发现 Android 手机')) &&
         nextSteps.any((step) => step.contains('v4:smoke:full')) &&
         nextSteps.any(
           (step) => step.contains('v4:smoke:full:password-prompt'),

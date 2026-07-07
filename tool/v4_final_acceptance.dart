@@ -798,6 +798,10 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
     evidence.readiness ?? const <String, Object?>{},
     'artifacts',
   );
+  final localState = _jsonMapAt(
+    evidence.readiness ?? const <String, Object?>{},
+    'localState',
+  );
   final latestFullSmoke = _jsonMapAt(
     archive ?? const <String, Object?>{},
     'latestFullSmoke',
@@ -812,19 +816,24 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
       ).map((warning) => _gateGapFromWarning(warning, iosTunnelNeeded)),
   ];
 
-  void addIfMissing(_AcceptanceGateGap gap) {
-    if (gaps.any((item) => item.title == gap.title)) return;
-    gaps.add(gap);
+  void addOrReplace(_AcceptanceGateGap gap) {
+    final index = gaps.indexWhere((item) => item.title == gap.title);
+    if (index < 0) {
+      gaps.add(gap);
+    } else {
+      gaps[index] = gap;
+    }
   }
 
   if (readinessArtifacts.isNotEmpty) {
     final latestIos = _jsonMapAt(readinessArtifacts, 'latestIos');
     if (_platformSmokeNeedsGap(latestIos)) {
-      addIfMissing(
+      addOrReplace(
         _platformSmokeGateGap(
           title: 'iOS smoke',
           platformLabel: 'iOS',
           latest: latestIos,
+          localDevice: _jsonMapAt(localState, 'iosDevice'),
           command: iosTunnelNeeded
               ? 'npm run v4:ios-smoke:full:password-prompt'
               : 'npm run v4:ios-smoke:full',
@@ -834,11 +843,12 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
 
     final latestAndroid = _jsonMapAt(readinessArtifacts, 'latestAndroid');
     if (_platformSmokeNeedsGap(latestAndroid)) {
-      addIfMissing(
+      addOrReplace(
         _platformSmokeGateGap(
           title: 'Android smoke',
           platformLabel: 'Android',
           latest: latestAndroid,
+          localDevice: _jsonMapAt(localState, 'androidDevice'),
           command: 'npm run v4:android-smoke:full',
         ),
       );
@@ -858,14 +868,19 @@ _AcceptanceGateGap _platformSmokeGateGap({
   required String title,
   required String platformLabel,
   required Map<String, Object?> latest,
+  required Map<String, Object?> localDevice,
   required String command,
 }) {
-  final current = latest.isEmpty
-      ? '未发现 $platformLabel 平台 smoke run。'
-      : '$platformLabel 最近未完整通过：${_plainText(latest['summary']?.toString() ?? latest['status']?.toString() ?? '无摘要')}';
+  final currentParts = <String>[
+    if (localDevice.isNotEmpty)
+      '$platformLabel 当前状态：${_localStateLabel(localDevice)}',
+    latest.isEmpty
+        ? '未发现 $platformLabel 平台 smoke run。'
+        : '$platformLabel 最近未完整通过：${_plainText(latest['summary']?.toString() ?? latest['status']?.toString() ?? '无摘要')}',
+  ];
   return _AcceptanceGateGap(
     title: title,
-    current: current,
+    current: currentParts.join('；'),
     required: '$platformLabel 真机 smoke run 完整通过',
     command: command,
   );

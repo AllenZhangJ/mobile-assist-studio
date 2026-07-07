@@ -713,12 +713,18 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
     gateGaps.any(
           (gap) =>
               _mapFrom(gap)['title'] == 'iOS smoke' &&
+              '${_mapFrom(gap)['current']}'.contains('iOS 当前状态') &&
+              '${_mapFrom(gap)['current']}'.contains('iOS 最近未完整通过') &&
               _mapFrom(gap)['command'] ==
                   'npm run v4:ios-smoke:full:password-prompt',
         ) &&
         gateGaps.any(
           (gap) =>
               _mapFrom(gap)['title'] == 'Android smoke' &&
+              '${_mapFrom(gap)['current']}'.contains('Android 当前状态') &&
+              '${_mapFrom(gap)['current']}'.contains(
+                '未发现 Android 平台 smoke run',
+              ) &&
               _mapFrom(gap)['command'] == 'npm run v4:android-smoke:full',
         ) &&
         gateGaps.any(

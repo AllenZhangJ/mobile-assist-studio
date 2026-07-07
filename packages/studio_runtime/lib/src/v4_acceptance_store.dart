@@ -81,6 +81,7 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
         _safeAcceptanceTextAt(latestFullSmoke, 'label') ?? '暂无',
     failures: _safeAcceptanceTextListAt(completion, 'failures'),
     nextSteps: _safeAcceptanceTextListAt(json, 'nextSteps'),
+    batches: _batchSummariesAt(readiness, 'batches'),
   );
 }
 
@@ -137,6 +138,32 @@ List<String> _safeAcceptanceTextListAt(Map<String, Object?> json, String key) {
       .map(_redactConnectionDetail)
       .take(6)
       .toList(growable: false);
+}
+
+// 安全读取 Batch 0-8 摘要列表，并对可见文本二次脱敏。
+List<V4AcceptanceBatchSummary> _batchSummariesAt(
+  Map<String, Object?> json,
+  String key,
+) {
+  final value = json[key];
+  if (value is! List) return const <V4AcceptanceBatchSummary>[];
+  final batches = <V4AcceptanceBatchSummary>[];
+  for (final item in value) {
+    if (item is! Map) continue;
+    final map = Map<String, Object?>.from(item);
+    final name = _safeAcceptanceTextAt(map, 'name');
+    final status = _safeAcceptanceTextAt(map, 'status');
+    if (name == null || status == null) continue;
+    batches.add(
+      V4AcceptanceBatchSummary(
+        name: name,
+        status: status,
+        evidence: _safeAcceptanceTextAt(map, 'evidence') ?? '无',
+      ),
+    );
+    if (batches.length >= 9) break;
+  }
+  return List<V4AcceptanceBatchSummary>.unmodifiable(batches);
 }
 
 // Git 字段只保留短提交号，避免未来误写长来源字符串。

@@ -20,6 +20,7 @@ final class V4AcceptanceSummary {
     required this.latestFullSmokeLabel,
     required this.failures,
     required this.nextSteps,
+    required this.batches,
   });
 
   final bool hasReport;
@@ -37,6 +38,7 @@ final class V4AcceptanceSummary {
   final String latestFullSmokeLabel;
   final List<String> failures;
   final List<String> nextSteps;
+  final List<V4AcceptanceBatchSummary> batches;
 
   // 无报告时的安全初始状态。
   static const empty = V4AcceptanceSummary(
@@ -55,6 +57,7 @@ final class V4AcceptanceSummary {
     latestFullSmokeLabel: '暂无',
     failures: <String>[],
     nextSteps: <String>[],
+    batches: <V4AcceptanceBatchSummary>[],
   );
 
   // 终验最短下一步，缺失报告时给出可操作入口。
@@ -67,4 +70,45 @@ final class V4AcceptanceSummary {
 
   // 判断是否已存在 Android 真机 smoke 留档。
   bool get hasAndroidRun => androidRuns > 0;
+
+  // 已完成批次数，供 UI 只展示摘要，不铺开完整表。
+  int get completedBatchCount =>
+      batches.where((batch) => batch.isComplete).length;
+
+  // 批次总数，缺失报告或旧报告时为 0。
+  int get totalBatchCount => batches.length;
+
+  // 批次进度短标签，避免主界面展示大段审计表。
+  String get batchProgressLabel {
+    if (batches.isEmpty) return '未读';
+    return '$completedBatchCount/${batches.length}';
+  }
+
+  // 首个未完成批次，用于给用户一个短下一步焦点。
+  V4AcceptanceBatchSummary? get firstPendingBatch {
+    for (final batch in batches) {
+      if (!batch.isComplete) return batch;
+    }
+    return null;
+  }
+}
+
+// V4AcceptanceBatchSummary 是 Batch 0-8 的单行脱敏验收摘要。
+// 它来自 final acceptance JSON，不读取 Markdown，不保存本机路径。
+final class V4AcceptanceBatchSummary {
+  // 创建单个批次摘要。
+  const V4AcceptanceBatchSummary({
+    required this.name,
+    required this.status,
+    required this.evidence,
+  });
+
+  final String name;
+  final String status;
+  final String evidence;
+
+  // 判断当前批次是否已闭环，未知或现场未就绪都不算完成。
+  bool get isComplete {
+    return status == '已落地' || status == '已完成完整 smoke 留档' || status == '完整通过';
+  }
 }

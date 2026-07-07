@@ -37,6 +37,10 @@ void main() {
       expect(summary.latestFullSmokeLabel, '前置检查阻断');
       expect(summary.primaryNextStep, startsWith('Android：'));
       expect(summary.hasAndroidRun, isFalse);
+      expect(summary.totalBatchCount, 9);
+      expect(summary.completedBatchCount, 8);
+      expect(summary.batchProgressLabel, '8/9');
+      expect(summary.firstPendingBatch?.name, 'Batch 2 双平台 smoke');
     },
   );
 
@@ -102,6 +106,11 @@ void main() {
       summary.latestFullSmokeLabel,
       ...summary.failures,
       ...summary.nextSteps,
+      for (final batch in summary.batches) ...[
+        batch.name,
+        batch.status,
+        batch.evidence,
+      ],
     ].join(' ');
 
     expect(visibleText, contains('[本机路径]'));
@@ -133,7 +142,8 @@ String _acceptanceJson({required String git, required int androidRuns}) {
           "status": "未就绪",
           "detail": "可用 0，未授权 0，离线 0"
         }
-      }
+      },
+      "batches": ${_batchRowsJson()}
     },
     "archive": {
       "counts": {
@@ -176,7 +186,8 @@ String _acceptanceJsonWithSensitiveText() {
           "status": "未就绪 /Users/example/status",
           "detail": "路径 /Users/example/project 设备 00008110-000A01E03C3B801E"
         }
-      }
+      },
+      "batches": ${_batchRowsJson(sensitive: true)}
     },
     "archive": {
       "counts": {
@@ -194,5 +205,24 @@ String _acceptanceJsonWithSensitiveText() {
     "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E"
   ]
 }
+''';
+}
+
+String _batchRowsJson({bool sensitive = false}) {
+  final batch2Evidence = sensitive
+      ? 'Android 00008110-000A01E03C3B801E 缺少 /Users/example/run'
+      : 'iOS 最近 失败，Android 最近 无记录';
+  return '''
+[
+  {"name": "Batch 0 真源治理", "status": "已落地", "evidence": "V4 文档"},
+  {"name": "Batch 1 Runtime 基座", "status": "已落地", "evidence": "Runtime tests"},
+  {"name": "Batch 2 双平台 smoke", "status": "现场未就绪", "evidence": "$batch2Evidence"},
+  {"name": "Batch 3 Inspector", "status": "已落地", "evidence": "Inspector tests"},
+  {"name": "Batch 4 Target / Recorder", "status": "已落地", "evidence": "Target tests"},
+  {"name": "Batch 5 Vision Core", "status": "已落地", "evidence": "Vision tests"},
+  {"name": "Batch 6 Workflow Canvas", "status": "已落地", "evidence": "Canvas tests"},
+  {"name": "Batch 7 Evidence / Report", "status": "已落地", "evidence": "Report tests"},
+  {"name": "Batch 8 AI / MCP Core", "status": "已落地", "evidence": "AI tests"}
+]
 ''';
 }

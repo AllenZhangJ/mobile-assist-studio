@@ -172,6 +172,7 @@ void main() {
         latestFullSmokeLabel: '前置检查阻断',
         failures: const ['缺少 Android 平台 smoke run。'],
         nextSteps: const ['Android：连接一台已开启 USB 调试的手机。'],
+        batches: _v4AcceptanceBatchFixture(),
       ),
     );
 
@@ -195,6 +196,7 @@ void main() {
     expect(find.text('V4 验收'), findsOneWidget);
     expect(find.text('未完成'), findsOneWidget);
     expect(find.text('iOS 1'), findsOneWidget);
+    expect(find.text('8/9'), findsOneWidget);
     expect(find.text('安卓 0'), findsOneWidget);
     expect(find.text('补安卓'), findsOneWidget);
     expect(find.text('可用 0，未授权 0，离线 0'), findsOneWidget);
@@ -794,4 +796,54 @@ void main() {
     expect(find.text('暂停流程'), findsNothing);
     expect(find.textContaining('run-failed-local'), findsNothing);
   });
+}
+
+List<V4AcceptanceBatchSummary> _v4AcceptanceBatchFixture() {
+  return const <V4AcceptanceBatchSummary>[
+    V4AcceptanceBatchSummary(
+      name: 'Batch 0 真源治理',
+      status: '已落地',
+      evidence: 'V4 文档',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 1 Runtime 基座',
+      status: '已落地',
+      evidence: 'Runtime tests',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 2 双平台 smoke',
+      status: '现场未就绪',
+      evidence: 'Android 无记录',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 3 Inspector',
+      status: '已落地',
+      evidence: 'Inspector tests',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 4 Target / Recorder',
+      status: '已落地',
+      evidence: 'Target tests',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 5 Vision Core',
+      status: '已落地',
+      evidence: 'Vision tests',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 6 Workflow Canvas',
+      status: '已落地',
+      evidence: 'Canvas tests',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 7 Evidence / Report',
+      status: '已落地',
+      evidence: 'Report tests',
+    ),
+    V4AcceptanceBatchSummary(
+      name: 'Batch 8 AI / MCP Core',
+      status: '已落地',
+      evidence: 'AI tests',
+    ),
+  ];
 }

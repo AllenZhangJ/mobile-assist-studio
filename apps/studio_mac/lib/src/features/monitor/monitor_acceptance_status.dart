@@ -32,6 +32,11 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             tone: summary.localRunTone,
           ),
           _V4AcceptanceFact(
+            label: '批次',
+            value: summary.batchProgressLabel,
+            tone: summary.batchProgressTone,
+          ),
+          _V4AcceptanceFact(
             label: '安卓留档',
             value: summary.androidRunLabel,
             tone: summary.androidRunTone,
@@ -260,6 +265,8 @@ final class _V4AcceptanceStatusSummary {
     required this.platformTone,
     required this.localRunLabel,
     required this.localRunTone,
+    required this.batchProgressLabel,
+    required this.batchProgressTone,
     required this.androidRunLabel,
     required this.androidRunTone,
     required this.issueLabel,
@@ -274,6 +281,8 @@ final class _V4AcceptanceStatusSummary {
   final StudioStatusTone platformTone;
   final String localRunLabel;
   final StudioStatusTone localRunTone;
+  final String batchProgressLabel;
+  final StudioStatusTone batchProgressTone;
   final String androidRunLabel;
   final StudioStatusTone androidRunTone;
   final String issueLabel;
@@ -305,6 +314,8 @@ final class _V4AcceptanceStatusSummary {
         localRunTone: acceptance.iosRuns > 0
             ? StudioStatusTone.ready
             : StudioStatusTone.warning,
+        batchProgressLabel: acceptance.batchProgressLabel,
+        batchProgressTone: _v4BatchProgressTone(acceptance),
         androidRunLabel: '安卓 ${acceptance.androidRuns}',
         androidRunTone: acceptance.androidRuns > 0
             ? StudioStatusTone.ready
@@ -332,6 +343,8 @@ final class _V4AcceptanceStatusSummary {
       localRunTone: hasLocalRuns
           ? StudioStatusTone.ready
           : StudioStatusTone.offline,
+      batchProgressLabel: '未读',
+      batchProgressTone: StudioStatusTone.offline,
       androidRunLabel: '未知',
       androidRunTone: StudioStatusTone.offline,
       issueLabel: issueRuns > 0 ? '$issueRuns 条' : '无',
@@ -342,6 +355,15 @@ final class _V4AcceptanceStatusSummary {
       routeHint: _v4RouteHint(platform),
     );
   }
+}
+
+// 根据批次进度给出短状态色，旧报告缺少批次时降级为离线。
+StudioStatusTone _v4BatchProgressTone(V4AcceptanceSummary acceptance) {
+  if (acceptance.totalBatchCount == 0) return StudioStatusTone.offline;
+  if (acceptance.completedBatchCount == acceptance.totalBatchCount) {
+    return StudioStatusTone.ready;
+  }
+  return StudioStatusTone.warning;
 }
 
 // 根据终验报告给出短下一步，避免把长命令挤进指标卡。

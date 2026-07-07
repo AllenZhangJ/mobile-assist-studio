@@ -39,6 +39,12 @@ Future<void> main(List<String> args) async {
     final results = <_FullSmokeResult>[];
 
     if (preflight.hasBlockers || preparation.hasBlockers) {
+      await _tryWriteAndroidPreflightFromFullSmoke(
+        options: options,
+        timestamp: timestamp,
+        preparation: preparation,
+        preflight: preflight,
+      );
       final report = await _writeFullSmokeReport(
         outDir: options.outDir,
         timestamp: timestamp,
@@ -582,6 +588,213 @@ Future<_FullSmokePreflight> _runPreflight(_FullSmokeOptions options) async {
   }
 
   return _FullSmokePreflight(items: items);
+}
+
+// Android 纳入 full smoke 时，同步写一份 Android preflight，便于 readiness/acceptance 索引最新阻断。
+Future<void> _tryWriteAndroidPreflightFromFullSmoke({
+  required _FullSmokeOptions options,
+  required DateTime timestamp,
+  required _FullSmokePreparation preparation,
+  required _FullSmokePreflight preflight,
+}) async {
+  if (options.skipAndroid) return;
+  try {
+    await _writeAndroidPreflightFromFullSmoke(
+      outDir: Directory('${options.outDir.path}/android'),
+      timestamp: timestamp,
+      preparation: preparation,
+      preflight: preflight,
+    );
+  } on Object catch (error) {
+    stdout.writeln('Android 前置诊断留档失败：${_redactText('$error')}');
+  }
+}
+
+// 把 full smoke 的 Appium/Android 准备项转换成 Android smoke preflight 同构报告。
+Future<void> _writeAndroidPreflightFromFullSmoke({
+  required Directory outDir,
+  required DateTime timestamp,
+  required _FullSmokePreparation preparation,
+  required _FullSmokePreflight preflight,
+}) async {
+  final checks = _androidPreflightChecksFromFullSmoke(preparation, preflight);
+  final ready = checks.every((check) => check.ok);
+  final blockers = checks
+      .where((check) => !check.ok)
+      .map((check) => check.name)
+      .toList(growable: false);
+  final nextSteps = checks
+      .where((check) => !check.ok && check.nextStep != '-')
+      .map((check) => check.nextStep)
+      .toSet()
+      .toList(growable: false);
+  final payload = <String, Object?>{
+    'schemaVersion': 1,
+    'kind': 'v4AndroidSmokePreflight',
+    'timestamp': timestamp.toIso8601String(),
+    'source': 'full-smoke',
+    'completion': <String, Object?>{
+      'ready': ready,
+      'label': ready ? '可运行' : '有阻断',
+      'blockers': blockers,
+    },
+    'request': <String, Object?>{
+      'allowActions': true,
+      'workflowBasic': true,
+      'source': 'full-smoke',
+    },
+    'checks': checks.map((check) => check.toJsonObject()).toList(),
+    'nextSteps': nextSteps.isEmpty
+        ? const <String>['继续运行 Android smoke。']
+        : nextSteps,
+  };
+  const encoder = JsonEncoder.withIndent('  ');
+  await outDir.create(recursive: true);
+  final base =
+      '${outDir.path}/ANDROID_SMOKE_PREFLIGHT_${_safeTimestamp(timestamp)}';
+  await File(
+    '$base.json',
+  ).writeAsString('${encoder.convert(payload)}\n', flush: true);
+  await File('$base.md').writeAsString(
+    _androidPreflightMarkdown(timestamp, payload, checks),
+    flush: true,
+  );
+}
+
+// 从 full smoke 的多段准备结果中抽取 Android smoke 语义的两类检查。
+List<_AndroidPreflightCheck> _androidPreflightChecksFromFullSmoke(
+  _FullSmokePreparation preparation,
+  _FullSmokePreflight preflight,
+) {
+  final driverItems = <_SmokeCheckView>[
+    if (_preparationItem(preparation, '驱动组件') case final item?)
+      _SmokeCheckView.fromPreparation(item),
+    if (_preparationItem(preparation, 'Appium') case final item?)
+      _SmokeCheckView.fromPreparation(item),
+    if (_preflightItem(preflight, 'Appium') case final item?)
+      _SmokeCheckView.fromPreflight(item),
+  ];
+  final androidItems = <_SmokeCheckView>[
+    if (_preparationItem(preparation, 'Android 手机') case final item?)
+      _SmokeCheckView.fromPreparation(item),
+    if (_preflightItem(preflight, 'Android 手机') case final item?)
+      _SmokeCheckView.fromPreflight(item),
+  ];
+  return <_AndroidPreflightCheck>[
+    _combinedAndroidPreflightCheck(
+      name: '驱动',
+      items: driverItems,
+      readyDetail: '已就绪',
+      fallbackNextStep: '先运行 full smoke 自动准备驱动，或在 Mac App 点连接设备。',
+    ),
+    _combinedAndroidPreflightCheck(
+      name: '安卓手机',
+      items: androidItems,
+      readyDetail: '已发现一台已授权 Android 手机',
+      fallbackNextStep: '连接一台已开启 USB 调试的 Android 手机，并在手机上允许调试。',
+    ),
+  ];
+}
+
+// 合并同一语义下的多个检查来源，任何来源阻断都会进入阻断态。
+_AndroidPreflightCheck _combinedAndroidPreflightCheck({
+  required String name,
+  required List<_SmokeCheckView> items,
+  required String readyDetail,
+  required String fallbackNextStep,
+}) {
+  final firstBlocker = _firstBlockingSmokeCheck(items);
+  if (firstBlocker != null) {
+    return _AndroidPreflightCheck(
+      name: name,
+      ok: false,
+      detail: firstBlocker.detail,
+      nextStep: firstBlocker.nextStep,
+    );
+  }
+  if (items.isEmpty) {
+    return _AndroidPreflightCheck(
+      name: name,
+      ok: false,
+      detail: '未执行检查',
+      nextStep: fallbackNextStep,
+    );
+  }
+  return _AndroidPreflightCheck(
+    name: name,
+    ok: true,
+    detail: readyDetail,
+    nextStep: '-',
+  );
+}
+
+// 返回第一个阻断检查；没有阻断时返回 null。
+_SmokeCheckView? _firstBlockingSmokeCheck(List<_SmokeCheckView> items) {
+  for (final item in items) {
+    if (!item.ok) return item;
+  }
+  return null;
+}
+
+// 生成 Android preflight Markdown，与 Android smoke CLI 的报告结构保持一致。
+String _androidPreflightMarkdown(
+  DateTime timestamp,
+  Map<String, Object?> payload,
+  List<_AndroidPreflightCheck> checks,
+) {
+  final completion = payload['completion'] as Map<String, Object?>;
+  final request = payload['request'] as Map<String, Object?>;
+  final nextSteps = (payload['nextSteps'] as List<Object?>)
+      .map((step) => step.toString())
+      .toList(growable: false);
+  final buffer = StringBuffer()
+    ..writeln('# V4 Android Smoke Preflight')
+    ..writeln()
+    ..writeln('- 时间：${timestamp.toIso8601String()}')
+    ..writeln('- 来源：full smoke')
+    ..writeln('- 结果：${completion['label']}')
+    ..writeln('- 动作：${request['allowActions'] == true ? '允许' : '未允许'}')
+    ..writeln('- 流程：${request['workflowBasic'] == true ? '基础流程' : '仅会话截图'}')
+    ..writeln()
+    ..writeln('## 检查')
+    ..writeln()
+    ..writeln('| 项目 | 状态 | 说明 | 下一步 |')
+    ..writeln('|---|---|---|---|');
+  for (final check in checks) {
+    buffer.writeln(
+      '| ${check.name} | ${check.ok ? '通过' : '阻断'} | ${check.detail} | ${check.nextStep} |',
+    );
+  }
+  buffer
+    ..writeln()
+    ..writeln('## 下一步')
+    ..writeln();
+  for (final step in nextSteps) {
+    buffer.writeln('- $step');
+  }
+  return buffer.toString();
+}
+
+// 按名称读取自动准备项；不存在时返回 null。
+_FullSmokePreparationItem? _preparationItem(
+  _FullSmokePreparation preparation,
+  String name,
+) {
+  for (final item in preparation.items) {
+    if (item.name == name) return item;
+  }
+  return null;
+}
+
+// 按名称读取前置检查项；不存在时返回 null。
+_FullSmokePreflightItem? _preflightItem(
+  _FullSmokePreflight preflight,
+  String name,
+) {
+  for (final item in preflight.items) {
+    if (item.name == name) return item;
+  }
+  return null;
 }
 
 // 探测 HTTP JSON 端点，保持短超时，避免 preflight 卡住。
@@ -1258,6 +1471,61 @@ final class _AndroidProbe {
   final int unauthorized;
   final int offline;
   final String? detail;
+}
+
+// Android preflight 同构报告中的单项检查。
+final class _AndroidPreflightCheck {
+  const _AndroidPreflightCheck({
+    required this.name,
+    required this.ok,
+    required this.detail,
+    required this.nextStep,
+  });
+
+  final String name;
+  final bool ok;
+  final String detail;
+  final String nextStep;
+
+  // 转成 Android smoke preflight 兼容的机器可读结构。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'name': name,
+      'ok': ok,
+      'status': ok ? '通过' : '阻断',
+      'detail': detail,
+      'nextStep': nextStep,
+    };
+  }
+}
+
+// full smoke 准备项和前置项的统一只读视图。
+final class _SmokeCheckView {
+  const _SmokeCheckView({
+    required this.ok,
+    required this.detail,
+    required this.nextStep,
+  });
+
+  factory _SmokeCheckView.fromPreparation(_FullSmokePreparationItem item) {
+    return _SmokeCheckView(
+      ok: item.ok,
+      detail: item.detail,
+      nextStep: item.ok ? '-' : item.nextStep,
+    );
+  }
+
+  factory _SmokeCheckView.fromPreflight(_FullSmokePreflightItem item) {
+    return _SmokeCheckView(
+      ok: item.ok,
+      detail: item.detail,
+      nextStep: item.ok ? '-' : item.nextStep,
+    );
+  }
+
+  final bool ok;
+  final String detail;
+  final String nextStep;
 }
 
 // 进程探测结果。

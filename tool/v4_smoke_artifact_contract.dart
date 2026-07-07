@@ -128,6 +128,11 @@ Future<void> _assertFullSmokeDriverProbe() async {
     source.contains(r'${result.stdout}\n${result.stderr}'),
     '平台 driver 探测必须同时解析 stdout 和 stderr。',
   );
+  _expect(
+    source.contains('ANDROID_SMOKE_PREFLIGHT_') &&
+        source.contains("'source': 'full-smoke'"),
+    'full smoke 的 Android 前置阻断必须同步生成 Android preflight 留档。',
+  );
 }
 
 // 写入最小 full smoke fixture，用于验证 readiness 能索引最近编排报告。

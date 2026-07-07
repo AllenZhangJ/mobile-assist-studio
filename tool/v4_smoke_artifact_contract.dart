@@ -90,6 +90,11 @@ Future<void> main() async {
       finalAcceptance.stderr,
       _listAt(acceptanceArtifacts.json, 'fieldChecklist'),
     );
+    _assertNoSensitiveText(finalAcceptance.stderr);
+    _assertPlainTextCommandsAreWhitelisted(
+      finalAcceptance.stderr,
+      'acceptance-final stderr',
+    );
     final currentGit = await _currentGitRevision();
     final completeDir = Directory('${tempDir.path}/complete-current');
     await _seedCompleteSmokeFixture(
@@ -1751,6 +1756,18 @@ void _assertCommandBackticksAreWhitelisted(
 // 断言最终验收 nextSteps 中的反引号命令也只能来自白名单。
 void _assertAcceptanceNextStepCommandsAreWhitelisted(List<String> steps) {
   _assertCommandBackticksAreWhitelisted(steps, 'acceptance nextSteps');
+}
+
+// 断言普通终端文本中的 npm 命令只能来自项目内 V4 白名单。
+void _assertPlainTextCommandsAreWhitelisted(String text, String field) {
+  final pattern = RegExp(r'npm run [A-Za-z0-9:._-]+');
+  for (final match in pattern.allMatches(text)) {
+    final command = match.group(0)?.trim();
+    _expect(
+      command != null && _allowedReportCommands.contains(command),
+      '$field 不得输出非白名单命令：$command',
+    );
+  }
 }
 
 // 断言最终验收 JSON 只输出项目内安全 smoke / 终验命令。

@@ -61,6 +61,8 @@ bool _acceptanceJsonLooksStructurallyValid(Map<String, Object?> json) {
   final completion = _acceptanceMapAt(json, 'completion');
   if (_boolAt(completion, 'auditOk') == null) return false;
   if (_boolAt(completion, 'complete') == null) return false;
+  final gitStatus = _acceptanceMapAt(json, 'gitStatus');
+  if (!_gitStatusLooksValid(gitStatus)) return false;
   final evidence = _acceptanceMapAt(json, 'evidence');
   final readiness = _acceptanceMapAt(evidence, 'readiness');
   final archive = _acceptanceMapAt(evidence, 'archive');
@@ -73,6 +75,16 @@ bool _acceptanceJsonLooksStructurallyValid(Map<String, Object?> json) {
       _deviceStateLooksValid(androidDevice) &&
       _archiveCountsLookValid(counts) &&
       _batchRowsLookValid(readiness);
+}
+
+// 判断代码状态摘要是否足以支撑终验卡，不接受路径或非提交指纹。
+bool _gitStatusLooksValid(Map<String, Object?> gitStatus) {
+  return _safeGitRevision(_stringAt(gitStatus, 'revision')) != null &&
+      _stringAt(gitStatus, 'branch') != null &&
+      _boolAt(gitStatus, 'dirty') != null &&
+      _boolAt(gitStatus, 'synced') != null &&
+      _nullableIntAt(gitStatus, 'ahead') != null &&
+      _nullableIntAt(gitStatus, 'behind') != null;
 }
 
 // 判断本机设备摘要是否足以支撑 UI 展示，不让空壳状态进入快照。
@@ -138,7 +150,7 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
     complete: _boolAt(completion, 'complete') ?? false,
     statusLabel: _safeAcceptanceTextAt(completion, 'label') ?? '终验未知',
     checkedAt: checkedAt,
-    gitRevision: _shortGitRevision(
+    gitRevision: _safeGitRevision(
       _stringAt(gitStatus, 'revision') ?? _stringAt(json, 'git'),
     ),
     gitBranch: _safeGitBranch(_stringAt(gitStatus, 'branch')),
@@ -347,10 +359,12 @@ List<V4AcceptanceBatchSummary> _batchSummariesAt(
   return List<V4AcceptanceBatchSummary>.unmodifiable(batches);
 }
 
-// Git 字段只保留短提交号，避免未来误写长来源字符串。
-String? _shortGitRevision(String? value) {
+// Git 字段只接受提交指纹并保留短值，避免未来误写路径或来源字符串。
+String? _safeGitRevision(String? value) {
   if (value == null || value.isEmpty) return null;
-  return value.length <= 8 ? value : value.substring(0, 8);
+  final normalized = value.trim();
+  if (!RegExp(r'^[0-9a-fA-F]{7,40}$').hasMatch(normalized)) return null;
+  return normalized.length <= 8 ? normalized : normalized.substring(0, 8);
 }
 
 // Git 分支仅作为短版本线索展示，同样应用脱敏和长度限制。

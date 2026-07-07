@@ -15,7 +15,7 @@ void main() {
       });
       await File(
         '${temp.path}/FINAL_ACCEPTANCE_2026-01-01T00-00-00Z.json',
-      ).writeAsString(_acceptanceJson(git: 'old', androidRuns: 1));
+      ).writeAsString(_acceptanceJson(git: '1111111', androidRuns: 1));
       await File(
         '${temp.path}/FINAL_ACCEPTANCE_2026-01-02T00-00-00Z.json',
       ).writeAsString(_acceptanceJson(git: '1234567890abcdef', androidRuns: 0));
@@ -127,7 +127,7 @@ void main() {
     });
     await File(
       '${temp.path}/FINAL_ACCEPTANCE_2026-01-01T00-00-00Z.json',
-    ).writeAsString(_acceptanceJson(git: 'good', androidRuns: 1));
+    ).writeAsString(_acceptanceJson(git: 'abc1234', androidRuns: 1));
     await File(
       '${temp.path}/FINAL_ACCEPTANCE_2026-01-02T00-00-00Z.json',
     ).writeAsString('{broken');
@@ -137,7 +137,7 @@ void main() {
     ).readLatest();
 
     expect(summary.hasReport, isTrue);
-    expect(summary.gitRevision, 'good');
+    expect(summary.gitRevision, 'abc1234');
     expect(summary.gitDirty, isFalse);
     expect(summary.gitRemoteSynced, isTrue);
     expect(summary.androidRuns, 1);
@@ -152,7 +152,7 @@ void main() {
       });
       await File(
         '${temp.path}/FINAL_ACCEPTANCE_2026-01-01T00-00-00Z.json',
-      ).writeAsString(_acceptanceJson(git: 'good', androidRuns: 1));
+      ).writeAsString(_acceptanceJson(git: 'abc1234', androidRuns: 1));
       await File(
         '${temp.path}/FINAL_ACCEPTANCE_2026-01-02T00-00-00Z.json',
       ).writeAsString('''
@@ -246,13 +246,52 @@ void main() {
   }
 }
 ''');
+      await File(
+        '${temp.path}/FINAL_ACCEPTANCE_2026-01-06T00-00-00Z.json',
+      ).writeAsString('''
+{
+  "schemaVersion": 1,
+  "kind": "v4FinalAcceptance",
+  "timestamp": "2026-01-06T00:00:00.000000Z",
+  "git": "/Users/example/project",
+  "gitStatus": {
+    "revision": "/Users/example/project",
+    "branch": "main",
+    "dirty": false,
+    "ahead": 0.5,
+    "behind": 0,
+    "synced": true
+  },
+  "completion": {
+    "auditOk": true,
+    "complete": false
+  },
+  "evidence": {
+    "readiness": {
+      "localState": {
+        "iosDevice": {"status": "未就绪", "detail": "可用 0"},
+        "androidDevice": {"status": "未就绪", "detail": "可用 0"}
+      },
+      "batches": ${_batchRowsJson()}
+    },
+    "archive": {
+      "counts": {
+        "screenshots": 0,
+        "iosRuns": 0,
+        "androidRuns": 0,
+        "fullSmokeReports": 7
+      }
+    }
+  }
+}
+''');
 
       final summary = await LocalV4AcceptanceSummaryReader(
         directory: temp,
       ).readLatest();
 
       expect(summary.hasReport, isTrue);
-      expect(summary.gitRevision, 'good');
+      expect(summary.gitRevision, 'abc1234');
       expect(summary.androidRuns, 1);
       expect(summary.statusLabel, '最终验收未完成');
     },

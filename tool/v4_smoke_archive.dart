@@ -639,19 +639,25 @@ final class _ReportJsonSummary {
     required this.kind,
     required this.git,
     required this.timestamp,
+    required this.rawComplete,
     required this.complete,
     required this.label,
     required this.blockers,
     required this.stepCount,
+    required this.iosStepPassed,
+    required this.androidStepPassed,
   });
 
   final String kind;
   final String? git;
   final String? timestamp;
+  final bool rawComplete;
   final bool complete;
   final String label;
   final List<String> blockers;
   final int stepCount;
+  final bool iosStepPassed;
+  final bool androidStepPassed;
 
   // 从报告 JSON 解析统一摘要。
   factory _ReportJsonSummary.fromJson(Map<String, Object?> json) {
@@ -659,14 +665,24 @@ final class _ReportJsonSummary {
     final preparation = _jsonMapAt(json, 'preparation');
     final preflight = _jsonMapAt(json, 'preflight');
     final steps = json['steps'];
+    final stepList = steps is Iterable ? steps.toList(growable: false) : [];
+    final kind = _redactText(json['kind']?.toString() ?? 'unknown');
+    final rawComplete = completion['complete'] == true;
+    final iosStepPassed = _fullSmokeStepPassed(stepList, 'iOS smoke');
+    final androidStepPassed = _fullSmokeStepPassed(stepList, 'Android smoke');
+    final fullSmokeStepsPassed =
+        kind != 'v4FullSmoke' || (iosStepPassed && androidStepPassed);
     return _ReportJsonSummary(
-      kind: _redactText(json['kind']?.toString() ?? 'unknown'),
+      kind: kind,
       git: _shortGitRevision(json['git']),
       timestamp: json['timestamp']?.toString(),
-      complete: completion['complete'] == true,
+      rawComplete: rawComplete,
+      complete: rawComplete && fullSmokeStepsPassed,
       label: _redactText(completion['label']?.toString() ?? '未知'),
       blockers: _combinedBlockers(preparation, preflight),
-      stepCount: steps is Iterable ? steps.length : 0,
+      stepCount: stepList.length,
+      iosStepPassed: iosStepPassed,
+      androidStepPassed: androidStepPassed,
     );
   }
 
@@ -676,23 +692,46 @@ final class _ReportJsonSummary {
       'kind': kind,
       'git': git,
       'timestamp': timestamp,
+      'rawComplete': rawComplete,
       'complete': complete,
       'label': label,
       'blockers': blockers,
       'stepCount': stepCount,
+      if (kind == 'v4FullSmoke') 'iosStepPassed': iosStepPassed,
+      if (kind == 'v4FullSmoke') 'androidStepPassed': androidStepPassed,
     };
   }
 
   String get markdownLabel {
     final parts = <String>[
-      complete ? '完整通过' : label,
+      complete
+          ? '完整通过'
+          : rawComplete && kind == 'v4FullSmoke'
+          ? '平台步骤未完整'
+          : label,
       if (git != null) '提交 $git',
       if (blockers.isNotEmpty) '阻断 ${blockers.join('/')}',
       if (stepCount > 0) '步骤 $stepCount',
+      if (kind == 'v4FullSmoke' && iosStepPassed) 'iOS 通过',
+      if (kind == 'v4FullSmoke' && !iosStepPassed) 'iOS 未通过',
+      if (kind == 'v4FullSmoke' && androidStepPassed) 'Android 通过',
+      if (kind == 'v4FullSmoke' && !androidStepPassed) 'Android 未通过',
       if (timestamp != null) '时间 $timestamp',
     ];
     return parts.join('，');
   }
+}
+
+// 判断 full smoke 报告中指定平台步骤是否通过。
+bool _fullSmokeStepPassed(List<Object?> steps, String expectedName) {
+  for (final step in steps) {
+    if (step is! Map) continue;
+    final stepMap = Map<String, Object?>.from(step);
+    final name = _jsonMapAt(stepMap, 'step')['name']?.toString();
+    final status = stepMap['status']?.toString();
+    if (name == expectedName && status == '通过') return true;
+  }
+  return false;
 }
 
 // 最近一次平台 smoke run 摘要，只保存结构化状态，不包含截图内容。

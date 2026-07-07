@@ -105,6 +105,41 @@ Future<void> main() async {
       '当前提交完整 fixture 的 archive final 应返回 0，实际 ${completeArchiveFinal.exitCode}。',
     );
 
+    final singlePlatformFullDir = Directory(
+      '${tempDir.path}/complete-single-platform-full-smoke',
+    );
+    await _seedCompleteSmokeFixture(
+      singlePlatformFullDir,
+      fullSmokeGit: currentGit,
+      platformGit: currentGit,
+      includeAndroidFullSmokeStep: false,
+    );
+    final singlePlatformReadiness = await _runReadiness(
+      singlePlatformFullDir,
+      requireComplete: true,
+    );
+    _expect(
+      singlePlatformReadiness.exitCode == 2,
+      'full smoke 缺少 Android 步骤时 readiness final 必须返回 2。',
+    );
+    final singlePlatformArchiveFinal = await _runArchiveFinal(
+      singlePlatformFullDir,
+    );
+    _expect(
+      singlePlatformArchiveFinal.exitCode == 2 &&
+          singlePlatformArchiveFinal.stderr.contains('full smoke'),
+      'full smoke 缺少 Android 步骤时 archive final 必须拒绝完整通过。',
+    );
+    final singlePlatformAcceptance = await _runFinalAcceptance(
+      singlePlatformFullDir,
+      requireComplete: true,
+    );
+    _expect(
+      singlePlatformAcceptance.exitCode == 2 &&
+          singlePlatformAcceptance.stderr.contains('Full smoke'),
+      'full smoke 缺少 Android 步骤时 acceptance final 必须输出 Full smoke 缺口。',
+    );
+
     final mismatchDir = Directory('${tempDir.path}/complete-old-full-smoke');
     await _seedCompleteSmokeFixture(
       mismatchDir,
@@ -434,6 +469,7 @@ Future<void> _seedCompleteSmokeFixture(
   required String fullSmokeGit,
   required String platformGit,
   bool writePlatformScreenshots = true,
+  bool includeAndroidFullSmokeStep = true,
 }) async {
   await outDir.create(recursive: true);
   final timestamp = DateTime.utc(2026, 1, 2);
@@ -468,10 +504,11 @@ Future<void> _seedCompleteSmokeFixture(
         'step': <String, Object?>{'name': 'iOS smoke'},
         'status': '通过',
       },
-      <String, Object?>{
-        'step': <String, Object?>{'name': 'Android smoke'},
-        'status': '通过',
-      },
+      if (includeAndroidFullSmokeStep)
+        <String, Object?>{
+          'step': <String, Object?>{'name': 'Android smoke'},
+          'status': '通过',
+        },
     ],
   };
   await File('$base.json').writeAsString('${encoder.convert(payload)}\n');

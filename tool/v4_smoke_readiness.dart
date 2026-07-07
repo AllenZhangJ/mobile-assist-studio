@@ -869,6 +869,7 @@ final class _FullSmokeReportSummary {
     required this.reportName,
     required this.gitRevision,
     required this.timestamp,
+    required this.rawComplete,
     required this.complete,
     required this.label,
     required this.preflightStatus,
@@ -876,11 +877,14 @@ final class _FullSmokeReportSummary {
     required this.failedSteps,
     required this.stepCount,
     required this.stepStatuses,
+    required this.iosStepPassed,
+    required this.androidStepPassed,
   });
 
   final String reportName;
   final String? gitRevision;
   final DateTime? timestamp;
+  final bool rawComplete;
   final bool complete;
   final String label;
   final String preflightStatus;
@@ -888,6 +892,8 @@ final class _FullSmokeReportSummary {
   final List<String> failedSteps;
   final int stepCount;
   final List<String> stepStatuses;
+  final bool iosStepPassed;
+  final bool androidStepPassed;
 
   // 从 full smoke JSON 解析摘要，坏字段按未知降级。
   factory _FullSmokeReportSummary.fromJson({
@@ -901,36 +907,52 @@ final class _FullSmokeReportSummary {
         ? json['steps'] as Iterable
         : const [];
     final stepStatuses = <String>[];
+    var iosStepPassed = false;
+    var androidStepPassed = false;
     for (final step in steps) {
       if (step is! Map) continue;
       final stepMap = Map<String, Object?>.from(step);
       final stepName =
           _jsonMapAt(stepMap, 'step')['name']?.toString() ?? '未知步骤';
       final status = stepMap['status']?.toString() ?? '未知';
+      if (stepName == 'iOS smoke' && status == '通过') iosStepPassed = true;
+      if (stepName == 'Android smoke' && status == '通过') {
+        androidStepPassed = true;
+      }
       stepStatuses.add('${_redactText(stepName)}：${_redactText(status)}');
     }
+    final rawComplete = completion['complete'] == true;
     return _FullSmokeReportSummary(
       reportName: reportName,
       gitRevision: _shortGitRevision(json['git']),
       timestamp: _parseDate(json['timestamp']),
-      complete: completion['complete'] == true,
+      rawComplete: rawComplete,
+      complete: rawComplete && iosStepPassed && androidStepPassed,
       label: _redactText(completion['label']?.toString() ?? '未知'),
       preflightStatus: _redactText(preflight['status']?.toString() ?? '未知'),
       blockers: _combinedBlockers(preparation, preflight),
       failedSteps: _jsonStringList(completion['failedSteps']),
       stepCount: stepStatuses.length,
       stepStatuses: stepStatuses,
+      iosStepPassed: iosStepPassed,
+      androidStepPassed: androidStepPassed,
     );
   }
 
   String get summaryLabel {
     final parts = <String>[
-      complete ? '完整通过' : label,
+      complete
+          ? '完整通过'
+          : rawComplete
+          ? '平台步骤未完整'
+          : label,
       if (gitRevision case final git?) '提交 $git',
       '前置 $preflightStatus',
       if (blockers.isNotEmpty) '阻断 ${blockers.join('/')}',
       if (failedSteps.isNotEmpty) '失败 ${failedSteps.join('/')}',
       '步骤 $stepCount',
+      iosStepPassed ? 'iOS 通过' : 'iOS 未通过',
+      androidStepPassed ? 'Android 通过' : 'Android 未通过',
     ];
     if (timestamp case final value?) {
       parts.add('时间 ${value.toUtc().toIso8601String()}');
@@ -944,6 +966,7 @@ final class _FullSmokeReportSummary {
       'reportName': reportName,
       'git': gitRevision,
       'timestamp': timestamp?.toUtc().toIso8601String(),
+      'rawComplete': rawComplete,
       'complete': complete,
       'label': label,
       'preflightStatus': preflightStatus,
@@ -951,6 +974,8 @@ final class _FullSmokeReportSummary {
       'failedSteps': failedSteps,
       'stepCount': stepCount,
       'stepStatuses': stepStatuses,
+      'iosStepPassed': iosStepPassed,
+      'androidStepPassed': androidStepPassed,
       'summary': summaryLabel,
     };
   }

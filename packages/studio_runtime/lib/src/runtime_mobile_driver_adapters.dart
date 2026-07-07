@@ -198,8 +198,8 @@ final class IosAppiumMobileDriver implements MobileDeviceDriver {
   }
 }
 
-// AndroidAppiumMobileDriverSkeleton 是 Android adapter 的首个安全骨架。
-// 它不虚报任何可执行能力，Batch 2 再接入真实 ADB / UiAutomator2。
+// AndroidAppiumMobileDriverSkeleton 是无能力占位 adapter。
+// 真实 Android 真机路径由 AndroidAppiumMobileDriver 承载。
 final class AndroidAppiumMobileDriverSkeleton implements MobileDeviceDriver {
   const AndroidAppiumMobileDriverSkeleton();
 
@@ -218,7 +218,7 @@ final class AndroidAppiumMobileDriverSkeleton implements MobileDeviceDriver {
 
   @override
   Future<MobileDriverSession> connect() {
-    throw UnsupportedError('Android 真机会话将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能创建真机会话。');
   }
 
   @override
@@ -228,14 +228,14 @@ final class AndroidAppiumMobileDriverSkeleton implements MobileDeviceDriver {
   Future<MobileDriverHeartbeat> heartbeat() async {
     return const MobileDriverHeartbeat(
       ready: false,
-      message: 'Android driver 骨架已加载，真实会话尚未接入。',
+      message: 'Android 无能力占位 adapter 已加载。',
       capabilities: _androidSkeletonCapabilities,
     );
   }
 
   @override
   Future<MobileScreenshot> captureScreenshot() {
-    throw UnsupportedError('Android 截图将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能截图。');
   }
 
   @override
@@ -245,7 +245,7 @@ final class AndroidAppiumMobileDriverSkeleton implements MobileDeviceDriver {
 
   @override
   Future<void> tap(ViewportPoint point, {Duration? duration}) {
-    throw UnsupportedError('Android 点按将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能点按。');
   }
 
   @override
@@ -254,27 +254,27 @@ final class AndroidAppiumMobileDriverSkeleton implements MobileDeviceDriver {
     ViewportPoint to, {
     Duration? duration,
   }) {
-    throw UnsupportedError('Android 滑动将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能滑动。');
   }
 
   @override
   Future<void> inputText(String text) {
-    throw UnsupportedError('Android 输入将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能输入。');
   }
 
   @override
   Future<void> launchApp(String appId) {
-    throw UnsupportedError('Android App 启动将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能启动 App。');
   }
 
   @override
   Future<void> stopApp(String appId) {
-    throw UnsupportedError('Android App 停止将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能停止 App。');
   }
 
   @override
   Future<void> pressHome() {
-    throw UnsupportedError('Android 主页键将在 Batch 2 接入。');
+    throw UnsupportedError('Android 无能力占位 adapter 不能回主页。');
   }
 
   @override

@@ -67,7 +67,17 @@ void main() {
       expect(driver.platform, MobilePlatform.android);
       expect(capabilities.supportsCoreActions, isFalse);
       expect(heartbeat.ready, isFalse);
-      expect(() => driver.connect(), throwsUnsupportedError);
+      expect(heartbeat.message, 'Android 无能力占位 adapter 已加载。');
+      expect(
+        () => driver.connect(),
+        throwsA(
+          isA<UnsupportedError>().having(
+            (error) => error.message,
+            'message',
+            'Android 无能力占位 adapter 不能创建真机会话。',
+          ),
+        ),
+      );
     },
   );
 }

@@ -25,14 +25,30 @@ Future<void> main(List<String> args) async {
     ..writeln('Smoke archive report: ${_redactText(markdownFile.path)}')
     ..writeln('Smoke archive json: ${_redactText(jsonFile.path)}');
 
-  if (options.requireScreenshot && archive.summary.screenshots == 0) {
-    stderr.writeln('V4 smoke archive failed: 未发现截图留档。');
+  final failures = _finalGateFailures(options, archive.summary);
+  if (failures.isNotEmpty) {
+    stderr.writeln('V4 smoke archive failed:');
+    for (final failure in failures) {
+      stderr.writeln('- $failure');
+    }
     exit(2);
   }
-  if (options.requireComplete && !archive.summary.latestFullSmokeComplete) {
-    stderr.writeln('V4 smoke archive failed: 最近 full smoke 尚未完整通过。');
-    exit(2);
-  }
+}
+
+// 根据严格参数生成最终验收缺口，避免一次只暴露一个问题。
+List<String> _finalGateFailures(
+  _ArchiveOptions options,
+  _ArchiveSummary summary,
+) {
+  return <String>[
+    if (options.requireScreenshot && summary.screenshots == 0) '未发现截图留档。',
+    if (options.requirePlatformRuns && summary.iosRuns == 0)
+      '未发现 iOS 平台 smoke run。',
+    if (options.requirePlatformRuns && summary.androidRuns == 0)
+      '未发现 Android 平台 smoke run。',
+    if (options.requireComplete && !summary.latestFullSmokeComplete)
+      '最近 full smoke 尚未完整通过。',
+  ];
 }
 
 // 构建 archive 报告，扫描前会排除 archive 输出目录，避免自我递增。
@@ -281,6 +297,7 @@ final class _ArchiveOptions {
     required this.timeout,
     required this.requireComplete,
     required this.requireScreenshot,
+    required this.requirePlatformRuns,
     required this.help,
   });
 
@@ -289,6 +306,7 @@ final class _ArchiveOptions {
   final Duration timeout;
   final bool requireComplete;
   final bool requireScreenshot;
+  final bool requirePlatformRuns;
   final bool help;
 
   // 解析命令行参数。
@@ -298,6 +316,7 @@ final class _ArchiveOptions {
     var timeoutSeconds = 4;
     var requireComplete = false;
     var requireScreenshot = false;
+    var requirePlatformRuns = false;
     var help = false;
 
     for (var index = 0; index < args.length; index += 1) {
@@ -319,6 +338,8 @@ final class _ArchiveOptions {
           requireComplete = true;
         case '--require-screenshot':
           requireScreenshot = true;
+        case '--require-platform-runs':
+          requirePlatformRuns = true;
         default:
           throw ArgumentError('未知参数：$arg');
       }
@@ -330,6 +351,7 @@ final class _ArchiveOptions {
       timeout: Duration(seconds: timeoutSeconds),
       requireComplete: requireComplete,
       requireScreenshot: requireScreenshot,
+      requirePlatformRuns: requirePlatformRuns,
       help: help,
     );
   }
@@ -672,5 +694,6 @@ V4 smoke archive
   --timeout <seconds>       git 探测超时，默认 4
   --require-complete        最近 full smoke 未完整通过时返回非 0
   --require-screenshot      未发现截图时返回非 0
+  --require-platform-runs   未发现 iOS 或 Android 平台 run 时返回非 0
   --help                    查看帮助
 ''';

@@ -29,6 +29,18 @@ Future<void> main() async {
     _assertArchiveJson(archive.json);
     _assertArchiveMarkdown(archive.markdown);
     _assertNoSensitiveText(archive.allText);
+
+    final finalArchive = await _runArchiveFinal(tempDir);
+    _expect(
+      finalArchive.exitCode == 2,
+      'archive final 在 fixture 未完整时必须返回 2，实际 ${finalArchive.exitCode}。',
+    );
+    _expect(
+      finalArchive.stderr.contains('iOS 平台') &&
+          finalArchive.stderr.contains('Android 平台') &&
+          finalArchive.stderr.contains('full smoke'),
+      'archive final 必须一次性提示平台 run 和 full smoke 缺口。',
+    );
     stdout.writeln('V4 smoke artifact contract passed');
   } finally {
     await tempDir.delete(recursive: true);
@@ -104,6 +116,22 @@ Future<_ProcessResult> _runArchive(Directory outDir) async {
     '${outDir.path}/archives',
     '--timeout',
     '1',
+  ]);
+}
+
+// 调用 archive final 严格门禁，验证未完整 fixture 不会误通过。
+Future<_ProcessResult> _runArchiveFinal(Directory outDir) async {
+  return _runDartTool(<String>[
+    'tool/v4_smoke_archive.dart',
+    '--out-dir',
+    outDir.path,
+    '--archive-dir',
+    '${outDir.path}/archives-final',
+    '--timeout',
+    '1',
+    '--require-complete',
+    '--require-screenshot',
+    '--require-platform-runs',
   ]);
 }
 
@@ -313,6 +341,8 @@ void _assertArchiveJson(Map<String, Object?> json) {
   _expect(summary['readinessReports'] == 1, 'archive 必须索引 readiness JSON。');
   _expect(summary['fullSmokeReports'] == 1, 'archive 必须索引 full smoke JSON。');
   _expect(summary['screenshots'] == 1, 'archive 必须索引截图。');
+  _expect(summary['iosRuns'] == 0, 'fixture 下 iOS run 必须为 0。');
+  _expect(summary['androidRuns'] == 0, 'fixture 下 Android run 必须为 0。');
 
   final latestFullSmoke = _mapAt(summary, 'latestFullSmoke');
   _expect(
@@ -324,6 +354,11 @@ void _assertArchiveJson(Map<String, Object?> json) {
 
   final warnings = _stringList(json['warnings']);
   _expect(warnings.isNotEmpty, 'archive 必须保留当前缺口提醒。');
+  _expect(
+    warnings.any((warning) => warning.contains('iOS 平台')) &&
+        warnings.any((warning) => warning.contains('Android 平台')),
+    'archive 必须提示缺少双平台 run。',
+  );
 
   final artifacts = _listAt(json, 'artifacts');
   _expect(artifacts.length >= 5, 'archive 必须索引 fixture 文件。');

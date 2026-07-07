@@ -207,7 +207,7 @@ Future<_AndroidProbe> _probeAndroidDevices(Duration timeout) async {
     }
   }
   return _AndroidProbe(
-    available: ready > 0,
+    available: ready == 1,
     ready: ready,
     unauthorized: unauthorized,
     offline: offline,
@@ -1488,6 +1488,9 @@ final class _SmokeReadinessReport {
   String _androidNextStep() {
     const command = 'npm run v4:android-smoke:full';
     final detail = _androidDetail();
+    if (android.ready > 1) {
+      return 'Android：发现多台可用手机（$detail）。只保留一台 USB 手机后运行 `$command`。';
+    }
     if (android.available) {
       return 'Android：当前手机可用（$detail），运行 `$command`。';
     }

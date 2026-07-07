@@ -19,6 +19,7 @@ Future<void> main() async {
     _assertReadinessJson(artifacts.json);
     _assertReadinessMarkdown(artifacts.markdown);
     _assertNoSensitiveText(artifacts.allText);
+    await _assertReadinessNextStepStateContracts();
 
     await _seedArchiveFixture(tempDir);
     final archiveResult = await _runArchive(tempDir);
@@ -371,6 +372,175 @@ Future<void> _assertFullSmokeDriverProbe() async {
   );
 }
 
+// 断言 readiness 对 Android 现场状态给出可执行、状态驱动的下一步。
+Future<void> _assertReadinessNextStepStateContracts() async {
+  final tempDir = await Directory.systemTemp.createTemp(
+    'ias-v4-readiness-state-',
+  );
+  try {
+    await _assertAndroidReadinessState(
+      tempDir,
+      name: 'none',
+      adbDevicesOutput: 'List of devices attached\n\n',
+      ready: 0,
+      unauthorized: 0,
+      offline: 0,
+      available: false,
+      expectedTexts: const <String>[
+        '未发现 Android 手机',
+        '开启 USB 调试',
+        'npm run v4:android-smoke:full',
+      ],
+    );
+    await _assertAndroidReadinessState(
+      tempDir,
+      name: 'unauthorized',
+      adbDevicesOutput: 'List of devices attached\nFAKE001\tunauthorized\n',
+      ready: 0,
+      unauthorized: 1,
+      offline: 0,
+      available: false,
+      expectedTexts: const <String>[
+        '手机未授权',
+        '允许 USB 调试',
+        'npm run v4:android-smoke:full',
+      ],
+    );
+    await _assertAndroidReadinessState(
+      tempDir,
+      name: 'offline',
+      adbDevicesOutput: 'List of devices attached\nFAKE001\toffline\n',
+      ready: 0,
+      unauthorized: 0,
+      offline: 1,
+      available: false,
+      expectedTexts: const <String>[
+        '手机离线',
+        '重插数据线',
+        'npm run v4:android-smoke:full',
+      ],
+    );
+    await _assertAndroidReadinessState(
+      tempDir,
+      name: 'single-ready',
+      adbDevicesOutput: 'List of devices attached\nFAKE001\tdevice\n',
+      ready: 1,
+      unauthorized: 0,
+      offline: 0,
+      available: true,
+      expectedTexts: const <String>['当前手机可用', 'npm run v4:android-smoke:full'],
+    );
+    await _assertAndroidReadinessState(
+      tempDir,
+      name: 'multi-ready',
+      adbDevicesOutput:
+          'List of devices attached\nFAKE001\tdevice\nFAKE002\tdevice\n',
+      ready: 2,
+      unauthorized: 0,
+      offline: 0,
+      available: false,
+      expectedTexts: const <String>[
+        '发现多台可用手机',
+        '只保留一台 USB 手机',
+        'npm run v4:android-smoke:full',
+      ],
+    );
+  } finally {
+    await tempDir.delete(recursive: true);
+  }
+}
+
+// 用 fake adb 输出生成 readiness，校验机器可读状态和用户下一步一致。
+Future<void> _assertAndroidReadinessState(
+  Directory rootDir, {
+  required String name,
+  required String adbDevicesOutput,
+  required int ready,
+  required int unauthorized,
+  required int offline,
+  required bool available,
+  required List<String> expectedTexts,
+}) async {
+  final binDir = Directory('${rootDir.path}/bin-$name');
+  await _writeFakeProbeCommands(binDir, adbDevicesOutput: adbDevicesOutput);
+  final outDir = Directory('${rootDir.path}/out-$name');
+  final result = await _runReadiness(
+    outDir,
+    environment: <String, String>{
+      'PATH': '${binDir.path}:${Platform.environment['PATH'] ?? ''}',
+    },
+  );
+  _expect(
+    result.exitCode == 0,
+    'readiness 状态 fixture $name 应生成成功，实际 ${result.exitCode}：${_shortText(result.stderr)}',
+  );
+
+  final artifacts = await _loadGeneratedArtifacts(outDir);
+  final localState = _mapAt(artifacts.json, 'localState');
+  final android = _mapAt(localState, 'androidDevice');
+  _expect(android['ready'] == ready, '$name ready 计数应为 $ready。');
+  _expect(
+    android['unauthorized'] == unauthorized,
+    '$name unauthorized 计数应为 $unauthorized。',
+  );
+  _expect(android['offline'] == offline, '$name offline 计数应为 $offline。');
+  _expect(android['available'] == available, '$name available 状态不正确。');
+
+  final nextSteps = _stringList(artifacts.json['nextSteps']).join('\n');
+  for (final text in expectedTexts) {
+    _expect(nextSteps.contains(text), '$name 下一步必须包含：$text');
+  }
+  _assertNoSensitiveText(artifacts.allText);
+}
+
+// 写入 fake 探测命令，确保合同测试不依赖真实手机或本机工具状态。
+Future<void> _writeFakeProbeCommands(
+  Directory binDir, {
+  required String adbDevicesOutput,
+}) async {
+  await binDir.create(recursive: true);
+  await _writeFakeExecutable(File('${binDir.path}/git'), '''
+#!/bin/sh
+if [ "\$1" = "rev-parse" ]; then
+  echo abc1234
+  exit 0
+fi
+exit 0
+''');
+  await _writeFakeExecutable(File('${binDir.path}/xcrun'), '''
+#!/bin/sh
+if [ "\$1" = "devicectl" ]; then
+  cat <<'EOF'
+Name        Identifier   State
+---------   ----------   -----
+EOF
+  exit 0
+fi
+exit 0
+''');
+  await _writeFakeExecutable(File('${binDir.path}/pymobiledevice3'), '''
+#!/bin/sh
+if [ "\$1" = "usbmux" ]; then
+  echo '[]'
+  exit 0
+fi
+exit 0
+''');
+  await _writeFakeExecutable(File('${binDir.path}/adb'), '''
+#!/bin/sh
+cat <<'EOF'
+$adbDevicesOutput
+EOF
+''');
+}
+
+// 写入可执行脚本，并显式设置执行权限。
+Future<void> _writeFakeExecutable(File file, String content) async {
+  await file.writeAsString(content.trimLeft(), flush: true);
+  final chmod = await Process.run('chmod', <String>['+x', file.path]);
+  _expect(chmod.exitCode == 0, '无法设置 fake 命令执行权限：${file.path}');
+}
+
 // 写入最小 full smoke fixture，用于验证 readiness 能索引最近编排报告。
 Future<void> _seedFullSmokeFixture(Directory outDir) async {
   await outDir.create(recursive: true);
@@ -657,6 +827,7 @@ String _differentGit(String currentGit) {
 Future<_ProcessResult> _runReadiness(
   Directory outDir, {
   bool requireComplete = false,
+  Map<String, String>? environment,
 }) async {
   return _runDartTool(<String>[
     'tool/v4_smoke_readiness.dart',
@@ -665,7 +836,7 @@ Future<_ProcessResult> _runReadiness(
     '--timeout',
     '1',
     if (requireComplete) '--require-complete',
-  ]);
+  ], environment: environment);
 }
 
 // 调用现有 archive 工具端到端生成本地索引。
@@ -719,12 +890,16 @@ Future<_ProcessResult> _runFinalAcceptance(
 }
 
 // 启动 Dart 工具并设置统一超时，合同不依赖真实设备。
-Future<_ProcessResult> _runDartTool(List<String> arguments) async {
+Future<_ProcessResult> _runDartTool(
+  List<String> arguments, {
+  Map<String, String>? environment,
+}) async {
   final process = await Process.start(
     Platform.resolvedExecutable,
     arguments,
     environment: <String, String>{
       ...Platform.environment,
+      if (environment != null) ...environment,
       'DART_SUPPRESS_ANALYTICS': 'true',
       'FLUTTER_SUPPRESS_ANALYTICS': 'true',
     },

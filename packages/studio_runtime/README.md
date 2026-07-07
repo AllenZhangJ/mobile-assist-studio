@@ -139,18 +139,24 @@ V4.0 合同层继续按职责拆分：
 fvm dart test
 ```
 
-Android 真机冒烟入口：
+V4 真机冒烟入口：
 
 ```sh
+npm run v4:smoke:full
+npm run v4:smoke:full:dry-run
 npm run v4:ios-smoke
+npm run v4:ios-smoke:full
 npm run v4:ios-smoke -- --allow-actions
 npm run v4:ios-smoke -- --workflow-basic --allow-actions
 npm run v4:android-smoke
+npm run v4:android-smoke:full
 npm run v4:android-smoke -- --allow-actions
 npm run v4:android-smoke -- --workflow-basic --allow-actions
 ```
 
-不带 `--allow-actions` 时只创建会话、截图并写入本地 evidence；加上后会在当前手机屏幕上执行真实 Tap、Swipe 和 Input。`--workflow-basic` 会把动作冒烟切换为基础 Project DSL workflow，用于验证 DSL、driver 和 evidence 是同一条链路。
+`npm run v4:smoke:full` 是最终现场验收入口，会顺序执行 iOS 与 Android 的真实 Tap、Swipe、Input 和基础 Project DSL workflow，并在最后生成 readiness / completion audit 留档。`npm run v4:smoke:full:dry-run` 只展示命令，不执行真实动作。
+
+不带 `--allow-actions` 时只创建会话、截图并写入本地 evidence；加上后会在当前手机屏幕上执行真实 Tap、Swipe 和 Input。`--workflow-basic` 会把动作冒烟切换为基础 Project DSL workflow，用于验证 DSL、driver 和 evidence 是同一条链路。单平台排障优先使用 `npm run v4:ios-smoke:full` 或 `npm run v4:android-smoke:full`。
 
 测试文件按职责拆分：
 

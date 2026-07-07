@@ -1,0 +1,72 @@
+{
+  "generatedAt": "2026-06-30T16:30:40.175Z",
+  "sourceCounts": {
+    "flowcharts": 10,
+    "sequences": 7,
+    "pagePrototypes": 14,
+    "htmlPrototypePanels": 9
+  },
+  "images": [
+    {
+      "name": "v3-flowcharts-specialized",
+      "png": "docs/prototypes/generated-images/v3-flowcharts-specialized.png",
+      "svg": "docs/prototypes/generated-images/v3-flowcharts-specialized.svg",
+      "expectedPanels": 10,
+      "actualPanels": 10,
+      "panelCountMatches": true,
+      "layoutComplete": true,
+      "width": 2400,
+      "height": 2264,
+      "sizeBytes": 393665,
+      "nonBackgroundRatio": 0.0619,
+      "nonBlank": true,
+      "complete": true
+    },
+    {
+      "name": "v3-sequence-diagrams-specialized",
+      "png": "docs/prototypes/generated-images/v3-sequence-diagrams-specialized.png",
+      "svg": "docs/prototypes/generated-images/v3-sequence-diagrams-specialized.svg",
+      "expectedPanels": 7,
+      "actualPanels": 7,
+      "panelCountMatches": true,
+      "layoutComplete": true,
+      "width": 2400,
+      "height": 1928,
+      "sizeBytes": 295713,
+      "nonBackgroundRatio": 0.0521,
+      "nonBlank": true,
+      "complete": true
+    },
+    {
+      "name": "v3-page-prototypes-specialized",
+      "png": "docs/prototypes/generated-images/v3-page-prototypes-specialized.png",
+      "svg": "docs/prototypes/generated-images/v3-page-prototypes-specialized.svg",
+      "expectedPanels": 14,
+      "actualPanels": 14,
+      "panelCountMatches": true,
+      "layoutComplete": true,
+      "width": 2400,
+      "height": 3416,
+      "sizeBytes": 403735,
+      "nonBackgroundRatio": 0.0712,
+      "nonBlank": true,
+      "complete": true
+    },
+    {
+      "name": "v3-html-static-prototype-overview",
+      "png": "docs/prototypes/generated-images/v3-html-static-prototype-overview.png",
+      "svg": "docs/prototypes/generated-images/v3-html-static-prototype-overview.svg",
+      "expectedPanels": 9,
+      "actualPanels": 9,
+      "panelCountMatches": true,
+      "layoutComplete": true,
+      "width": 2400,
+      "height": 2554,
+      "sizeBytes": 302252,
+      "nonBackgroundRatio": 0.0625,
+      "nonBlank": true,
+      "complete": true
+    }
+  ],
+  "allComplete": true
+}

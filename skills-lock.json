@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "skills": {
+    "appium-skill": {
+      "source": "lambdatest/agent-skills",
+      "sourceType": "github",
+      "skillPath": "appium-skill/SKILL.md",
+      "computedHash": "d18b9b024822eb67c4c33fb783c5cd5cf7553e442cab44cd307c3ff5f0a79bba"
+    },
+    "computer-vision-opencv": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "skillPath": "computer-vision-opencv/SKILL.md",
+      "computedHash": "07d2f35a381b86991164e77833f661e55420a92c8d879473b504dce1fc945af5"
+    },
+    "ios-device-automation": {
+      "source": "web-infra-dev/midscene-skills",
+      "sourceType": "github",
+      "skillPath": "skills/ios-automation/SKILL.md",
+      "computedHash": "fdb685a7fda9688b977e6cd81b724bb9d4874394690bf97fad88ce44a6382e8d"
+    },
+    "ios-device-toolkit": {
+      "source": "0xbigboss/claude-code",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/ios-device-toolkit/SKILL.md",
+      "computedHash": "8d19fa25d9d99bad1641302bc852acb08222f6d8fe4d533b62eee97e14066909"
+    },
+    "mobile-testing": {
+      "source": "petrkindlmann/qa-skills",
+      "sourceType": "github",
+      "skillPath": "skills/mobile-testing/SKILL.md",
+      "computedHash": "c6219800180ef0e4a723d9c42fcbee7483d8593e729e9ccd1f59c9ee4303602c"
+    },
+    "playwright-e2e-testing": {
+      "source": "fugazi/test-automation-skills-agents",
+      "sourceType": "github",
+      "skillPath": "skills/playwright-e2e-testing/SKILL.md",
+      "computedHash": "a8a7adb857d799d4312377da03d61853159ef7c44f23343e7c1cd43638eae204"
+    },
+    "playwright-visual-testing": {
+      "source": "manutej/luxor-claude-marketplace",
+      "sourceType": "github",
+      "skillPath": "plugins/luxor-specialized-tools/skills/playwright-visual-testing/SKILL.md",
+      "computedHash": "c942ebb478c672f41d4dbf673d0a6b04584ba8bd7bdf2c5b1f42e0d2f59bc249"
+    }
+  }
+}

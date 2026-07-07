@@ -1,0 +1,6 @@
+# melos_managed_dependency_overrides: appium_client,workflow_dsl
+dependency_overrides:
+  appium_client:
+    path: ../appium_client
+  workflow_dsl:
+    path: ../workflow_dsl

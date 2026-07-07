@@ -1,0 +1,311 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <svg xmlns="http://www.w3.org/2000/svg" width="2400" height="3416" viewBox="0 0 2400 3416">
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2f2f2f" />
+    </marker>
+    <filter id="paperShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+    <rect width="2400" height="3416" fill="#fbfaf7"/>
+    <g opacity="0.55"><line x1="0" y1="0" x2="0" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="48" y1="0" x2="48" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="96" y1="0" x2="96" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="144" y1="0" x2="144" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="192" y1="0" x2="192" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="240" y1="0" x2="240" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="288" y1="0" x2="288" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="336" y1="0" x2="336" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="384" y1="0" x2="384" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="432" y1="0" x2="432" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="480" y1="0" x2="480" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="528" y1="0" x2="528" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="576" y1="0" x2="576" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="624" y1="0" x2="624" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="672" y1="0" x2="672" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="720" y1="0" x2="720" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="768" y1="0" x2="768" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="816" y1="0" x2="816" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="864" y1="0" x2="864" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="912" y1="0" x2="912" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="960" y1="0" x2="960" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1008" y1="0" x2="1008" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1056" y1="0" x2="1056" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1104" y1="0" x2="1104" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1152" y1="0" x2="1152" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1200" y1="0" x2="1200" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1248" y1="0" x2="1248" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1296" y1="0" x2="1296" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1344" y1="0" x2="1344" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1392" y1="0" x2="1392" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1440" y1="0" x2="1440" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1488" y1="0" x2="1488" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1536" y1="0" x2="1536" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1584" y1="0" x2="1584" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1632" y1="0" x2="1632" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1680" y1="0" x2="1680" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1728" y1="0" x2="1728" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1776" y1="0" x2="1776" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1824" y1="0" x2="1824" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1872" y1="0" x2="1872" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1920" y1="0" x2="1920" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="1968" y1="0" x2="1968" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2016" y1="0" x2="2016" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2064" y1="0" x2="2064" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2112" y1="0" x2="2112" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2160" y1="0" x2="2160" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2208" y1="0" x2="2208" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2256" y1="0" x2="2256" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2304" y1="0" x2="2304" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2352" y1="0" x2="2352" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="2400" y1="0" x2="2400" y2="3416" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="0" x2="2400" y2="0" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="48" x2="2400" y2="48" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="96" x2="2400" y2="96" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="144" x2="2400" y2="144" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="192" x2="2400" y2="192" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="240" x2="2400" y2="240" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="288" x2="2400" y2="288" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="336" x2="2400" y2="336" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="384" x2="2400" y2="384" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="432" x2="2400" y2="432" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="480" x2="2400" y2="480" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="528" x2="2400" y2="528" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="576" x2="2400" y2="576" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="624" x2="2400" y2="624" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="672" x2="2400" y2="672" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="720" x2="2400" y2="720" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="768" x2="2400" y2="768" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="816" x2="2400" y2="816" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="864" x2="2400" y2="864" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="912" x2="2400" y2="912" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="960" x2="2400" y2="960" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1008" x2="2400" y2="1008" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1056" x2="2400" y2="1056" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1104" x2="2400" y2="1104" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1152" x2="2400" y2="1152" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1200" x2="2400" y2="1200" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1248" x2="2400" y2="1248" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1296" x2="2400" y2="1296" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1344" x2="2400" y2="1344" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1392" x2="2400" y2="1392" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1440" x2="2400" y2="1440" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1488" x2="2400" y2="1488" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1536" x2="2400" y2="1536" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1584" x2="2400" y2="1584" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1632" x2="2400" y2="1632" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1680" x2="2400" y2="1680" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1728" x2="2400" y2="1728" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1776" x2="2400" y2="1776" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1824" x2="2400" y2="1824" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1872" x2="2400" y2="1872" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1920" x2="2400" y2="1920" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="1968" x2="2400" y2="1968" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2016" x2="2400" y2="2016" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2064" x2="2400" y2="2064" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2112" x2="2400" y2="2112" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2160" x2="2400" y2="2160" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2208" x2="2400" y2="2208" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2256" x2="2400" y2="2256" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2304" x2="2400" y2="2304" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2352" x2="2400" y2="2352" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2400" x2="2400" y2="2400" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2448" x2="2400" y2="2448" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2496" x2="2400" y2="2496" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2544" x2="2400" y2="2544" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2592" x2="2400" y2="2592" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2640" x2="2400" y2="2640" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2688" x2="2400" y2="2688" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2736" x2="2400" y2="2736" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2784" x2="2400" y2="2784" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2832" x2="2400" y2="2832" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2880" x2="2400" y2="2880" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2928" x2="2400" y2="2928" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="2976" x2="2400" y2="2976" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3024" x2="2400" y2="3024" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3072" x2="2400" y2="3072" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3120" x2="2400" y2="3120" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3168" x2="2400" y2="3168" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3216" x2="2400" y2="3216" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3264" x2="2400" y2="3264" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3312" x2="2400" y2="3312" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3360" x2="2400" y2="3360" stroke="#ece8dd" stroke-width="1"/><line x1="0" y1="3408" x2="2400" y2="3408" stroke="#ece8dd" stroke-width="1"/></g>
+    <text x="70" y="86" font-size="48" font-weight="800" fill="#222222" text-anchor="start"><tspan x="70" dy="0">V3.0 页面原型专项图片</tspan></text>
+    <text x="70" y="132" font-size="24" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="70" dy="0">覆盖全局壳、六个任务页、Target / Run / Settings / Console / Command Center。</tspan></text>
+    <text x="2330" y="86" font-size="22" font-weight="500" fill="#66645f" text-anchor="end"><tspan x="2330" dy="0">完整性: 14 个面板</tspan></text>
+
+    <g>
+
+    <rect x="70" y="190" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 75 603 C 381.36 609, 881.76 599, 1177 605" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="98" y="236" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="98" dy="0">Global Shell</tspan></text>
+
+    <rect x="98" y="286" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 103 563 C 393.68 569, 868.88 559, 1149 565" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="98" y="286" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="98" y="328" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="118" y="314" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="118" dy="0">Global Shell</tspan></text><text x="110" y="364" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="110" dy="0">任务导</tspan><tspan x="110" dy="20">航</tspan></text>
+    <rect x="206" y="352" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 421 C 464.72 427, 880.52 417, 1125 423" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="382" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="224" dy="0">当前状态、当前位置和下一步</tspan></text>
+    <rect x="206" y="456" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 541 C 332 547, 534.5 537, 651 543" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="680" y="456" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 685 541 C 806 547, 1008.5 537, 1125 543" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="490" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="224" dy="0">任务导航</tspan></text><text x="698" y="490" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="698" dy="0">工作区 / Drawer</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="1218" y="190" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 1223 603 C 1529.3600000000001 609, 2029.76 599, 2325 605" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="1246" y="236" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1246" dy="0">开始</tspan></text>
+
+    <rect x="1246" y="286" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1251 563 C 1541.68 569, 2016.88 559, 2297 565" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="1246" y="286" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="1246" y="328" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="1266" y="314" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1266" dy="0">开始</tspan></text><text x="1258" y="364" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="1258" dy="0">任务导</tspan><tspan x="1258" dy="20">航</tspan></text>
+    <rect x="1354" y="352" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 421 C 1612.72 427, 2028.52 417, 2273 423" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="382" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">Next Best Action</tspan></text>
+    <rect x="1354" y="456" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 541 C 1480 547, 1682.5 537, 1799 543" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="1828" y="456" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1833 541 C 1954 547, 2156.5 537, 2273 543" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="490" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">最近流程</tspan></text><text x="1846" y="490" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1846" dy="0">最近问题</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="70" y="646" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 75 1059 C 381.36 1065, 881.76 1055, 1177 1061" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="98" y="692" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="98" dy="0">连接设备</tspan></text>
+
+    <rect x="98" y="742" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 103 1019 C 393.68 1025, 868.88 1015, 1149 1021" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="98" y="742" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="98" y="784" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="118" y="770" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="118" dy="0">连接设备</tspan></text><text x="110" y="820" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="110" dy="0">任务导</tspan><tspan x="110" dy="20">航</tspan></text>
+    <rect x="206" y="808" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 877 C 464.72 883, 880.52 873, 1125 879" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="838" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="224" dy="0">当前设备摘要</tspan></text>
+    <rect x="206" y="912" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 997 C 332 1003, 534.5 993, 651 999" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="680" y="912" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 685 997 C 806 1003, 1008.5 993, 1125 999" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="946" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="224" dy="0">设备画面预览</tspan></text><text x="698" y="946" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="698" dy="0">创建目标</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="1218" y="646" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 1223 1059 C 1529.3600000000001 1065, 2029.76 1055, 2325 1061" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="1246" y="692" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1246" dy="0">Target Inspector</tspan></text>
+
+    <rect x="1246" y="742" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1251 1019 C 1541.68 1025, 2016.88 1015, 2297 1021" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="1246" y="742" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="1246" y="784" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="1266" y="770" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1266" dy="0">Target Inspector</tspan></text><text x="1258" y="820" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="1258" dy="0">任务导</tspan><tspan x="1258" dy="20">航</tspan></text>
+    <rect x="1354" y="808" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 877 C 1612.72 883, 2028.52 873, 2273 879" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="838" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">名称和策略</tspan></text>
+    <rect x="1354" y="912" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 997 C 1480 1003, 1682.5 993, 1799 999" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="1828" y="912" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1833 997 C 1954 1003, 2156.5 993, 2273 999" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="946" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">测试识别</tspan></text><text x="1846" y="946" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1846" dy="0">保存目标</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="70" y="1102" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 75 1515 C 381.36 1521, 881.76 1511, 1177 1517" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="98" y="1148" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="98" dy="0">开始录制</tspan></text>
+
+    <rect x="98" y="1198" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 103 1475 C 393.68 1481, 868.88 1471, 1149 1477" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="98" y="1198" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="98" y="1240" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="118" y="1226" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="118" dy="0">开始录制</tspan></text><text x="110" y="1276" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="110" dy="0">任务导</tspan><tspan x="110" dy="20">航</tspan></text>
+    <rect x="206" y="1264" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 1333 C 464.72 1339, 880.52 1329, 1125 1335" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="1294" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="224" dy="0">设备预览</tspan></text>
+    <rect x="206" y="1368" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 1453 C 332 1459, 534.5 1449, 651 1455" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="680" y="1368" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 685 1453 C 806 1459, 1008.5 1449, 1125 1455" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="1402" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="224" dy="0">动作时间轴</tspan></text><text x="698" y="1402" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="698" dy="0">生成流程</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="1218" y="1102" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 1223 1515 C 1529.3600000000001 1521, 2029.76 1511, 2325 1517" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="1246" y="1148" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1246" dy="0">编辑流程</tspan></text>
+
+    <rect x="1246" y="1198" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1251 1475 C 1541.68 1481, 2016.88 1471, 2297 1477" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="1246" y="1198" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="1246" y="1240" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="1266" y="1226" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1266" dy="0">编辑流程</tspan></text><text x="1258" y="1276" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="1258" dy="0">任务导</tspan><tspan x="1258" dy="20">航</tspan></text>
+    <rect x="1354" y="1264" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 1333 C 1612.72 1339, 2028.52 1329, 2273 1335" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="1294" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">目标库 / 节点</tspan></text>
+    <rect x="1354" y="1368" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 1453 C 1480 1459, 1682.5 1449, 1799 1455" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="1828" y="1368" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1833 1453 C 1954 1459, 2156.5 1449, 2273 1455" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="1402" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">画布</tspan></text><text x="1846" y="1402" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1846" dy="0">Inspector</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="70" y="1558" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 75 1971 C 381.36 1977, 881.76 1967, 1177 1973" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="98" y="1604" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="98" dy="0">Source / Validate</tspan></text>
+
+    <rect x="98" y="1654" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 103 1931 C 393.68 1937, 868.88 1927, 1149 1933" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="98" y="1654" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="98" y="1696" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="118" y="1682" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="118" dy="0">Source / Validate</tspan></text><text x="110" y="1732" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="110" dy="0">任务导</tspan><tspan x="110" dy="20">航</tspan></text>
+    <rect x="206" y="1720" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 1789 C 464.72 1795, 880.52 1785, 1125 1791" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="1750" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="224" dy="0">DSL 编辑</tspan></text>
+    <rect x="206" y="1824" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 1909 C 332 1915, 534.5 1905, 651 1911" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="680" y="1824" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 685 1909 C 806 1915, 1008.5 1905, 1125 1911" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="1858" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="224" dy="0">诊断定位</tspan></text><text x="698" y="1858" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="698" dy="0">保存源码</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="1218" y="1558" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 1223 1971 C 1529.3600000000001 1977, 2029.76 1967, 2325 1973" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="1246" y="1604" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1246" dy="0">运行任务</tspan></text>
+
+    <rect x="1246" y="1654" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1251 1931 C 1541.68 1937, 2016.88 1927, 2297 1933" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="1246" y="1654" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="1246" y="1696" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="1266" y="1682" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1266" dy="0">运行任务</tspan></text><text x="1258" y="1732" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="1258" dy="0">任务导</tspan><tspan x="1258" dy="20">航</tspan></text>
+    <rect x="1354" y="1720" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 1789 C 1612.72 1795, 2028.52 1785, 2273 1791" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="1750" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">预检</tspan></text>
+    <rect x="1354" y="1824" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 1909 C 1480 1915, 1682.5 1905, 1799 1911" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="1828" y="1824" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1833 1909 C 1954 1915, 2156.5 1905, 2273 1911" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="1858" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">当前运行</tspan></text><text x="1846" y="1858" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1846" dy="0">安全停止</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="70" y="2014" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 75 2427 C 381.36 2433, 881.76 2423, 1177 2429" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="98" y="2060" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="98" dy="0">暂停介入</tspan></text>
+
+    <rect x="98" y="2110" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 103 2387 C 393.68 2393, 868.88 2383, 1149 2389" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="98" y="2110" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="98" y="2152" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="118" y="2138" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="118" dy="0">暂停介入</tspan></text><text x="110" y="2188" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="110" dy="0">任务导</tspan><tspan x="110" dy="20">航</tspan></text>
+    <rect x="206" y="2176" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 2245 C 464.72 2251, 880.52 2241, 1125 2247" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="2206" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="224" dy="0">低置信原因</tspan></text>
+    <rect x="206" y="2280" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 2365 C 332 2371, 534.5 2361, 651 2367" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="680" y="2280" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 685 2365 C 806 2371, 1008.5 2361, 1125 2367" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="2314" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="224" dy="0">现场画面</tspan></text><text x="698" y="2314" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="698" dy="0">更新目标</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="1218" y="2014" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 1223 2427 C 1529.3600000000001 2433, 2029.76 2423, 2325 2429" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="1246" y="2060" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1246" dy="0">查看结果</tspan></text>
+
+    <rect x="1246" y="2110" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1251 2387 C 1541.68 2393, 2016.88 2383, 2297 2389" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="1246" y="2110" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="1246" y="2152" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="1266" y="2138" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1266" dy="0">查看结果</tspan></text><text x="1258" y="2188" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="1258" dy="0">任务导</tspan><tspan x="1258" dy="20">航</tspan></text>
+    <rect x="1354" y="2176" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 2245 C 1612.72 2251, 2028.52 2241, 2273 2247" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="2206" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">结果 KPI</tspan></text>
+    <rect x="1354" y="2280" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 2365 C 1480 2371, 1682.5 2361, 1799 2367" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="1828" y="2280" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1833 2365 C 1954 2371, 2156.5 2361, 2273 2367" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="2314" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">运行历史</tspan></text><text x="1846" y="2314" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1846" dy="0">详情入口</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="70" y="2470" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 75 2883 C 381.36 2889, 881.76 2879, 1177 2885" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="98" y="2516" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="98" dy="0">Run Detail</tspan></text>
+
+    <rect x="98" y="2566" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 103 2843 C 393.68 2849, 868.88 2839, 1149 2845" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="98" y="2566" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="98" y="2608" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="118" y="2594" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="118" dy="0">Run Detail</tspan></text><text x="110" y="2644" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="110" dy="0">任务导</tspan><tspan x="110" dy="20">航</tspan></text>
+    <rect x="206" y="2632" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 2701 C 464.72 2707, 880.52 2697, 1125 2703" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="2662" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="224" dy="0">状态 / 结果 / 问题</tspan></text>
+    <rect x="206" y="2736" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 2821 C 332 2827, 534.5 2817, 651 2823" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="680" y="2736" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 685 2821 C 806 2827, 1008.5 2817, 1125 2823" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="2770" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="224" dy="0">目标解析链</tspan></text><text x="698" y="2770" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="698" dy="0">复制摘要</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="1218" y="2470" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 1223 2883 C 1529.3600000000001 2889, 2029.76 2879, 2325 2885" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="1246" y="2516" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1246" dy="0">Settings</tspan></text>
+
+    <rect x="1246" y="2566" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1251 2843 C 1541.68 2849, 2016.88 2839, 2297 2845" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="1246" y="2566" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="1246" y="2608" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="1266" y="2594" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1266" dy="0">Settings</tspan></text><text x="1258" y="2644" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="1258" dy="0">任务导</tspan><tspan x="1258" dy="20">航</tspan></text>
+    <rect x="1354" y="2632" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 2701 C 1612.72 2707, 2028.52 2697, 2273 2703" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="2662" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">本地设置</tspan></text>
+    <rect x="1354" y="2736" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 2821 C 1480 2827, 1682.5 2817, 1799 2823" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="1828" y="2736" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1833 2821 C 1954 2827, 2156.5 2817, 2273 2823" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="2770" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">隐私边界</tspan></text><text x="1846" y="2770" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1846" dy="0">证据保留</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="70" y="2926" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 75 3339 C 381.36 3345, 881.76 3335, 1177 3341" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="98" y="2972" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="98" dy="0">Bottom Console</tspan></text>
+
+    <rect x="98" y="3022" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 103 3299 C 393.68 3305, 868.88 3295, 1149 3301" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="98" y="3022" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="98" y="3064" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="118" y="3050" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="118" dy="0">Bottom Console</tspan></text><text x="110" y="3100" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="110" dy="0">任务导</tspan><tspan x="110" dy="20">航</tspan></text>
+    <rect x="206" y="3088" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 3157 C 464.72 3163, 880.52 3153, 1125 3159" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="3118" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="224" dy="0">Log / Error / Driver</tspan></text>
+    <rect x="206" y="3192" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 211 3277 C 332 3283, 534.5 3273, 651 3279" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="680" y="3192" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 685 3277 C 806 3283, 1008.5 3273, 1125 3279" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="224" y="3226" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="224" dy="0">Targets /</tspan><tspan x="224" dy="22">Performance</tspan></text><text x="698" y="3226" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="698" dy="0">复制/清除视图</tspan></text>
+    </g>
+
+    <g>
+
+    <rect x="1218" y="2926" width="1112" height="420" rx="18" fill="#ffffff" stroke="#2f2f2f" stroke-width="3" />
+    <path d="M 1223 3339 C 1529.3600000000001 3345, 2029.76 3335, 2325 3341" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+      <text x="1246" y="2972" font-size="28" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1246" dy="0">Command Center</tspan></text>
+
+    <rect x="1246" y="3022" width="1056" height="284" rx="14" fill="#fdfdfd" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1251 3299 C 1541.68 3305, 2016.88 3295, 2297 3301" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <rect x="1246" y="3022" width="1056" height="42" rx="14" fill="#f0f0f5" stroke="#2f2f2f" stroke-width="2"/><rect x="1246" y="3064" width="84" height="242" fill="#f5f5f7" stroke="#2f2f2f" stroke-width="2"/><text x="1266" y="3050" font-size="18" font-weight="750" fill="#222222" text-anchor="start"><tspan x="1266" dy="0">Command Center</tspan></text><text x="1258" y="3100" font-size="14" font-weight="500" fill="#66645f" text-anchor="start"><tspan x="1258" dy="0">任务导</tspan><tspan x="1258" dy="20">航</tspan></text>
+    <rect x="1354" y="3088" width="924" height="76" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 3157 C 1612.72 3163, 2028.52 3153, 2273 3159" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="3118" font-size="17" font-weight="700" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">搜索命令</tspan></text>
+    <rect x="1354" y="3192" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1359 3277 C 1480 3283, 1682.5 3273, 1799 3279" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+
+    <rect x="1828" y="3192" width="450" height="92" rx="12" fill="#ffffff" stroke="#2f2f2f" stroke-width="2" />
+    <path d="M 1833 3277 C 1954 3283, 2156.5 3273, 2273 3279" fill="none" stroke="#2f2f2f" stroke-opacity="0.18" stroke-width="2"/>
+  <text x="1372" y="3226" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1372" dy="0">跳转页面</tspan></text><text x="1846" y="3226" font-size="15" font-weight="500" fill="#222222" text-anchor="start"><tspan x="1846" dy="0">安全命令</tspan></text>
+    </g>
+  </svg>

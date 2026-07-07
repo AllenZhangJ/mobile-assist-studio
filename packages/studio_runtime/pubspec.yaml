@@ -1,0 +1,17 @@
+name: studio_runtime
+description: Dart runtime state model for iOS Assist Studio V2.0.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  appium_client:
+    path: ../appium_client
+  workflow_dsl:
+    path: ../workflow_dsl
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.25.6

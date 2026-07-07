@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iOS Assist Studio V3.0 Prototype</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --window: #f5f5f7;
+      --sidebar: #ececf0;
+      --surface: #ffffff;
+      --surface-2: #f2f2f5;
+      --border: #d7d7dd;
+      --text: #1d1d1f;
+      --muted: #5f6368;
+      --accent: #0a84ff;
+      --success: #248a3d;
+      --warning: #b26a00;
+      --danger: #d70015;
+      --paused: #6e56cf;
+      --shadow: rgba(0, 0, 0, 0.14);
+      --radius: 8px;
+      --top: 56px;
+      --nav: 72px;
+      --console: 48px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --window: #1c1c1e;
+        --sidebar: #242428;
+        --surface: #2c2c2e;
+        --surface-2: #3a3a3c;
+        --border: #48484a;
+        --text: #f5f5f7;
+        --muted: #c7c7cc;
+        --accent: #0a84ff;
+        --success: #30d158;
+        --warning: #ffd60a;
+        --danger: #ff453a;
+        --paused: #bfadf6;
+        --shadow: rgba(0, 0, 0, 0.36);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-width: 1180px;
+      min-height: 760px;
+      background: var(--window);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.38;
+      overflow: hidden;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--text);
+      height: 30px;
+      padding: 0 10px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+    }
+
+    button:focus-visible,
+    input:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--accent) 28%, transparent);
+      outline-offset: 2px;
+    }
+
+    .primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-weight: 600;
+    }
+
+    .danger {
+      color: var(--danger);
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: var(--top) 1fr var(--console);
+      grid-template-columns: var(--nav) 1fr;
+    }
+
+    .topbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border);
+      background: color-mix(in srgb, var(--surface) 82%, var(--window));
+    }
+
+    .traffic {
+      display: flex;
+      gap: 7px;
+      width: 66px;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--border);
+    }
+
+    .dot:nth-child(1) { background: #ff5f57; }
+    .dot:nth-child(2) { background: #ffbd2e; }
+    .dot:nth-child(3) { background: #28c840; }
+
+    .project {
+      font-size: 14px;
+      font-weight: 650;
+      min-width: 176px;
+    }
+
+    .status-strip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+      padding: 5px 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+      white-space: nowrap;
+      color: var(--muted);
+    }
+
+    .status strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    .led {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .led.ready { background: var(--success); }
+    .led.warn { background: var(--warning); }
+    .led.run { background: var(--accent); }
+    .led.pause { background: var(--paused); }
+
+    .nav {
+      grid-row: 2;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .nav button {
+      height: 54px;
+      border: 0;
+      background: transparent;
+      padding: 4px;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      border-radius: 8px;
+    }
+
+    .nav button[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px var(--shadow);
+    }
+
+    .nav .symbol {
+      width: 20px;
+      height: 20px;
+      border: 1.5px solid currentColor;
+      border-radius: 6px;
+      position: relative;
+    }
+
+    .nav .symbol::after {
+      content: "";
+      position: absolute;
+      inset: 5px;
+      border-radius: 3px;
+      background: currentColor;
+      opacity: .22;
+    }
+
+    .nav .label {
+      font-size: 11px;
+      line-height: 1;
+    }
+
+    .workspace {
+      grid-row: 2;
+      padding: 18px;
+      overflow: auto;
+    }
+
+    .page {
+      display: none;
+      height: 100%;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    .page-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 28px;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      line-height: 20px;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hero {
+      min-height: 116px;
+      padding: 18px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .hero h2 {
+      margin-bottom: 6px;
+      font-size: 20px;
+      line-height: 26px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .grid.cols-3 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .grid.cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 300px minmax(0, 1fr);
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .triple {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr) 320px;
+      gap: 12px;
+      min-height: 560px;
+    }
+
+    .panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .panel.tight {
+      padding: 10px;
+    }
+
+    .metric {
+      min-height: 92px;
+    }
+
+    .metric .value {
+      display: block;
+      margin-top: 8px;
+      font-size: 21px;
+      font-weight: 700;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .row {
+      min-height: 44px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: var(--surface-2);
+    }
+
+    .row-title {
+      font-weight: 620;
+    }
+
+    .row-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .pill.success { color: var(--success); }
+    .pill.warning { color: var(--warning); }
+    .pill.paused { color: var(--paused); }
+
+    .device-frame {
+      height: 480px;
+      border-radius: 28px;
+      border: 10px solid color-mix(in srgb, var(--text) 80%, transparent);
+      background: linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 70%, var(--accent)), var(--surface-2));
+      position: relative;
+      overflow: hidden;
+      max-width: 280px;
+      margin: 0 auto;
+    }
+
+    .device-frame::before {
+      content: "";
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      width: 68px;
+      height: 18px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--text) 18%, transparent);
+    }
+
+    .mock-screen {
+      position: absolute;
+      inset: 46px 16px 20px;
+      display: grid;
+      align-content: start;
+      gap: 10px;
+    }
+
+    .app-block {
+      height: 42px;
+      border-radius: 8px;
+      background: color-mix(in srgb, var(--surface) 82%, var(--accent));
+      border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+    }
+
+    .app-block.wide { height: 72px; }
+    .app-block.small { width: 70%; }
+
+    .canvas {
+      min-height: 490px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(var(--surface-2), var(--surface-2)),
+        var(--surface);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .node {
+      position: absolute;
+      min-width: 132px;
+      padding: 10px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: 0 1px 3px var(--shadow);
+    }
+
+    .node.start { left: 58px; top: 74px; }
+    .node.tap { left: 230px; top: 74px; }
+    .node.wait { left: 420px; top: 160px; }
+    .node.assert { left: 250px; top: 278px; }
+    .node.end { left: 498px; top: 278px; }
+
+    .edge {
+      position: absolute;
+      height: 2px;
+      background: var(--border);
+      transform-origin: left center;
+    }
+
+    .edge.e1 { left: 188px; top: 108px; width: 40px; }
+    .edge.e2 { left: 358px; top: 108px; width: 88px; transform: rotate(25deg); }
+    .edge.e3 { left: 374px; top: 302px; width: 120px; }
+
+    .progress {
+      height: 8px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .progress span {
+      display: block;
+      height: 100%;
+      width: 72%;
+      background: var(--accent);
+    }
+
+    .console {
+      grid-column: 1 / -1;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      display: grid;
+      grid-template-rows: 48px 0;
+      transition: grid-template-rows 180ms ease-out;
+    }
+
+    .console.open {
+      grid-template-rows: 48px 272px;
+    }
+
+    .console-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px;
+    }
+
+    .console-tabs {
+      display: flex;
+      gap: 6px;
+      flex: 1;
+    }
+
+    .console-tabs button {
+      height: 28px;
+      background: transparent;
+    }
+
+    .console-body {
+      overflow: hidden;
+      border-top: 1px solid var(--border);
+      padding: 12px 14px;
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 12px;
+    }
+
+    .logline {
+      padding: 6px 0;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .drawer {
+      position: fixed;
+      top: var(--top);
+      right: 0;
+      bottom: var(--console);
+      width: 392px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      box-shadow: -8px 0 18px var(--shadow);
+      transform: translateX(100%);
+      transition: transform 180ms ease-out;
+      z-index: 30;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .drawer.open {
+      transform: translateX(0);
+    }
+
+    .drawer-head {
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .drawer-body {
+      padding: 14px;
+      overflow: auto;
+      display: grid;
+      gap: 12px;
+    }
+
+    .command {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: start center;
+      padding-top: 110px;
+      background: color-mix(in srgb, var(--window) 70%, transparent);
+      z-index: 40;
+    }
+
+    .command.open {
+      display: grid;
+    }
+
+    .command-panel {
+      width: 560px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface);
+      box-shadow: 0 16px 40px var(--shadow);
+      overflow: hidden;
+    }
+
+    .command input {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      padding: 0 16px;
+      outline: none;
+      font-size: 16px;
+    }
+
+    .cmd-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        transition: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="traffic" aria-hidden="true"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+      <div class="project">Mobile Workstation</div>
+      <div class="status-strip" aria-label="当前状态">
+        <span class="status"><span class="led ready"></span><strong>平台</strong> iOS</span>
+        <span class="status"><span class="led ready"></span><strong>设备</strong> 已连接</span>
+        <span class="status"><span class="led ready"></span><strong>目标</strong> 3 可用</span>
+        <span class="status"><span class="led warn"></span><strong>流程</strong> 1 提醒</span>
+        <span class="status"><span class="led pause"></span><strong>运行</strong> 等待确认</span>
+      </div>
+      <button id="openCommand">命令</button>
+      <button data-drawer="settings">设置</button>
+    </header>
+
+    <nav class="nav" aria-label="任务导航">
+      <button class="nav-item" data-page="home" aria-selected="true"><span class="symbol"></span><span class="label">开始</span></button>
+      <button class="nav-item" data-page="device"><span class="symbol"></span><span class="label">连接</span></button>
+      <button class="nav-item" data-page="recorder"><span class="symbol"></span><span class="label">录制</span></button>
+      <button class="nav-item" data-page="workflow"><span class="symbol"></span><span class="label">流程</span></button>
+      <button class="nav-item" data-page="execute"><span class="symbol"></span><span class="label">运行</span></button>
+      <button class="nav-item" data-page="monitor"><span class="symbol"></span><span class="label">结果</span></button>
+    </nav>
+
+    <main class="workspace">
+      <section id="home" class="page active" aria-labelledby="homeTitle">
+        <div class="page-head">
+          <h1 id="homeTitle">开始</h1>
+          <div class="actions"><button>定位问题</button><button class="primary" data-page-jump="execute">开始运行</button></div>
+        </div>
+        <div class="hero">
+          <div>
+            <h2>登录检查可以运行，但目标有一个提醒</h2>
+            <p>登录按钮最近一次识别置信度偏低。可以先修复目标，或运行时让系统暂停确认。</p>
+          </div>
+          <div class="actions"><button data-drawer="target">修复目标</button><button class="primary" data-page-jump="execute">运行任务</button></div>
+        </div>
+        <div class="grid cols-3">
+          <div class="panel metric"><h2>当前设备</h2><p>iOS · 已连接 · 空闲</p><span class="value">可操作</span></div>
+          <div class="panel metric"><h2>当前流程</h2><p>登录检查 · 6 个节点</p><span class="value">1 个提醒</span></div>
+          <div class="panel metric"><h2>最近结果</h2><p>今天 4 次运行</p><span class="value">3 通过</span></div>
+        </div>
+        <div class="grid" style="grid-template-columns: 1.35fr 1fr; margin-top: 12px;">
+          <div class="panel">
+            <h2>最近流程</h2>
+            <div class="list">
+              <div class="row"><div><div class="row-title">登录检查</div><div class="row-meta">可运行 · 6 个节点</div></div><div class="actions"><button data-page-jump="workflow">编辑</button><button data-page-jump="execute">运行</button></div></div>
+              <div class="row"><div><div class="row-title">下单流程</div><div class="row-meta">目标缺少截图</div></div><button data-drawer="target">修复</button></div>
+              <div class="row"><div><div class="row-title">首页巡检</div><div class="row-meta">上次通过</div></div><button>查看</button></div>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>最近问题</h2>
+            <div class="list">
+              <div class="row"><div><div class="row-title">登录按钮低置信</div><div class="row-meta">目标问题 · 建议更新截图</div></div><button data-drawer="target">修复</button></div>
+              <div class="row"><div><div class="row-title">驱动恢复过一次</div><div class="row-meta">已自动收口</div></div><button data-drawer="run">详情</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="device" class="page" aria-labelledby="deviceTitle">
+        <div class="page-head">
+          <h1 id="deviceTitle">连接设备</h1>
+          <div class="actions"><button>刷新画面</button><button class="primary" data-drawer="target">创建目标</button><button>断开</button></div>
+        </div>
+        <div class="split">
+          <div class="panel">
+            <h2>当前设备</h2>
+            <p>iOS · 已连接</p>
+            <div class="list" style="margin-top: 12px;">
+              <span class="pill success">资源空闲</span>
+              <span class="pill success">驱动就绪</span>
+              <span class="pill warning">1 个目标提醒</span>
+            </div>
+            <div class="row" style="margin-top: 14px;"><div><div class="row-title">当前 App</div><div class="row-meta">示例 App</div></div><button>启动</button></div>
+            <div class="row"><div><div class="row-title">本机准备</div><div class="row-meta">全部就绪</div></div><button>查看</button></div>
+            <button class="primary" style="margin-top: 14px; width: 100%;" data-page-jump="recorder">开始录制</button>
+          </div>
+          <div class="panel">
+            <h2>设备画面</h2>
+            <div class="device-frame" aria-label="设备画面预览">
+              <div class="mock-screen">
+                <div class="app-block wide"></div>
+                <div class="app-block small"></div>
+                <div class="app-block"></div>
+                <div class="app-block small"></div>
+                <div class="app-block"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="recorder" class="page" aria-labelledby="recorderTitle">
+        <div class="page-head">
+          <h1 id="recorderTitle">开始录制</h1>
+          <div class="actions"><button class="primary">开始录制</button><button>停止</button><button data-page-jump="workflow">生成流程</button></div>
+        </div>
+        <div class="grid" style="grid-template-columns: minmax(0, 1fr) 360px;">
+          <div class="panel">
+            <h2>现场预览</h2>
+            <div class="device-frame">
+              <div class="mock-screen">
+                <div class="app-block wide"></div>
+                <div class="app-block"></div>
+                <div class="app-block small"></div>
+                <div class="app-block"></div>
+              </div>
+            </div>
+          </div>
+          <div class="panel">
+            <h2>动作时间轴</h2>
+            <div class="list">
+              <div class="row"><div><div class="row-title">点击 登录按钮</div><div class="row-meta">目标 · 有截图证据</div></div><button>详情</button></div>
+              <div class="row"><div><div class="row-title">等待 首页出现</div><div class="row-meta">目标 · 最多 5 秒</div></div><button>详情</button></div>
+              <div class="row"><div><div class="row-title">输入 手机号字段</div><div class="row-meta">内容已隐藏</div></div><button>详情</button></div>
+              <div class="row"><div><div class="row-title">点击 下一步</div><div class="row-meta">坐标兜底</div></div><button>详情</button></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflow" class="page" aria-labelledby="workflowTitle">
+        <div class="page-head">
+          <h1 id="workflowTitle">编辑流程</h1>
+          <div class="actions"><button>画布</button><button>源码</button><button>检查</button><button class="primary" data-page-jump="execute">去运行</button></div>
+        </div>
+        <div class="triple">
+          <div class="panel tight">
+            <h2>节点 / 目标</h2>
+            <div class="list">
+              <div class="row"><div><div class="row-title">登录按钮</div><div class="row-meta">可用 · 92%</div></div></div>
+              <div class="row"><div><div class="row-title">首页标题</div><div class="row-meta">可用</div></div></div>
+              <div class="row"><div><div class="row-title">商品卡片</div><div class="row-meta">缺少截图</div></div></div>
+            </div>
+            <button style="width: 100%; margin-top: 12px;" data-drawer="target">新建目标</button>
+          </div>
+          <div class="canvas" aria-label="流程画布">
+            <div class="node start"><strong>Start</strong><p>入口</p></div>
+            <div class="node tap"><strong>点击登录</strong><p>目标：登录按钮</p></div>
+            <div class="node wait"><strong>等待首页</strong><p>目标：首页标题</p></div>
+            <div class="node assert"><strong>断言文字</strong><p>用例结果</p></div>
+            <div class="node end"><strong>End</strong><p>结束</p></div>
+            <span class="edge e1"></span><span class="edge e2"></span><span class="edge e3"></span>
+          </div>
+          <div class="panel">
+            <h2>Inspector</h2>
+            <div class="list">
+              <div class="row"><div><div class="row-title">节点</div><div class="row-meta">点击登录</div></div></div>
+              <div class="row"><div><div class="row-title">目标</div><div class="row-meta">登录按钮</div></div><button data-drawer="target">打开</button></div>
+              <div class="row"><div><div class="row-title">低置信时</div><div class="row-meta">暂停</div></div></div>
+              <div class="row"><div><div class="row-title">平台能力</div><div class="row-meta">iOS / Android 可用</div></div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="execute" class="page" aria-labelledby="executeTitle">
+        <div class="page-head">
+          <h1 id="executeTitle">运行任务</h1>
+          <div class="actions"><button class="danger">安全停止</button><button data-drawer="run">最近证据</button></div>
+        </div>
+        <div class="grid" style="grid-template-columns: 320px minmax(0, 1fr);">
+          <div class="panel">
+            <h2>预检</h2>
+            <div class="list">
+              <span class="pill success">设备就绪</span>
+              <span class="pill success">流程可运行</span>
+              <span class="pill warning">1 个目标提醒</span>
+              <span class="pill success">资源空闲</span>
+            </div>
+            <button class="primary" style="width: 100%; margin-top: 16px;">开始运行</button>
+          </div>
+          <div class="panel">
+            <h2>当前运行</h2>
+            <div class="hero" style="margin: 0 0 12px; min-height: 92px;">
+              <div>
+                <h2>等待人工确认：登录按钮低置信</h2>
+                <p>系统找到了一个可能目标，但置信度不足，不会继续点击。</p>
+              </div>
+              <div class="actions"><button data-drawer="target">更新目标</button><button class="primary">手动确认</button></div>
+            </div>
+            <div class="grid cols-3">
+              <div class="panel metric"><h2>当前节点</h2><span class="value">等待首页</span></div>
+              <div class="panel metric"><h2>置信度</h2><span class="value">61%</span></div>
+              <div class="panel metric"><h2>进度</h2><span class="value">4 / 6</span></div>
+            </div>
+            <div class="progress"><span></span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="monitor" class="page" aria-labelledby="monitorTitle">
+        <div class="page-head">
+          <h1 id="monitorTitle">查看结果</h1>
+          <div class="actions"><button>7 日</button><button>30 日</button><button class="primary">复制摘要</button></div>
+        </div>
+        <div class="grid cols-4">
+          <div class="panel metric"><h2>任务完成率</h2><span class="value">86%</span></div>
+          <div class="panel metric"><h2>用例通过率</h2><span class="value">75%</span></div>
+          <div class="panel metric"><h2>暂停率</h2><span class="value">12%</span></div>
+          <div class="panel metric"><h2>目标失败率</h2><span class="value">8%</span></div>
+        </div>
+        <div class="panel" style="margin-top: 12px;">
+          <h2>运行历史</h2>
+          <div class="list">
+            <div class="row"><div><div class="row-title">登录检查</div><div class="row-meta">已完成 / 通过 · iOS · 42s</div></div><button data-drawer="run">详情</button></div>
+            <div class="row"><div><div class="row-title">下单流程</div><div class="row-meta">暂停 / 不确定 · Android · 1m12s</div></div><button data-drawer="run">详情</button></div>
+            <div class="row"><div><div class="row-title">首页巡检</div><div class="row-meta">失败 / 未评估 · driver</div></div><button data-drawer="run">详情</button></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <section id="console" class="console" aria-label="底部诊断">
+      <div class="console-bar">
+        <div class="console-tabs">
+          <button>Log</button><button>Error</button><button>Inspector</button><button>Driver</button><button>Targets</button><button>Performance</button>
+        </div>
+        <button id="toggleConsole">展开 Console</button>
+      </div>
+      <div class="console-body">
+        <div>
+          <div class="logline">信息 · 设备已连接，当前资源空闲。</div>
+          <div class="logline">提醒 · 登录按钮最近一次识别置信度偏低。</div>
+          <div class="logline">信息 · 已保存目标解析证据。</div>
+        </div>
+        <div class="panel tight">
+          <h2>当前摘要</h2>
+          <p>不显示完整设备标识、endpoint、session 或原始日志。</p>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <aside id="targetDrawer" class="drawer" aria-label="目标 Inspector">
+    <div class="drawer-head"><strong>目标</strong><button data-close>关闭</button></div>
+    <div class="drawer-body">
+      <div class="panel tight"><h2>登录按钮</h2><p>图片 + 坐标建议 · iOS / Android</p></div>
+      <div class="row"><div><div class="row-title">最近验证</div><div class="row-meta">可识别 · 92%</div></div><span class="pill success">可用</span></div>
+      <div class="row"><div><div class="row-title">找不到时</div><div class="row-meta">暂停并等待人工确认</div></div></div>
+      <div class="row"><div><div class="row-title">低置信时</div><div class="row-meta">不点击，进入暂停</div></div></div>
+      <button class="primary">保存目标</button>
+      <button>测试识别</button>
+    </div>
+  </aside>
+
+  <aside id="runDrawer" class="drawer" aria-label="运行详情">
+    <div class="drawer-head"><strong>运行详情</strong><button data-close>关闭</button></div>
+    <div class="drawer-body">
+      <div class="grid cols-3">
+        <span class="pill success">已完成</span>
+        <span class="pill success">用例通过</span>
+        <span class="pill">无问题</span>
+      </div>
+      <div class="panel tight"><h2>执行路径</h2><p>Start → 点击登录 → 等待首页 → 断言文字 → End</p></div>
+      <div class="panel tight"><h2>目标解析链</h2><p>登录按钮 · 图像命中 · 92%。首页标题 · selector 命中。</p></div>
+      <div class="panel tight"><h2>证据</h2><p>截图、日志摘要和性能采样均保存在本地。</p></div>
+      <button class="primary">复制脱敏摘要</button>
+      <button data-page-jump="workflow">定位流程</button>
+    </div>
+  </aside>
+
+  <aside id="settingsDrawer" class="drawer" aria-label="设置">
+    <div class="drawer-head"><strong>设置</strong><button data-close>关闭</button></div>
+    <div class="drawer-body">
+      <div class="panel tight"><h2>工作站</h2><p>单设备 · 本地保存 · 无云同步。</p></div>
+      <div class="panel tight"><h2>隐私</h2><p>隐藏设备标识和原始 payload 已开启。</p></div>
+      <div class="panel tight"><h2>证据保留</h2><p>保留最近 50 次运行。</p></div>
+      <div class="panel tight"><h2>边界</h2><p>串行执行、安全停止、禁止任意脚本。</p></div>
+    </div>
+  </aside>
+
+  <div id="command" class="command" role="dialog" aria-label="命令面板">
+    <div class="command-panel">
+      <input id="commandInput" type="text" value="连接" aria-label="搜索命令">
+      <div class="cmd-row"><span>连接设备</span><span>打开连接设备页</span></div>
+      <div class="cmd-row"><span>修复登录按钮</span><span>打开目标 Inspector</span></div>
+      <div class="cmd-row"><span>查看运行状态</span><span>打开运行任务</span></div>
+      <div class="cmd-row"><span>复制脱敏诊断</span><span>复制当前摘要</span></div>
+    </div>
+  </div>
+
+  <script>
+    const pages = document.querySelectorAll('.page');
+    const navItems = document.querySelectorAll('.nav-item');
+    const drawers = {
+      target: document.getElementById('targetDrawer'),
+      run: document.getElementById('runDrawer'),
+      settings: document.getElementById('settingsDrawer')
+    };
+
+    function showPage(id) {
+      pages.forEach(page => page.classList.toggle('active', page.id === id));
+      navItems.forEach(item => item.setAttribute('aria-selected', String(item.dataset.page === id)));
+    }
+
+    function closeDrawers() {
+      Object.values(drawers).forEach(drawer => drawer.classList.remove('open'));
+    }
+
+    document.addEventListener('click', event => {
+      const nav = event.target.closest('[data-page]');
+      if (nav) showPage(nav.dataset.page);
+
+      const jump = event.target.closest('[data-page-jump]');
+      if (jump) showPage(jump.dataset.pageJump);
+
+      const drawerButton = event.target.closest('[data-drawer]');
+      if (drawerButton) {
+        closeDrawers();
+        drawers[drawerButton.dataset.drawer]?.classList.add('open');
+      }
+
+      if (event.target.matches('[data-close]')) closeDrawers();
+    });
+
+    document.getElementById('toggleConsole').addEventListener('click', () => {
+      const consolePanel = document.getElementById('console');
+      consolePanel.classList.toggle('open');
+      document.getElementById('toggleConsole').textContent = consolePanel.classList.contains('open') ? '收起 Console' : '展开 Console';
+    });
+
+    const command = document.getElementById('command');
+    const commandInput = document.getElementById('commandInput');
+    document.getElementById('openCommand').addEventListener('click', () => {
+      command.classList.add('open');
+      commandInput.focus();
+      commandInput.select();
+    });
+
+    document.addEventListener('keydown', event => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        command.classList.add('open');
+        commandInput.focus();
+        commandInput.select();
+      }
+      if (event.key === 'Escape') {
+        command.classList.remove('open');
+        closeDrawers();
+      }
+    });
+
+    command.addEventListener('click', event => {
+      if (event.target === command) command.classList.remove('open');
+    });
+  </script>
+</body>
+</html>

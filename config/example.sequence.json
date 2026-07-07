@@ -1,0 +1,54 @@
+{
+  "appium": {
+    "hostname": "127.0.0.1",
+    "port": 4723,
+    "path": "/",
+    "capabilities": {
+      "platformName": "iOS",
+      "appium:automationName": "XCUITest",
+      "appium:deviceName": "iPhone 13 Pro",
+      "appium:udid": "YOUR_DEVICE_UDID",
+      "appium:bundleId": "com.example.yourapp",
+      "appium:noReset": true,
+      "appium:newCommandTimeout": 300,
+      "appium:xcodeOrgId": "YOUR_APPLE_TEAM_ID",
+      "appium:xcodeSigningId": "iPhone Developer",
+      "appium:updatedWDABundleId": "com.example.WebDriverAgentRunner"
+    }
+  },
+  "run": {
+    "loops": 1,
+    "initialDelayMs": 2000,
+    "betweenLoopsDelayMs": 1000,
+    "tapDurationMs": 80,
+    "stopOnError": true
+  },
+  "sequence": [
+    {
+      "type": "tap",
+      "x": 320,
+      "y": 680,
+      "label": "first button"
+    },
+    {
+      "type": "wait",
+      "ms": 1200
+    },
+    {
+      "type": "tap",
+      "x": 250,
+      "y": 540,
+      "label": "second button"
+    },
+    {
+      "type": "wait",
+      "ms": 800
+    },
+    {
+      "type": "tap",
+      "x": 360,
+      "y": 720,
+      "label": "third button"
+    }
+  ]
+}

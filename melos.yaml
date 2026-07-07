@@ -1,0 +1,25 @@
+name: ios_assist_studio
+
+packages:
+  - apps/*
+  - packages/*
+
+command:
+  bootstrap:
+    usePubspecOverrides: true
+
+scripts:
+  analyze:
+    run: melos run analyze:dart && melos run analyze:flutter
+    description: Analyze all Dart and Flutter packages.
+  analyze:dart:
+    run: melos exec --no-flutter -- "fvm dart analyze ."
+  analyze:flutter:
+    run: melos exec --flutter -c 1 -- "fvm flutter analyze ."
+  test:
+    run: melos run test:dart && melos run test:flutter
+    description: Run all Dart and Flutter tests.
+  test:dart:
+    run: melos exec --no-flutter -- "fvm dart test"
+  test:flutter:
+    run: melos exec --flutter -c 1 -- "fvm flutter test"

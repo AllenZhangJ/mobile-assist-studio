@@ -1,0 +1,10 @@
+# melos_managed_dependency_overrides: appium_client,studio_design_system,studio_runtime,workflow_dsl
+dependency_overrides:
+  appium_client:
+    path: ../../packages/appium_client
+  studio_design_system:
+    path: ../../packages/studio_design_system
+  studio_runtime:
+    path: ../../packages/studio_runtime
+  workflow_dsl:
+    path: ../../packages/workflow_dsl

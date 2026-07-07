@@ -78,7 +78,11 @@ class _PageContent extends StatelessWidget {
         controller: controller,
         onNavigate: onNavigate,
       ),
-      1 => _DevicePage(snapshot: snapshot, controller: controller),
+      1 => _DevicePage(
+        snapshot: snapshot,
+        controller: controller,
+        onNavigate: onNavigate,
+      ),
       2 => _RecorderPage(
         snapshot: snapshot,
         controller: controller,

@@ -2,10 +2,15 @@ part of '../../studio_mac_workspace.dart';
 
 // 设备页入口与侧栏面板，负责展示当前设备状态、准备项和连接动作。
 class _DevicePage extends StatelessWidget {
-  const _DevicePage({required this.snapshot, required this.controller});
+  const _DevicePage({
+    required this.snapshot,
+    required this.controller,
+    required this.onNavigate,
+  });
 
   final StudioRuntimeSnapshot snapshot;
   final StudioRuntimeController controller;
+  final ValueChanged<int> onNavigate;
 
   /// 渲染设备页双栏骨架。
   /// 左侧承载状态与动作，右侧保留实时预览。
@@ -37,6 +42,7 @@ class _DevicePage extends StatelessWidget {
                 _DeviceInspectorPanel(
                   snapshot: snapshot,
                   controller: controller,
+                  onNavigate: onNavigate,
                 ),
                 const SizedBox(height: 14),
                 _DeviceTargetLibraryPanel(

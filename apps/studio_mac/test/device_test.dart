@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:appium_client/appium_client.dart';
 import 'package:studio_mac/studio_mac.dart';
 import 'package:studio_runtime/studio_runtime.dart';
+import 'package:workflow_dsl/workflow_dsl.dart';
 
 import 'support/studio_widget_harness.dart';
 
@@ -209,6 +210,36 @@ void main() {
       actions.calls,
       containsAllInOrder(['screenshot', 'source:inspect-session']),
     );
+
+    final createTapButton = find.byKey(
+      const ValueKey('device-inspector-create-tap-node'),
+    );
+    await tester.dragUntilVisible(
+      createTapButton,
+      find.byKey(const ValueKey('device-side-scroll')),
+      const Offset(0, -180),
+      maxIteration: 8,
+    );
+    await tester.ensureVisible(createTapButton);
+    await tester.pumpAndSettle();
+    await tester.tap(createTapButton);
+    await tester.pumpAndSettle();
+
+    final target = controller.snapshot.targetLibrary.targets.single;
+    expect(target.kind, RuntimeTargetKind.selector);
+    expect(target.label, '开始');
+    expect(target.payload['selector'], 'label=开始');
+    final generatedNodes = controller.snapshot.workflow.nodes
+        .where((node) => node.parameters['targetRef'] == target.id)
+        .toList(growable: false);
+    expect(generatedNodes, hasLength(1));
+    expect(generatedNodes.single.type, WorkflowNodeType.tap);
+    expect(generatedNodes.single.label, '点开始');
+    expect(
+      find.byKey(const ValueKey('workflow-visual-canvas')),
+      findsOneWidget,
+    );
+    expect(find.text('已加到流程。'), findsOneWidget);
   });
 
   testWidgets('device readiness guide summarizes connected local stack', (

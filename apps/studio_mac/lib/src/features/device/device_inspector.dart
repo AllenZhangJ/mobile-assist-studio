@@ -5,10 +5,12 @@ class _DeviceInspectorPanel extends StatelessWidget {
   const _DeviceInspectorPanel({
     required this.snapshot,
     required this.controller,
+    required this.onNavigate,
   });
 
   final StudioRuntimeSnapshot snapshot;
   final StudioRuntimeController controller;
+  final ValueChanged<int> onNavigate;
 
   // 渲染 Device 内的 Inspector MVP。
   @override
@@ -59,6 +61,12 @@ class _DeviceInspectorPanel extends StatelessWidget {
             _InspectorAiSuggestionPanel(
               snapshot: snapshot,
               controller: controller,
+            ),
+            const SizedBox(height: 12),
+            _InspectorWorkflowAssistPanel(
+              snapshot: snapshot,
+              controller: controller,
+              onNavigate: onNavigate,
             ),
             const SizedBox(height: 12),
             _InspectorElementTree(root: inspector.rootElement),

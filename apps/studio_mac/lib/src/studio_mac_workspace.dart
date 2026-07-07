@@ -38,6 +38,7 @@ part 'features/device/device_summary.dart';
 part 'features/device/device_readiness.dart';
 part 'features/device/device_actions.dart';
 part 'features/device/device_inspector.dart';
+part 'features/device/device_inspector_workflow_assist.dart';
 part 'features/device/device_target_library.dart';
 part 'features/device/device_setup_guide.dart';
 part 'features/device/device_setup_guide_sections.dart';

@@ -37,6 +37,7 @@ part 'src/runtime_inspector_models.dart';
 part 'src/runtime_inspector_source_parser.dart';
 part 'src/runtime_inspector_commands.dart';
 part 'src/runtime_ai_tool_models.dart';
+part 'src/runtime_ai_tool_commands.dart';
 part 'src/runtime_python_sidecar.dart';
 part 'src/runtime_connection_diagnostics.dart';
 part 'src/dependency_probe.dart';

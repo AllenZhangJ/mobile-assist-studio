@@ -177,6 +177,7 @@ final class StudioRuntimeSnapshot {
     required this.executionFocus,
     required this.subWorkflows,
     required this.settings,
+    required this.aiAuditLog,
     required this.events,
   });
 
@@ -213,6 +214,7 @@ final class StudioRuntimeSnapshot {
       executionFocus: RuntimeExecutionFocus.empty,
       subWorkflows: SubWorkflowSummary.fromWorkflows(subWorkflows),
       settings: settings,
+      aiAuditLog: const <AiToolAuditEntry>[],
       events: <RuntimeEvent>[
         RuntimeEvent(level: 'info', message: '工作台运行时已就绪。'),
       ],
@@ -238,6 +240,7 @@ final class StudioRuntimeSnapshot {
   final RuntimeExecutionFocus executionFocus;
   final List<SubWorkflowSummary> subWorkflows;
   final StudioSettings settings;
+  final List<AiToolAuditEntry> aiAuditLog;
   final List<RuntimeEvent> events;
 
   // 复制快照，支持 session 和截图字段显式置空。
@@ -261,6 +264,7 @@ final class StudioRuntimeSnapshot {
     RuntimeExecutionFocus? executionFocus,
     List<SubWorkflowSummary>? subWorkflows,
     StudioSettings? settings,
+    List<AiToolAuditEntry>? aiAuditLog,
     List<RuntimeEvent>? events,
   }) {
     return StudioRuntimeSnapshot(
@@ -293,6 +297,7 @@ final class StudioRuntimeSnapshot {
       executionFocus: executionFocus ?? this.executionFocus,
       subWorkflows: subWorkflows ?? this.subWorkflows,
       settings: settings ?? this.settings,
+      aiAuditLog: aiAuditLog ?? this.aiAuditLog,
       events: events ?? this.events,
     );
   }

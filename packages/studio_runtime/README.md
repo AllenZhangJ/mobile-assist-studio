@@ -14,6 +14,8 @@
 - 写入本地运行事件、截图证据和运行摘要；子流程传参证据只保存字段名和数量。
 - 读取本地运行历史和详情，并为 Monitor 提供脱敏事件摘要和关联运行筛选所需的强类型字段；读取历史前会应用本地证据保留策略，保证重启后旧证据不会继续出现在记录页。
 - 从本地运行详情派生本地运行报告，提供摘要、问题、时间线、视觉检查、截图胶片、日志统计和平台差异摘要，并可把脱敏 JSON 写入当前运行目录内的 `exports/`。
+- 提供受控 AI / MCP-compatible 工具入口：读屏摘要、流程草稿、失败解释、目标建议、Locator 建议、模板修复建议和运行交接；AI 工具只生成草稿或解释，危险动作必须确认且仍交给 Runtime 主命令执行。
+- 在 Runtime snapshot 中保留最近 AI 行为审计日志，记录工具、风险、状态和确认状态，不保存截图 base64、完整设备号、本机路径或长 session。
 - 管理本地工作流、子流程和设置。
 - 管理本地 Target Library，支持坐标、selector、图片、区域和文本目标的受控项目数据。
 - 管理图片目标模板资产，目标库只保存项目内相对引用，解析时再读取模板。
@@ -35,6 +37,7 @@
 - 不做多用户或多设备调度。
 - 不绕过 iOS Developer Mode、证书信任或 WDA 签名限制。
 - 不长期暴露完整设备标识、完整 session、账号、证书主体或本机绝对路径。
+- AI 不直接点击、不直接启动运行、不绕过 Runtime、不默认上传截图。
 
 ## 包入口
 
@@ -77,7 +80,8 @@ V4.0 合同层继续按职责拆分：
 - `runtime_inspector_models.dart`：Inspector 快照和元素摘要模型。
 - `runtime_inspector_source_parser.dart`：Appium source 脱敏解析、元素树摘要和 Source 预览。
 - `runtime_inspector_commands.dart`：当前界面检查命令，负责截图、source、资源锁和失败兜底。
-- `runtime_ai_tool_models.dart`：AI / MCP-compatible 工具注册表和权限风险模型。
+- `runtime_ai_tool_models.dart`：AI / MCP-compatible 工具注册表、权限风险、调用请求、门禁决策、调用结果和审计模型。
+- `runtime_ai_tool_commands.dart`：Runtime 受控 AI 工具入口，负责读屏摘要、流程草稿、失败解释、目标建议、Locator 建议、模板修复建议和危险动作交接。
 - `runtime_python_sidecar.dart`：Python Sidecar 能力探测、Airtest / Pyxelator 包可用性摘要、后端选择、图片模板定位和 OCR 文本定位的短生命周期 Python 视觉 JSON 调用；缺少包或 API 不匹配时只返回结构化不可用结果，不阻断坐标、selector、text source 和内置匹配链路。
 
 依赖探测继续按职责拆分：
@@ -152,6 +156,7 @@ npm run v4:android-smoke -- --workflow-basic --allow-actions
 
 - `test/runtime_snapshot_test.dart`：Runtime 初始快照和只读摘要。
 - `test/runtime_v4_contracts_test.dart`：V4 平台、视觉、Python Sidecar 和 AI 工具合同。
+- `test/runtime_ai_tool_test.dart`：Batch 8 AI / MCP Core 权限门禁、危险工具确认、读屏摘要、目标 / Locator 草稿、失败解释、模板修复建议、行为审计和不持久化边界。
 - `test/runtime_vision_provider_test.dart`：坐标 / 区域 / selector / text source / Python OCR 解析、Pyxelator fixture、Airtest fixture、Python sidecar JSON 映射、Pyxelator / Airtest / builtin 后端分派、Python 内置后端真实脚本冒烟和 Python 优先 resolver 目标解析。
 - `test/runtime_v4_driver_adapter_test.dart`：V4 iOS adapter 包装和 Android 骨架。
 - `test/runtime_v4_android_adapter_test.dart`：Android ADB 发现、UiAutomator2 session、截图 / 动作 / 日志和授权阻断。

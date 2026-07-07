@@ -51,7 +51,10 @@ Future<void> main() async {
     );
     final acceptanceArtifacts = await _loadAcceptanceArtifacts(tempDir);
     _assertAcceptanceJson(acceptanceArtifacts.json);
-    _assertAcceptanceMarkdown(acceptanceArtifacts.markdown);
+    _assertAcceptanceMarkdown(
+      acceptanceArtifacts.markdown,
+      acceptanceArtifacts.json,
+    );
     _assertNoSensitiveText(acceptanceArtifacts.allText);
     await _assertPackageSmokeScripts();
 
@@ -1800,7 +1803,7 @@ void _assertAcceptanceFieldChecklistContract(List<Object?> items) {
 }
 
 // 断言 final acceptance Markdown 包含人工复盘区域。
-void _assertAcceptanceMarkdown(String markdown) {
+void _assertAcceptanceMarkdown(String markdown, Map<String, Object?> json) {
   for (final text in <String>[
     '# V4 Final Acceptance',
     '- 工作区：',
@@ -1835,32 +1838,18 @@ void _assertAcceptanceMarkdown(String markdown) {
   ]) {
     _expect(markdown.contains(text), 'Acceptance Markdown 必须包含：$text');
   }
-  _assertAcceptanceMarkdownChecklistContract(markdown);
+  _assertAcceptanceMarkdownChecklistContract(
+    markdown,
+    _listAt(json, 'fieldChecklist'),
+  );
 }
 
 // 断言人类阅读的 Markdown 现场清单也保持和 JSON 一致的安全路线。
-void _assertAcceptanceMarkdownChecklistContract(String markdown) {
-  final section = _markdownSection(markdown, '## 现场补验清单');
-  final rows = <({String? command, int order, String proof, String title})>[];
-  for (final line in section.split('\n')) {
-    final trimmed = line.trim();
-    if (!trimmed.startsWith('|')) continue;
-    final cells = _markdownTableCells(trimmed);
-    if (cells.length < 4 ||
-        cells.first == '顺序' ||
-        cells.first.contains('---')) {
-      continue;
-    }
-    final order = int.tryParse(cells[0]);
-    _expect(order != null, 'Acceptance Markdown 现场清单顺序必须是数字：${cells[0]}');
-    rows.add((
-      order: order!,
-      title: cells[1],
-      command: _markdownCommand(cells[2]),
-      proof: cells[3],
-    ));
-  }
-
+void _assertAcceptanceMarkdownChecklistContract(
+  String markdown,
+  List<Object?> jsonItems,
+) {
+  final rows = _acceptanceMarkdownChecklistRows(markdown);
   _expect(rows.length >= 4, 'Acceptance Markdown 必须输出现场补验清单表格。');
   final nonCommandTitles = <String>{'清代码', '推远端', '保留报告'};
   final seenOrders = <int>{};
@@ -1892,6 +1881,58 @@ void _assertAcceptanceMarkdownChecklistContract(String markdown) {
       );
     }
   }
+
+  final jsonMaps = jsonItems.map(_mapFrom).toList(growable: false);
+  _expect(
+    rows.length == jsonMaps.length,
+    'Acceptance Markdown 现场清单必须和 JSON fieldChecklist 行数一致。',
+  );
+  for (var index = 0; index < rows.length; index += 1) {
+    final row = rows[index];
+    final json = jsonMaps[index];
+    _expect(
+      row.order == json['order'],
+      'Acceptance Markdown 第 ${index + 1} 行顺序必须和 JSON 一致。',
+    );
+    _expect(
+      row.title == json['title'],
+      'Acceptance Markdown 第 ${index + 1} 行标题必须和 JSON 一致。',
+    );
+    _expect(
+      row.command == json['command'],
+      'Acceptance Markdown 第 ${index + 1} 行命令必须和 JSON 一致。',
+    );
+    _expect(
+      row.proof == json['proof'],
+      'Acceptance Markdown 第 ${index + 1} 行通过标准必须和 JSON 一致。',
+    );
+  }
+}
+
+// 提取现场补验清单表格，供 Markdown 自身合同和 JSON 一致性合同复用。
+List<({String? command, int order, String proof, String title})>
+_acceptanceMarkdownChecklistRows(String markdown) {
+  final section = _markdownSection(markdown, '## 现场补验清单');
+  final rows = <({String? command, int order, String proof, String title})>[];
+  for (final line in section.split('\n')) {
+    final trimmed = line.trim();
+    if (!trimmed.startsWith('|')) continue;
+    final cells = _markdownTableCells(trimmed);
+    if (cells.length < 4 ||
+        cells.first == '顺序' ||
+        cells.first.contains('---')) {
+      continue;
+    }
+    final order = int.tryParse(cells[0]);
+    _expect(order != null, 'Acceptance Markdown 现场清单顺序必须是数字：${cells[0]}');
+    rows.add((
+      order: order!,
+      title: cells[1],
+      command: _markdownCommand(cells[2]),
+      proof: cells[3],
+    ));
+  }
+  return rows;
 }
 
 // 截取指定 Markdown 二级标题到下一个二级标题之间的正文。

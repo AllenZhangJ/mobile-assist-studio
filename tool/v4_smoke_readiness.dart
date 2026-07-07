@@ -156,14 +156,20 @@ Future<_AndroidProbe> _probeAndroidDevices(Duration timeout) async {
 // 统计本地 smoke 产物，避免打开截图或读取隐私内容。
 Future<_ArtifactProbe> _probeArtifacts(Directory outDir) async {
   final uiScreenshots = await _countMatchingFiles(outDir, RegExp(r'\.png$'));
-  final iosRuns = await _countRunDirs(Directory('${outDir.path}/ios'));
-  final androidRuns = await _countRunDirs(Directory('${outDir.path}/android'));
+  final iosDir = Directory('${outDir.path}/ios');
+  final androidDir = Directory('${outDir.path}/android');
+  final iosRuns = await _countRunDirs(iosDir);
+  final androidRuns = await _countRunDirs(androidDir);
   final markdownReports = await _countMatchingFiles(outDir, RegExp(r'\.md$'));
+  final latestIos = await _probeLatestSmokeRun(iosDir);
+  final latestAndroid = await _probeLatestSmokeRun(androidDir);
   return _ArtifactProbe(
     uiScreenshots: uiScreenshots,
     iosRuns: iosRuns,
     androidRuns: androidRuns,
     markdownReports: markdownReports,
+    latestIos: latestIos,
+    latestAndroid: latestAndroid,
   );
 }
 
@@ -185,6 +191,109 @@ Future<int> _countRunDirs(Directory dir) async {
     if (entity is Directory) count += 1;
   }
   return count;
+}
+
+// 读取最近一次 smoke 运行摘要，只读取结构化元数据和事件类型。
+Future<_SmokeRunSummary?> _probeLatestSmokeRun(Directory dir) async {
+  if (!await dir.exists()) return null;
+  final runs = <Directory>[];
+  await for (final entity in dir.list(recursive: false, followLinks: false)) {
+    if (entity is Directory && entity.path.split('/').last.startsWith('run-')) {
+      runs.add(entity);
+    }
+  }
+  if (runs.isEmpty) return null;
+  runs.sort((left, right) => right.path.compareTo(left.path));
+  return _readSmokeRunSummary(runs.first);
+}
+
+// 从单个运行目录解析状态、动作、流程、截图和失败摘要。
+Future<_SmokeRunSummary> _readSmokeRunSummary(Directory dir) async {
+  final metadata = await _readJsonObject(File('${dir.path}/metadata.json'));
+  final finished = await _readJsonObject(File('${dir.path}/finished.json'));
+  final events = await _readEventObjects(File('${dir.path}/events.jsonl'));
+  final eventTypes = events
+      .map((event) => event['type']?.toString() ?? '')
+      .where((type) => type.isNotEmpty)
+      .toSet();
+  final failure = events
+      .where((event) => event['type'] == 'smokeFailure')
+      .map((event) => event['message']?.toString() ?? '')
+      .where((message) => message.trim().isNotEmpty)
+      .lastOrNull;
+  return _SmokeRunSummary(
+    runName: _redactText(dir.path.split('/').last),
+    workflowName: _redactText(
+      metadata?['workflowName']?.toString() ?? 'V4 Smoke',
+    ),
+    status: finished?['status']?.toString() ?? 'running',
+    startedAt: _parseDate(metadata?['startedAt']),
+    finishedAt: _parseDate(finished?['finishedAt']),
+    actionsAllowed: _eventBool(events, 'smokeStart', 'actionsAllowed'),
+    hasScreenshot: eventTypes.contains('smokeScreenshot'),
+    actionsExecuted: eventTypes.contains('smokeAction'),
+    workflowExecuted: eventTypes.contains('smokeWorkflowStart'),
+    logsCollected: eventTypes.contains('smokeLogs'),
+    failureSummary: failure == null ? null : _shortText(_redactText(failure)),
+  );
+}
+
+// 读取 JSON object，失败时返回 null。
+Future<Map<String, Object?>?> _readJsonObject(File file) async {
+  if (!await file.exists()) return null;
+  try {
+    final decoded = jsonDecode(await file.readAsString());
+    if (decoded is Map<String, Object?>) return decoded;
+    if (decoded is Map) return Map<String, Object?>.from(decoded);
+  } on Object {
+    return null;
+  }
+  return null;
+}
+
+// 读取 JSONL 事件，坏行直接跳过，避免单条损坏影响 readiness。
+Future<List<Map<String, Object?>>> _readEventObjects(File file) async {
+  if (!await file.exists()) return const <Map<String, Object?>>[];
+  final events = <Map<String, Object?>>[];
+  try {
+    final lines = await file.readAsLines();
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final decoded = jsonDecode(trimmed);
+      if (decoded is Map<String, Object?>) {
+        events.add(decoded);
+      } else if (decoded is Map) {
+        events.add(Map<String, Object?>.from(decoded));
+      }
+    }
+  } on Object {
+    return events;
+  }
+  return events;
+}
+
+// 从指定事件读取布尔字段。
+bool? _eventBool(List<Map<String, Object?>> events, String type, String field) {
+  for (final event in events) {
+    if (event['type'] != type) continue;
+    final value = event[field];
+    if (value is bool) return value;
+  }
+  return null;
+}
+
+// 解析 ISO 时间，失败时返回 null。
+DateTime? _parseDate(Object? value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString());
+}
+
+// 裁剪短摘要，避免报告泄露长 payload 或堆栈。
+String _shortText(String value, {int limit = 120}) {
+  final compact = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (compact.length <= limit) return compact;
+  return '${compact.substring(0, limit)}...';
 }
 
 // 执行短命令并裁剪输出。
@@ -401,12 +510,70 @@ final class _ArtifactProbe {
     required this.iosRuns,
     required this.androidRuns,
     required this.markdownReports,
+    this.latestIos,
+    this.latestAndroid,
   });
 
   final int uiScreenshots;
   final int iosRuns;
   final int androidRuns;
   final int markdownReports;
+  final _SmokeRunSummary? latestIos;
+  final _SmokeRunSummary? latestAndroid;
+}
+
+// 最近一次平台 smoke 的脱敏摘要。
+final class _SmokeRunSummary {
+  const _SmokeRunSummary({
+    required this.runName,
+    required this.workflowName,
+    required this.status,
+    required this.startedAt,
+    required this.finishedAt,
+    required this.actionsAllowed,
+    required this.hasScreenshot,
+    required this.actionsExecuted,
+    required this.workflowExecuted,
+    required this.logsCollected,
+    required this.failureSummary,
+  });
+
+  final String runName;
+  final String workflowName;
+  final String status;
+  final DateTime? startedAt;
+  final DateTime? finishedAt;
+  final bool? actionsAllowed;
+  final bool hasScreenshot;
+  final bool actionsExecuted;
+  final bool workflowExecuted;
+  final bool logsCollected;
+  final String? failureSummary;
+
+  bool get passed => status == 'success';
+
+  String get summaryLabel {
+    final parts = <String>[
+      status == 'success'
+          ? '通过'
+          : status == 'failed'
+          ? '失败'
+          : '运行中',
+      actionsAllowed == true ? '允许动作' : '未执行动作',
+      workflowExecuted ? '含流程' : '无流程',
+      hasScreenshot ? '有截图' : '无截图',
+      logsCollected ? '有日志' : '无日志',
+    ];
+    if (finishedAt case final finished?) {
+      parts.add('完成 ${finished.toUtc().toIso8601String()}');
+    } else if (startedAt case final started?) {
+      parts.add('开始 ${started.toUtc().toIso8601String()}');
+    }
+    if (failureSummary case final failure?) {
+      parts.add('失败：$failure');
+    }
+    return parts.join('，');
+  }
 }
 
 // 进程探测结果。
@@ -450,6 +617,10 @@ final class _SmokeReadinessReport {
 
   bool get _hasTunnel => tunnel.reachable && (tunnel.count ?? 0) > 0;
 
+  bool get _latestIosPassed => artifacts.latestIos?.passed ?? false;
+
+  bool get _latestAndroidPassed => artifacts.latestAndroid?.passed ?? false;
+
   // 转成可留档的脱敏 Markdown。
   String toMarkdown() {
     final buffer = StringBuffer()
@@ -460,6 +631,10 @@ final class _SmokeReadinessReport {
       ..writeln('- 完成判定：${_completionLabel()}')
       ..writeln('- iOS 完整冒烟：${iosFullSmokeReady ? '可运行' : '未就绪'}')
       ..writeln('- Android 完整冒烟：${androidFullSmokeReady ? '可运行' : '未就绪'}')
+      ..writeln('- iOS 最近 smoke：${_latestSmokeLabel(artifacts.latestIos)}')
+      ..writeln(
+        '- Android 最近 smoke：${_latestSmokeLabel(artifacts.latestAndroid)}',
+      )
       ..writeln()
       ..writeln('## 本机状态')
       ..writeln()
@@ -483,6 +658,8 @@ final class _SmokeReadinessReport {
     for (final row in _batchAcceptanceRows(
       iosReady: iosFullSmokeReady,
       androidReady: androidFullSmokeReady,
+      latestIos: artifacts.latestIos,
+      latestAndroid: artifacts.latestAndroid,
     )) {
       buffer.writeln('| ${row.name} | ${row.status} | ${row.evidence} |');
     }
@@ -492,7 +669,9 @@ final class _SmokeReadinessReport {
       ..writeln()
       ..writeln('- UI 截图：${artifacts.uiScreenshots}')
       ..writeln('- iOS smoke 记录：${artifacts.iosRuns}')
+      ..writeln('  - 最近：${_latestSmokeDetail(artifacts.latestIos)}')
       ..writeln('- Android smoke 记录：${artifacts.androidRuns}')
+      ..writeln('  - 最近：${_latestSmokeDetail(artifacts.latestAndroid)}')
       ..writeln('- Markdown 报告：${artifacts.markdownReports + 1}')
       ..writeln()
       ..writeln('## 下一步')
@@ -533,10 +712,27 @@ final class _SmokeReadinessReport {
   }
 
   String _completionLabel() {
+    if (_latestIosPassed && _latestAndroidPassed) {
+      return '最近双平台 smoke 已成功留档';
+    }
     if (iosFullSmokeReady && androidFullSmokeReady) {
       return '待执行完整 smoke';
     }
     return '未完成，等待现场 smoke 条件';
+  }
+
+  String _latestSmokeLabel(_SmokeRunSummary? summary) {
+    if (summary == null) return '无记录';
+    return summary.passed
+        ? '通过'
+        : summary.status == 'failed'
+        ? '失败'
+        : '运行中';
+  }
+
+  String _latestSmokeDetail(_SmokeRunSummary? summary) {
+    if (summary == null) return '无记录';
+    return '${summary.workflowName} / ${summary.summaryLabel}';
   }
 }
 
@@ -545,8 +741,18 @@ final class _SmokeReadinessReport {
 List<_BatchAcceptanceRow> _batchAcceptanceRows({
   required bool iosReady,
   required bool androidReady,
+  required _SmokeRunSummary? latestIos,
+  required _SmokeRunSummary? latestAndroid,
 }) {
-  final smokeStatus = iosReady && androidReady ? '待完整 smoke' : '现场未就绪';
+  final latestPassed =
+      (latestIos?.passed ?? false) && (latestAndroid?.passed ?? false);
+  final smokeStatus = latestPassed
+      ? '已完成 smoke 留档'
+      : iosReady && androidReady
+      ? '待完整 smoke'
+      : '现场未就绪';
+  final smokeEvidence =
+      'iOS 最近 ${_batchSmokeLabel(latestIos)}，Android 最近 ${_batchSmokeLabel(latestAndroid)}，当前现场状态见上表';
   return <_BatchAcceptanceRow>[
     const _BatchAcceptanceRow(
       name: 'Batch 0 真源治理',
@@ -561,7 +767,7 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
     _BatchAcceptanceRow(
       name: 'Batch 2 双平台 smoke',
       status: smokeStatus,
-      evidence: 'iOS / Android smoke 命令、fake adapter、当前现场状态见上表',
+      evidence: smokeEvidence,
     ),
     const _BatchAcceptanceRow(
       name: 'Batch 3 Inspector',
@@ -594,6 +800,14 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
       evidence: 'AI permission gate、draft-only、audit log runtime tests',
     ),
   ];
+}
+
+// 批次表里使用的最近 smoke 短状态。
+String _batchSmokeLabel(_SmokeRunSummary? summary) {
+  if (summary == null) return '无记录';
+  if (summary.passed) return '通过';
+  if (summary.status == 'failed') return '失败';
+  return '运行中';
 }
 
 // 批次验收索引行。

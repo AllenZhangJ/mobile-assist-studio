@@ -126,13 +126,13 @@ void main() {
       find.byKey(const ValueKey('monitor-copy-v4-password-smoke')),
     );
     await tester.pumpAndSettle();
-    expect(copiedCommand, 'npm run v4:smoke:full:password-stdin');
+    expect(copiedCommand, 'npm run v4:smoke:full:password-prompt');
 
     await tester.tap(
       find.byKey(const ValueKey('monitor-copy-v4-ios-password-smoke')),
     );
     await tester.pumpAndSettle();
-    expect(copiedCommand, 'npm run v4:ios-smoke:full:password-stdin');
+    expect(copiedCommand, 'npm run v4:ios-smoke:full:password-prompt');
 
     await tester.tap(
       find.byKey(const ValueKey('monitor-copy-v4-android-smoke')),
@@ -247,7 +247,7 @@ void main() {
         latestFullSmokeLabel: '前置检查阻断',
         failures: const ['最近 full smoke 尚未完整通过。'],
         nextSteps: const [
-          'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-stdin` 启动隧道后补验。',
+          'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-prompt` 输入 Mac 密码后补验。',
           'Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。',
           '双平台：iOS 和 Android 单平台 smoke 都通过后，运行 `npm run v4:smoke:full`。',
           '终验：补齐留档后运行 `npm run v4:acceptance-final`。',
@@ -284,7 +284,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       copiedCommand,
-      'npm run v4:ios-smoke:full:password-stdin\n'
+      'npm run v4:ios-smoke:full:password-prompt\n'
       'npm run v4:android-smoke:full\n'
       'npm run v4:smoke:full\n'
       'npm run v4:acceptance-final',
@@ -294,7 +294,7 @@ void main() {
       find.byKey(const ValueKey('monitor-copy-v4-ios-password-smoke')),
     );
     await tester.pumpAndSettle();
-    expect(copiedCommand, 'npm run v4:ios-smoke:full:password-stdin');
+    expect(copiedCommand, 'npm run v4:ios-smoke:full:password-prompt');
   });
 
   testWidgets('monitor renders local trend and status distribution', (

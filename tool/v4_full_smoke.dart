@@ -279,7 +279,7 @@ Future<_FullSmokePreparationItem> _prepareAppiumForSmoke(
 }
 
 // 准备 iOS 18+ 所需的 XCUITest 本机隧道。
-// 密码只从 stdin 读一行并写入 sudo stdin，不写入报告。
+// 密码只从 stdin 或终端提示读取一行并写入 sudo stdin，不写入报告。
 Future<_FullSmokePreparationItem> _prepareIosTunnelForSmoke(
   StudioProjectConfig config,
   _FullSmokeOptions options,
@@ -311,16 +311,18 @@ Future<_FullSmokePreparationItem> _prepareIosTunnelForSmoke(
     );
   }
 
-  if (!options.adminPasswordStdin) {
+  if (!options.adminPasswordStdin && !options.adminPasswordPrompt) {
     return const _FullSmokePreparationItem(
       name: 'iOS 隧道',
       ok: false,
       detail: '缺少启动隧道所需的本机密码',
-      nextStep: '用 Mac App 点连接设备，或使用 --admin-password-stdin 后重试。',
+      nextStep: '用 Mac App 点连接设备，或使用 --admin-password-prompt 后重试。',
     );
   }
 
-  final password = await _readAdminPasswordFromStdin();
+  final password = options.adminPasswordPrompt
+      ? await _readAdminPasswordFromPrompt()
+      : await _readAdminPasswordFromStdin();
   final manager = AppiumTunnelProcessManager(config: tunnelConfig);
   resources.tunnel = manager;
   try {
@@ -441,6 +443,20 @@ Future<String> _readAdminPasswordFromStdin() async {
       .transform(const LineSplitter())
       .first;
   return line.trimRight();
+}
+
+// 从终端提示读取一次性本机密码，支持终端时关闭回显。
+Future<String> _readAdminPasswordFromPrompt() async {
+  stdout.write('Mac 密码: ');
+  final canHideInput = stdin.hasTerminal;
+  final previousEchoMode = canHideInput ? stdin.echoMode : true;
+  if (canHideInput) stdin.echoMode = false;
+  try {
+    return await _readAdminPasswordFromStdin();
+  } finally {
+    if (canHideInput) stdin.echoMode = previousEchoMode;
+    stdout.writeln();
+  }
 }
 
 // 根据配置文件位置推导项目目录。
@@ -1033,9 +1049,12 @@ List<String> _uniqueStrings(Iterable<String> values) {
 void _printDryRun(List<_FullSmokeStep> steps, _FullSmokeOptions options) {
   stdout.writeln('V4 full smoke dry-run');
   stdout.writeln('- 自动准备: ${options.autoPrepare ? '启用' : '跳过'}');
-  if (options.autoPrepare && !options.skipIos && !options.adminPasswordStdin) {
+  if (options.autoPrepare &&
+      !options.skipIos &&
+      !options.adminPasswordStdin &&
+      !options.adminPasswordPrompt) {
     stdout.writeln(
-      '- iOS 隧道密码: 未从 stdin 读取，需要 Mac App 已连接或改用 password-stdin 入口',
+      '- iOS 隧道密码: 未读取，需要 Mac App 已连接或改用 password-prompt / password-stdin 入口',
     );
   }
   if (options.autoPrepare && !options.skipAndroid) {
@@ -1551,6 +1570,7 @@ final class _FullSmokeOptions {
     required this.confirmActions,
     required this.autoPrepare,
     required this.adminPasswordStdin,
+    required this.adminPasswordPrompt,
     required this.skipIos,
     required this.skipAndroid,
     required this.skipPreflight,
@@ -1565,6 +1585,7 @@ final class _FullSmokeOptions {
   final bool confirmActions;
   final bool autoPrepare;
   final bool adminPasswordStdin;
+  final bool adminPasswordPrompt;
   final bool skipIos;
   final bool skipAndroid;
   final bool skipPreflight;
@@ -1580,6 +1601,7 @@ final class _FullSmokeOptions {
     var confirmActions = false;
     var autoPrepare = false;
     var adminPasswordStdin = false;
+    var adminPasswordPrompt = false;
     var skipIos = false;
     var skipAndroid = false;
     var skipPreflight = false;
@@ -1610,6 +1632,8 @@ final class _FullSmokeOptions {
           autoPrepare = true;
         case '--admin-password-stdin':
           adminPasswordStdin = true;
+        case '--admin-password-prompt':
+          adminPasswordPrompt = true;
         case '--skip-ios':
           skipIos = true;
         case '--skip-android':
@@ -1622,6 +1646,11 @@ final class _FullSmokeOptions {
           throw ArgumentError('未知参数：$arg');
       }
     }
+    if (adminPasswordPrompt && adminPasswordStdin) {
+      throw ArgumentError(
+        '--admin-password-prompt 和 --admin-password-stdin 不能同时使用。',
+      );
+    }
 
     return _FullSmokeOptions(
       outDir: outDir,
@@ -1631,6 +1660,7 @@ final class _FullSmokeOptions {
       confirmActions: confirmActions,
       autoPrepare: autoPrepare,
       adminPasswordStdin: adminPasswordStdin,
+      adminPasswordPrompt: adminPasswordPrompt,
       skipIos: skipIos,
       skipAndroid: skipAndroid,
       skipPreflight: skipPreflight,
@@ -1738,6 +1768,7 @@ V4 full smoke
   --confirm-actions         确认执行真实 Tap / Swipe / Input
   --auto-prepare            先自动准备本机驱动和必要隧道
   --admin-password-stdin    从 stdin 读取一次性 Mac 密码用于启动隧道
+  --admin-password-prompt   从终端隐藏输入一次性 Mac 密码用于启动隧道
   --skip-ios                跳过 iOS 完整冒烟
   --skip-android            跳过 Android 完整冒烟
   --skip-preflight          跳过只读前置检查

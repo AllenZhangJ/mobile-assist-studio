@@ -68,7 +68,7 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             icon: Icons.lock_outline,
             onPressed: () => _copyPlainText(
               context,
-              text: _v4PasswordSmokeCommand,
+              text: _v4PromptSmokeCommand,
               message: '密码版命令已复制',
             ),
           ),
@@ -78,7 +78,7 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             icon: Icons.phone_iphone_outlined,
             onPressed: () => _copyPlainText(
               context,
-              text: _v4IosPasswordSmokeCommand,
+              text: _v4IosPromptSmokeCommand,
               message: 'iOS 命令已复制',
             ),
           ),
@@ -412,7 +412,9 @@ String _v4AcceptanceRouteHint(V4AcceptanceSummary acceptance) {
 // 判断终验下一步是否要求先补 iOS 隧道。
 bool _v4AcceptanceNeedsIosTunnel(V4AcceptanceSummary acceptance) {
   return acceptance.nextSteps.any(
-    (step) => step.contains(_v4IosPasswordSmokeCommand),
+    (step) =>
+        step.contains(_v4IosPromptSmokeCommand) ||
+        step.contains(_v4IosPasswordSmokeCommand),
   );
 }
 
@@ -429,7 +431,7 @@ String _v4AcceptanceRouteCommandsFor(V4AcceptanceSummary acceptance) {
   }
 
   if (_v4AcceptanceNeedsIosTunnel(acceptance)) {
-    addCommand(_v4IosPasswordSmokeCommand);
+    addCommand(_v4IosPromptSmokeCommand);
   } else if (_v4AcceptanceNeedsIosSmoke(acceptance)) {
     addCommand(_v4IosSmokeCommand);
   }

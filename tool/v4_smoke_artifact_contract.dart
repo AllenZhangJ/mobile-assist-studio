@@ -98,6 +98,12 @@ Future<void> _assertPackageSmokeScripts() async {
   );
   _assertFullSmokeScript(
     scripts,
+    name: 'v4:ios-smoke:full:password-prompt',
+    requiredSkipFlag: '--skip-android',
+    requiresPasswordPrompt: true,
+  );
+  _assertFullSmokeScript(
+    scripts,
     name: 'v4:ios-smoke:full:password-stdin',
     requiredSkipFlag: '--skip-android',
     requiresPasswordStdin: true,
@@ -107,6 +113,12 @@ Future<void> _assertPackageSmokeScripts() async {
     name: 'v4:android-smoke:full',
     requiredSkipFlag: '--skip-ios',
   );
+  _assertFullSmokeScript(
+    scripts,
+    name: 'v4:smoke:full:password-prompt',
+    requiredSkipFlag: '',
+    requiresPasswordPrompt: true,
+  );
 }
 
 // 断言单条 full smoke 脚本包含自动准备、动作确认和单平台跳过参数。
@@ -115,6 +127,7 @@ void _assertFullSmokeScript(
   required String name,
   required String requiredSkipFlag,
   bool requiresPasswordStdin = false,
+  bool requiresPasswordPrompt = false,
 }) {
   final command = scripts[name]?.toString() ?? '';
   _expect(
@@ -123,11 +136,22 @@ void _assertFullSmokeScript(
   );
   _expect(command.contains('--confirm-actions'), '$name 必须显式确认真实动作。');
   _expect(command.contains('--auto-prepare'), '$name 必须自动准备本机环境。');
-  _expect(command.contains(requiredSkipFlag), '$name 必须包含 $requiredSkipFlag。');
+  if (requiredSkipFlag.isNotEmpty) {
+    _expect(
+      command.contains(requiredSkipFlag),
+      '$name 必须包含 $requiredSkipFlag。',
+    );
+  }
   if (requiresPasswordStdin) {
     _expect(
       command.contains('--admin-password-stdin'),
       '$name 必须通过 stdin 一次性读取本机密码。',
+    );
+  }
+  if (requiresPasswordPrompt) {
+    _expect(
+      command.contains('--admin-password-prompt'),
+      '$name 必须通过终端提示读取本机密码。',
     );
   }
 }
@@ -140,6 +164,13 @@ Future<void> _assertFullSmokeDriverProbe() async {
   _expect(
     source.contains(r'${result.stdout}\n${result.stderr}'),
     '平台 driver 探测必须同时解析 stdout 和 stderr。',
+  );
+  _expect(
+    source.contains('_readAdminPasswordFromPrompt') &&
+        source.contains(
+          '--admin-password-prompt 和 --admin-password-stdin 不能同时使用',
+        ),
+    'full smoke 必须支持隐藏输入密码，并阻止 prompt / stdin 同时启用。',
   );
   _expect(
     source.contains('ANDROID_SMOKE_PREFLIGHT_') &&
@@ -178,7 +209,7 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
           'name': 'iOS 隧道',
           'ok': false,
           'detail': '缺少密码',
-          'nextStep': '通过 stdin 一次性传入密码后重试。',
+          'nextStep': '通过终端提示一次性传入密码后重试。',
         },
         <String, Object?>{
           'name': 'Android 准备',
@@ -643,7 +674,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   _expect(
     nextSteps.any((step) => step.contains('v4:ios-smoke:full')) &&
         nextSteps.any(
-          (step) => step.contains('v4:ios-smoke:full:password-stdin'),
+          (step) => step.contains('v4:ios-smoke:full:password-prompt'),
         ) &&
         nextSteps.any((step) => step.contains('v4:android-smoke:full')) &&
         nextSteps.any((step) => step.contains('v4:smoke:full')) &&
@@ -703,7 +734,7 @@ void _assertAcceptanceMarkdown(String markdown) {
     '完成审计',
     '归档终验',
     'v4:ios-smoke:full',
-    'v4:ios-smoke:full:password-stdin',
+    'v4:ios-smoke:full:password-prompt',
     'v4:android-smoke:full',
     'v4:smoke:full',
     'v4:acceptance-final',

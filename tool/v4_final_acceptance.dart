@@ -812,7 +812,7 @@ List<String> _nextStepsForFailures({
   if (needsIosSmoke) {
     if (latestFullSmokeNeedsIosTunnel) {
       steps.add(
-        'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-stdin` 启动隧道后补验。',
+        'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-prompt` 输入 Mac 密码后补验。',
       );
     } else {
       steps.add('iOS：连接并信任一台 iPhone，运行 `npm run v4:ios-smoke:full`。');

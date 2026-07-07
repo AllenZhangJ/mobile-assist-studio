@@ -260,6 +260,37 @@ class _StudioShellState extends State<StudioShell> {
       ),
     );
   }
+
+  // 打开智能抽屉；所有工具调用仍走 Runtime 受控入口。
+  void _openAiCommandDrawer() {
+    unawaited(
+      showGeneralDialog<void>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: '关闭智能',
+        barrierColor: Colors.black.withValues(alpha: 0.42),
+        transitionDuration: const Duration(milliseconds: 160),
+        pageBuilder: (context, animation, secondaryAnimation) {
+          return Align(
+            alignment: Alignment.centerRight,
+            child: _AiCommandDrawer(
+              controller: _controller,
+              snapshot: _snapshot,
+            ),
+          );
+        },
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+                .animate(
+                  CurvedAnimation(parent: animation, curve: Curves.easeOut),
+                ),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
 }
 
 // 项目配置缺失时的本机检查兜底。

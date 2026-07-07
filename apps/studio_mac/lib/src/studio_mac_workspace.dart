@@ -20,6 +20,7 @@ part 'shell/command_center.dart';
 part 'shell/command_center_results.dart';
 part 'shell/command_center_actions.dart';
 part 'shell/command_center_diagnostics.dart';
+part 'shell/ai_command_drawer.dart';
 part 'shell/status_detail_drawer.dart';
 part 'shell/navigation.dart';
 part 'shell/settings_drawer.dart';

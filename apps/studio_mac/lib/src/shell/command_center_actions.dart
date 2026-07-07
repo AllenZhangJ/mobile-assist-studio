@@ -78,6 +78,13 @@ extension _StudioShellCommandActions on _StudioShellState {
         action: () => unawaited(_copyDiagnosticsSummary()),
       ),
       _CommandCenterCommand(
+        icon: Icons.auto_awesome_outlined,
+        title: '智能',
+        description: '只读建议和草稿',
+        keywords: '智能 AI 建议 草稿 读屏 失败 目标 定位',
+        action: _openAiCommandDrawer,
+      ),
+      _CommandCenterCommand(
         icon: Icons.cable_outlined,
         title: '复制隧道',
         description: '复制本机命令',

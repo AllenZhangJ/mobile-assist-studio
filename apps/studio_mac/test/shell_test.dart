@@ -391,6 +391,97 @@ void main() {
     await controller.dispose();
   });
 
+  // 验证命令中心可打开智能抽屉，并调用只读工具生成脱敏结果。
+  testWidgets('global command center invokes safe ai tool', (tester) async {
+    await useDesktopSurface(tester);
+    final copiedText = captureClipboardText();
+    final controller = StudioRuntimeController();
+
+    await tester.pumpWidget(StudioMacApp(controllerFactory: () => controller));
+
+    await tester.tap(find.byKey(const ValueKey('open-command-center')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('command-center-search')),
+      '智能',
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('command-center-command-智能')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('command-center-command-智能')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('ai-command-drawer')), findsOneWidget);
+    expect(find.text('建议、草稿、解释'), findsOneWidget);
+    expect(find.text('暂无结果'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('ai-tool-readCurrentScreenSummary')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('已生成读屏摘要。'), findsOneWidget);
+    expect(find.text('完成'), findsOneWidget);
+    expect(
+      controller.snapshot.aiAuditLog.last.toolId,
+      'readCurrentScreenSummary',
+    );
+    expect(controller.snapshot.runStatus, RunStatus.idle);
+    expect(controller.snapshot.connectionStatus, ConnectionStatus.disconnected);
+
+    await tester.tap(find.byTooltip('复制结果'));
+    await tester.pumpAndSettle();
+
+    expect(copiedText(), contains('readCurrentScreenSummary'));
+    expect(copiedText(), contains('completed'));
+    expect(copiedText(), isNot(contains('screenshotBase64')));
+    expect(copiedText(), isNot(contains('127.0.0.1')));
+
+    await controller.dispose();
+  });
+
+  // 验证危险智能工具必须确认，确认后也只交接不直接运行。
+  testWidgets('ai run handoff requires confirmation and does not run', (
+    tester,
+  ) async {
+    await useDesktopSurface(tester);
+    final controller = StudioRuntimeController();
+
+    await tester.pumpWidget(StudioMacApp(controllerFactory: () => controller));
+
+    await tester.tap(find.byKey(const ValueKey('open-command-center')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('command-center-search')),
+      '智能',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('command-center-command-智能')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('ai-tool-runWorkflow')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('确认交接'), findsOneWidget);
+    expect(find.text('智能不会直接运行，只生成交接结果。'), findsOneWidget);
+
+    await tester.tap(find.text('确认'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('需交接'), findsWidgets);
+    expect(find.textContaining('AI 不直接运行'), findsWidgets);
+    expect(controller.snapshot.aiAuditLog.last.toolId, 'runWorkflow');
+    expect(controller.snapshot.aiAuditLog.last.userConfirmed, isTrue);
+    expect(controller.snapshot.runStatus, RunStatus.idle);
+    expect(controller.snapshot.connectionStatus, ConnectionStatus.disconnected);
+
+    await controller.dispose();
+  });
+
   // 验证全局底部控制台的展开、标签和清空行为。
   testWidgets('bottom console expands, tabs and clears visible events', (
     tester,

@@ -19,6 +19,20 @@ const _requiredFiles = [
   'third_party/README.md',
 ];
 
+const _internalPubspecFiles = [
+  'pubspec.yaml',
+  'apps/studio_mac/pubspec.yaml',
+  'packages/appium_client/pubspec.yaml',
+  'packages/studio_design_system/pubspec.yaml',
+  'packages/studio_runtime/pubspec.yaml',
+  'packages/workflow_dsl/pubspec.yaml',
+];
+
+const _metadataTemplateFiles = [
+  ..._internalPubspecFiles,
+  'packages/studio_design_system/LICENSE',
+];
+
 final _forbiddenProductRules = [
   _BoundaryRule(
     RegExp(r'\bios-assist-console\b'),
@@ -60,6 +74,21 @@ final _privacyRules = [
   _BoundaryRule(RegExp(r'0000[0-9A-Fa-f]{4,}'), '文档不得写入完整设备标识'),
   _BoundaryRule(RegExp(r'DEVICE_UDID'), '文档不得保留真实设备标识占位误导'),
   _BoundaryRule(RegExp(r'Hangzhou\s+\w+'), '文档不得写入完整证书主体'),
+];
+
+final _metadataTemplateRules = [
+  _BoundaryRule(RegExp(r'TODO:\s*Add your license here'), '包级许可证不得保留模板 TODO'),
+  _BoundaryRule(RegExp(r'flutter pub publish'), '内部包 pubspec 不得保留发布模板注释'),
+  _BoundaryRule(
+    RegExp(r'images/a_dot_burr'),
+    'pubspec 不得保留 Flutter sample 资源注释',
+  ),
+  _BoundaryRule(RegExp(r'\bSchyler\b'), 'pubspec 不得保留 Flutter sample 字体注释'),
+  _BoundaryRule(RegExp(r'\bTrajan Pro\b'), 'pubspec 不得保留 Flutter sample 字体注释'),
+  _BoundaryRule(
+    RegExp(r'Remove this line if you wish to publish'),
+    '内部包 pubspec 不得提示可发布到 pub.dev',
+  ),
 ];
 
 final _v4DocExpectations = [
@@ -124,6 +153,7 @@ Future<void> main() async {
   violations.addAll(await _checkProductBoundaries());
   violations.addAll(await _checkV4Docs());
   violations.addAll(await _checkPrivacy());
+  violations.addAll(await _checkPackageMetadata());
   violations.addAll(_checkThirdPartyGovernance());
 
   if (violations.isNotEmpty) {
@@ -213,6 +243,41 @@ Future<List<String>> _checkPrivacy() async {
       for (final rule in _privacyRules) {
         if (rule.pattern.hasMatch(lines[lineIndex])) {
           final path = file.path.replaceAll('\\', '/');
+          violations.add('$path:${lineIndex + 1} ${rule.reason}');
+        }
+      }
+    }
+  }
+  return violations;
+}
+
+// 检查内部包发布边界和模板残留，避免 Batch 0 法务真源退回脚手架状态。
+Future<List<String>> _checkPackageMetadata() async {
+  final violations = <String>[];
+  for (final path in _internalPubspecFiles) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      violations.add('$path missing internal package pubspec');
+      continue;
+    }
+    final text = await file.readAsString();
+    if (!RegExp(
+      r'''^publish_to:\s*['"]?none['"]?\s*$''',
+      multiLine: true,
+    ).hasMatch(text)) {
+      violations.add('$path internal package must declare publish_to: none');
+    }
+  }
+
+  for (final path in _metadataTemplateFiles) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      continue;
+    }
+    final lines = await file.readAsLines();
+    for (var lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      for (final rule in _metadataTemplateRules) {
+        if (rule.pattern.hasMatch(lines[lineIndex])) {
           violations.add('$path:${lineIndex + 1} ${rule.reason}');
         }
       }

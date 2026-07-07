@@ -35,7 +35,9 @@ Future<void> main(List<String> args) async {
       preflight: preflight,
       results: const <_FullSmokeResult>[],
     );
-    stdout.writeln('\nFull smoke report: ${_redactText(report.path)}');
+    stdout
+      ..writeln('\nFull smoke report: ${_redactText(report.markdownFile.path)}')
+      ..writeln('Full smoke json: ${_redactText(report.jsonFile.path)}');
     _fail('V4 full smoke 前置检查未通过：${preflight.blockerNames.join('、')}。');
   }
 
@@ -50,7 +52,9 @@ Future<void> main(List<String> args) async {
     preflight: preflight,
     results: results,
   );
-  stdout.writeln('\nFull smoke report: ${_redactText(report.path)}');
+  stdout
+    ..writeln('\nFull smoke report: ${_redactText(report.markdownFile.path)}')
+    ..writeln('Full smoke json: ${_redactText(report.jsonFile.path)}');
 
   final failed = results.where((result) => result.exitCode != 0).toList();
   if (failed.isNotEmpty) {
@@ -417,16 +421,16 @@ void _printDryRun(List<_FullSmokeStep> steps) {
 }
 
 // 写入 full smoke 汇总报告，调用方负责按结果决定退出码。
-Future<File> _writeFullSmokeReport({
+Future<_FullSmokeReportFiles> _writeFullSmokeReport({
   required Directory outDir,
   required DateTime timestamp,
   required _FullSmokePreflight preflight,
   required List<_FullSmokeResult> results,
 }) async {
-  final report = File(
-    '${outDir.path}/FULL_SMOKE_${_safeTimestamp(timestamp)}.md',
-  );
-  await report.writeAsString(
+  final reportBase = '${outDir.path}/FULL_SMOKE_${_safeTimestamp(timestamp)}';
+  final markdownFile = File('$reportBase.md');
+  final jsonFile = File('$reportBase.json');
+  await markdownFile.writeAsString(
     _summaryMarkdown(
       timestamp: timestamp,
       preflight: preflight,
@@ -434,7 +438,15 @@ Future<File> _writeFullSmokeReport({
     ),
     flush: true,
   );
-  return report;
+  await jsonFile.writeAsString(
+    _summaryJsonString(
+      timestamp: timestamp,
+      preflight: preflight,
+      results: results,
+    ),
+    flush: true,
+  );
+  return _FullSmokeReportFiles(markdownFile: markdownFile, jsonFile: jsonFile);
 }
 
 // 生成本地 Markdown 汇总，保留失败原因但脱敏路径、设备号和 session。
@@ -494,6 +506,35 @@ String _summaryMarkdown({
     _writeOutputBlock(buffer, 'stderr', result.stderrText);
   }
   return buffer.toString();
+}
+
+// 生成机器可读的 full smoke JSON，输出同样经过脱敏和裁剪。
+String _summaryJsonString({
+  required DateTime timestamp,
+  required _FullSmokePreflight preflight,
+  required List<_FullSmokeResult> results,
+}) {
+  final failed = results.where((result) => result.exitCode != 0).toList();
+  final complete =
+      !preflight.hasBlockers && results.isNotEmpty && failed.isEmpty;
+  final payload = <String, Object?>{
+    'schemaVersion': 1,
+    'kind': 'v4FullSmoke',
+    'timestamp': timestamp.toIso8601String(),
+    'completion': <String, Object?>{
+      'complete': complete,
+      'label': complete
+          ? '完整通过'
+          : preflight.hasBlockers
+          ? '前置检查阻断'
+          : '执行未完成',
+      'failedSteps': failed.map((result) => result.step.name).toList(),
+    },
+    'preflight': preflight.toJsonObject(),
+    'steps': results.map((result) => result.toJsonObject()).toList(),
+  };
+  const encoder = JsonEncoder.withIndent('  ');
+  return '${encoder.convert(payload)}\n';
 }
 
 // 写入裁剪后的输出块，避免报告被长日志淹没。
@@ -601,6 +642,17 @@ final class _FullSmokePreflight {
     if (skipped) return '已跳过';
     return hasBlockers ? '有阻断' : '通过';
   }
+
+  // 转成机器可读前置检查结果。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'skipped': skipped,
+      'status': statusLabel,
+      'hasBlockers': hasBlockers,
+      'blockers': blockerNames.toList(),
+      'items': items.map((item) => item.toJsonObject()).toList(),
+    };
+  }
 }
 
 // full smoke 前置检查单项。
@@ -616,6 +668,27 @@ final class _FullSmokePreflightItem {
   final bool ok;
   final String detail;
   final String nextStep;
+
+  // 转成机器可读前置检查单项。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'name': name,
+      'ok': ok,
+      'detail': detail,
+      'nextStep': ok ? null : nextStep,
+    };
+  }
+}
+
+// full smoke 报告文件集合。
+final class _FullSmokeReportFiles {
+  const _FullSmokeReportFiles({
+    required this.markdownFile,
+    required this.jsonFile,
+  });
+
+  final File markdownFile;
+  final File jsonFile;
 }
 
 // HTTP 探测结果。
@@ -792,6 +865,11 @@ final class _FullSmokeStep {
     if (workingDirectory == null) return command;
     return 'cd $workingDirectory && $command';
   }
+
+  // 转成机器可读步骤定义，命令仅用于审计展示。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{'name': name, 'command': _redactText(commandLine)};
+  }
 }
 
 // 单个步骤的脱敏执行结果。
@@ -819,6 +897,21 @@ final class _FullSmokeResult {
   String get statusLabel {
     if (timedOut) return '超时';
     return exitCode == 0 ? '通过' : '失败';
+  }
+
+  // 转成机器可读步骤结果，长输出只保留裁剪后的预览。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'step': step.toJsonObject(),
+      'status': statusLabel,
+      'exitCode': exitCode,
+      'timedOut': timedOut,
+      'startedAt': startedAt.toIso8601String(),
+      'finishedAt': finishedAt.toIso8601String(),
+      'durationSeconds': duration.inSeconds,
+      'stdoutPreview': _shortBlock(stdoutText),
+      'stderrPreview': _shortBlock(stderrText),
+    };
   }
 }
 

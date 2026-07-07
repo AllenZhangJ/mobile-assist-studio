@@ -678,8 +678,33 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
         ) &&
         nextSteps.any((step) => step.contains('v4:android-smoke:full')) &&
         nextSteps.any((step) => step.contains('v4:smoke:full')) &&
+        nextSteps.any(
+          (step) => step.contains('v4:smoke:full:password-prompt'),
+        ) &&
         nextSteps.any((step) => step.contains('v4:acceptance-final')),
-    'acceptance nextSteps 必须给出 iOS 隧道、Android、full smoke 和终验命令。',
+    'acceptance nextSteps 必须给出 iOS 隧道、Android、密码版 full smoke 和终验命令。',
+  );
+  final fieldChecklist = _listAt(json, 'fieldChecklist');
+  _expect(fieldChecklist.length >= 4, 'acceptance 必须给出现场补验清单。');
+  _expect(
+    fieldChecklist.any(
+          (item) =>
+              _mapFrom(item)['command'] ==
+              'npm run v4:ios-smoke:full:password-prompt',
+        ) &&
+        fieldChecklist.any(
+          (item) =>
+              _mapFrom(item)['command'] == 'npm run v4:android-smoke:full',
+        ) &&
+        fieldChecklist.any(
+          (item) =>
+              _mapFrom(item)['command'] ==
+              'npm run v4:smoke:full:password-prompt',
+        ) &&
+        fieldChecklist.any(
+          (item) => _mapFrom(item)['command'] == 'npm run v4:acceptance-final',
+        ),
+    'acceptance 现场补验清单必须包含 iOS、Android、密码版全量和终验命令。',
   );
 
   final evidence = _mapAt(json, 'evidence');
@@ -730,6 +755,8 @@ void _assertAcceptanceMarkdown(String markdown) {
     'Android smoke 前置诊断',
     '最近完整冒烟',
     '留档数量',
+    '## 现场补验清单',
+    '通过标准',
     '## 下一步',
     '完成审计',
     '归档终验',
@@ -737,6 +764,7 @@ void _assertAcceptanceMarkdown(String markdown) {
     'v4:ios-smoke:full:password-prompt',
     'v4:android-smoke:full',
     'v4:smoke:full',
+    'v4:smoke:full:password-prompt',
     'v4:acceptance-final',
   ]) {
     _expect(markdown.contains(text), 'Acceptance Markdown 必须包含：$text');

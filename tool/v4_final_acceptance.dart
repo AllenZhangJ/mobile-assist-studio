@@ -456,6 +456,11 @@ final class _AcceptanceReport {
     );
   }
 
+  // 生成现场补验清单；它只重排安全命令，不执行真实设备动作。
+  List<_AcceptanceChecklistItem> get fieldChecklist {
+    return _fieldChecklistForNextSteps(nextSteps, complete: complete);
+  }
+
   String toJsonString() {
     const encoder = JsonEncoder.withIndent('  ');
     return '${encoder.convert(toJsonObject())}\n';
@@ -481,6 +486,9 @@ final class _AcceptanceReport {
       },
       'evidence': evidence.toJsonObject(),
       'nextSteps': nextSteps,
+      'fieldChecklist': fieldChecklist
+          .map((item) => item.toJsonObject())
+          .toList(growable: false),
       'steps': results.map((result) => result.toJsonObject()).toList(),
     };
   }
@@ -519,12 +527,54 @@ final class _AcceptanceReport {
     buffer.write(evidence.toMarkdown());
     buffer
       ..writeln()
+      ..writeln('## 现场补验清单')
+      ..writeln()
+      ..writeln('| 顺序 | 操作 | 命令 | 通过标准 |')
+      ..writeln('|---:|---|---|---|');
+    for (final item in fieldChecklist) {
+      buffer.writeln(
+        '| ${item.order} | ${item.title} | ${item.commandMarkdown} | ${item.proof} |',
+      );
+    }
+    buffer
+      ..writeln()
       ..writeln('## 下一步')
       ..writeln();
     for (final step in nextSteps) {
       buffer.writeln('- $step');
     }
     return buffer.toString();
+  }
+}
+
+// 现场补验项，用于把多条下一步整理成稳定执行顺序。
+final class _AcceptanceChecklistItem {
+  const _AcceptanceChecklistItem({
+    required this.order,
+    required this.title,
+    required this.proof,
+    this.command,
+  });
+
+  final int order;
+  final String title;
+  final String proof;
+  final String? command;
+
+  String get commandMarkdown {
+    final value = command;
+    if (value == null || value.isEmpty) return '-';
+    return '`$value`';
+  }
+
+  // 转为 JSON，命令保持短 npm 入口，不写本机路径或设备标识。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'order': order,
+      'title': title,
+      'command': command,
+      'proof': proof,
+    };
   }
 }
 
@@ -826,10 +876,99 @@ List<String> _nextStepsForFailures({
     steps.add('截图：保留 Mac App 或设备 smoke 截图，再重新生成 archive。');
   }
   if (needsFullSmoke) {
-    steps.add('双平台：iOS 和 Android 单平台 smoke 都通过后，运行 `npm run v4:smoke:full`。');
+    final command = latestFullSmokeNeedsIosTunnel
+        ? 'npm run v4:smoke:full:password-prompt'
+        : 'npm run v4:smoke:full';
+    steps.add('双平台：iOS 和 Android 单平台 smoke 都通过后，运行 `$command`。');
   }
   steps.add('终验：补齐留档后运行 `npm run v4:acceptance-final`。');
   return steps.toSet().toList(growable: false);
+}
+
+// 根据下一步生成现场执行顺序，避免用户在多条命令间来回试错。
+List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
+  List<String> nextSteps, {
+  required bool complete,
+}) {
+  if (complete) {
+    return const <_AcceptanceChecklistItem>[
+      _AcceptanceChecklistItem(
+        order: 1,
+        title: '保留报告',
+        proof: '最终验收已通过，保留本次 Markdown、JSON、截图和平台 smoke 留档。',
+      ),
+    ];
+  }
+
+  final joined = nextSteps.join('\n');
+  final items = <_AcceptanceChecklistItem>[];
+  var order = 1;
+
+  void add({required String title, required String proof, String? command}) {
+    items.add(
+      _AcceptanceChecklistItem(
+        order: order,
+        title: title,
+        command: command,
+        proof: proof,
+      ),
+    );
+    order += 1;
+  }
+
+  if (joined.contains('v4:ios-smoke:full:password-prompt')) {
+    add(
+      title: '补 iOS',
+      command: 'npm run v4:ios-smoke:full:password-prompt',
+      proof: '终端隐藏输入 Mac 密码，手机保持解锁并允许系统提示，生成 iOS smoke 留档。',
+    );
+  } else if (joined.contains('v4:ios-smoke:full')) {
+    add(
+      title: '补 iOS',
+      command: 'npm run v4:ios-smoke:full',
+      proof: 'iPhone 已连接、已信任，生成 iOS smoke 留档。',
+    );
+  }
+
+  if (joined.contains('v4:android-smoke:full')) {
+    add(
+      title: '补 Android',
+      command: 'npm run v4:android-smoke:full',
+      proof: '只连接一台已允许 USB 调试的 Android 手机，生成 Android smoke 留档。',
+    );
+  }
+
+  if (joined.contains('v4:smoke:full:password-prompt')) {
+    add(
+      title: '跑全量',
+      command: 'npm run v4:smoke:full:password-prompt',
+      proof: 'iOS 和 Android 单平台条件都就绪，双平台 full smoke 完整通过。',
+    );
+  } else if (joined.contains('v4:smoke:full')) {
+    add(
+      title: '跑全量',
+      command: 'npm run v4:smoke:full',
+      proof: 'iOS 和 Android 单平台条件都就绪，双平台 full smoke 完整通过。',
+    );
+  }
+
+  if (joined.contains('v4:acceptance-final')) {
+    add(
+      title: '做终验',
+      command: 'npm run v4:acceptance-final',
+      proof: '终验返回 0，并保留 FINAL_ACCEPTANCE Markdown / JSON。',
+    );
+  }
+
+  if (items.isEmpty) {
+    add(
+      title: '重跑审计',
+      command: 'npm run v4:acceptance-audit',
+      proof: '重新生成现场摘要，按新的下一步继续补验。',
+    );
+  }
+
+  return items;
 }
 
 // 判断单平台 smoke 摘要是否存在但尚未完整通过。

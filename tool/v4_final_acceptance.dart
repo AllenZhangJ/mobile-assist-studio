@@ -819,11 +819,56 @@ String? _safeAcceptanceCommand(String? value) {
 
 // 清洗可见步骤里的反引号命令；只保留白名单命令。
 String _safeAcceptanceInstructionText(String value) {
-  return _redactText(value).replaceAllMapped(RegExp(r'`([^`]+)`'), (match) {
-    final command = _safeAcceptanceCommand(match.group(1));
-    return command == null ? '`命令已过滤`' : '`$command`';
-  });
+  final backtickSafe = _redactText(value).replaceAllMapped(
+    RegExp(r'`([^`]+)`'),
+    (match) {
+      final command = _safeAcceptanceCommand(match.group(1));
+      return command == null ? '`命令已过滤`' : '`$command`';
+    },
+  );
+  return _filterPlainAcceptanceCommands(backtickSafe);
 }
+
+// 过滤普通文本命令，避免坏报告绕开反引号命令白名单。
+String _filterPlainAcceptanceCommands(String value) {
+  var safe = value.replaceAllMapped(_plainNpmRunCommandPattern, (match) {
+    final command = match.group(0)?.trim();
+    final normalized = command == null ? null : _normalizePlainCommand(command);
+    if (normalized != null && _allowedAcceptanceCommands.contains(normalized)) {
+      return normalized;
+    }
+    return '命令已过滤';
+  });
+  for (final pattern in _blockedPlainCommandPatterns) {
+    safe = safe.replaceAll(pattern, '命令已过滤');
+  }
+  return safe;
+}
+
+// 将普通文本命令里的重复空白收敛后再与白名单比较。
+String _normalizePlainCommand(String command) {
+  return command.replaceAll(RegExp(r'\s+'), ' ');
+}
+
+final _plainNpmRunCommandPattern = RegExp(
+  r'\bnpm\s+run\s+[A-Za-z0-9:._-]+',
+  caseSensitive: false,
+);
+
+final _blockedPlainCommandPatterns =
+    <String>[
+          r'\brm\s+-rf\b[^。；，,;]*',
+          r'\bosascript\s+-e\b[^。；，,;]*',
+          r'\bsudo\s+\S+[^。；，,;]*',
+          r'\bcurl\s+\S+[^。；，,;]*',
+          r'\bpython3?\s+\S+[^。；，,;]*',
+          r'\bnode\s+\S+[^。；，,;]*',
+          r'\bbash\s+\S+[^。；，,;]*',
+          r'\bzsh\s+\S+[^。；，,;]*',
+          r'\bsh\s+\S+[^。；，,;]*',
+        ]
+        .map((pattern) => RegExp(pattern, caseSensitive: false))
+        .toList(growable: false);
 
 // 终验门禁缺口，描述还差哪类证据才能完成。
 final class _AcceptanceGateGap {

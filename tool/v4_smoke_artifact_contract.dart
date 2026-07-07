@@ -330,6 +330,7 @@ Future<void> _assertPackageSmokeScripts() async {
   await _assertFullSmokeDriverProbe();
   await _assertFullSmokePreflightStateContracts();
   await _assertFinalAcceptanceNextStepSanitizer();
+  _assertPlainTextCommandScanner();
   _assertFullSmokeScript(
     scripts,
     name: 'v4:ios-smoke:full',
@@ -368,8 +369,25 @@ Future<void> _assertFinalAcceptanceNextStepSanitizer() async {
   _expect(
     source.contains('_safeAcceptanceInstructionText') &&
         source.contains('命令已过滤') &&
-        source.contains('_allowedAcceptanceCommands.contains(command)'),
-    'final acceptance 生成端必须过滤 nextSteps 中的非白名单命令。',
+        source.contains('_allowedAcceptanceCommands.contains(command)') &&
+        source.contains('_filterPlainAcceptanceCommands') &&
+        source.contains('_plainNpmRunCommandPattern') &&
+        source.contains('caseSensitive: false'),
+    'final acceptance 生成端必须过滤 nextSteps 中的非白名单命令和普通文本命令。',
+  );
+}
+
+// 断言合同扫描器能识别大小写和多空格形式的裸 npm 命令。
+void _assertPlainTextCommandScanner() {
+  _expect(
+    _plainTextCommandsAreWhitelisted(
+      '允许 npm run v4:acceptance-final 和 npm run v4:smoke-readiness。',
+    ),
+    '普通文本扫描器必须允许项目内白名单命令。',
+  );
+  _expect(
+    !_plainTextCommandsAreWhitelisted('禁止 NPM   RUN legacy:danger。'),
+    '普通文本扫描器必须拦截大小写和多空格绕过。',
   );
 }
 
@@ -1799,15 +1817,41 @@ void _assertAcceptanceNextStepCommandsAreWhitelisted(List<String> steps) {
 
 // 断言普通终端文本中的 npm 命令只能来自项目内 V4 白名单。
 void _assertPlainTextCommandsAreWhitelisted(String text, String field) {
-  final pattern = RegExp(r'npm run [A-Za-z0-9:._-]+');
-  for (final match in pattern.allMatches(text)) {
+  for (final match in _plainReportCommandPattern.allMatches(text)) {
     final command = match.group(0)?.trim();
+    final normalized = command == null
+        ? null
+        : _normalizePlainReportCommand(command);
     _expect(
-      command != null && _allowedReportCommands.contains(command),
+      normalized != null && _allowedReportCommands.contains(normalized),
       '$field 不得输出非白名单命令：$command',
     );
   }
 }
+
+// 判断普通文本里的 npm 命令是否全部来自白名单，供扫描器自测复用。
+bool _plainTextCommandsAreWhitelisted(String text) {
+  for (final match in _plainReportCommandPattern.allMatches(text)) {
+    final command = match.group(0)?.trim();
+    final normalized = command == null
+        ? null
+        : _normalizePlainReportCommand(command);
+    if (normalized == null || !_allowedReportCommands.contains(normalized)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// 收敛普通文本命令空白，避免多空格绕过白名单比较。
+String _normalizePlainReportCommand(String command) {
+  return command.replaceAll(RegExp(r'\s+'), ' ');
+}
+
+final _plainReportCommandPattern = RegExp(
+  r'\bnpm\s+run\s+[A-Za-z0-9:._-]+',
+  caseSensitive: false,
+);
 
 // 断言最终验收 JSON 只输出项目内安全 smoke / 终验命令。
 void _assertAcceptanceCommandsAreWhitelisted(

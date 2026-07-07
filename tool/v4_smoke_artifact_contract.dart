@@ -144,6 +144,26 @@ Future<void> main() async {
           platformMismatchArchiveFinal.stderr.contains('当前提交完整通过'),
       '旧提交平台 run 的 archive final 必须提示平台 smoke 不属于当前提交完整通过。',
     );
+
+    final detachedScreenshotDir = Directory(
+      '${tempDir.path}/complete-detached-screenshots',
+    );
+    await _seedCompleteSmokeFixture(
+      detachedScreenshotDir,
+      fullSmokeGit: currentGit,
+      platformGit: currentGit,
+      writePlatformScreenshots: false,
+    );
+    final detachedScreenshotArchiveFinal = await _runArchiveFinal(
+      detachedScreenshotDir,
+    );
+    _expect(
+      detachedScreenshotArchiveFinal.exitCode == 2 &&
+          detachedScreenshotArchiveFinal.stderr.contains('iOS 平台') &&
+          detachedScreenshotArchiveFinal.stderr.contains('Android 平台') &&
+          detachedScreenshotArchiveFinal.stderr.contains('当前提交完整通过'),
+      '只有全局截图、平台 run 缺少同 run 截图文件时 archive final 必须拒绝通过。',
+    );
     stdout.writeln('V4 smoke artifact contract passed');
   } finally {
     await tempDir.delete(recursive: true);
@@ -393,6 +413,7 @@ Future<void> _seedCompleteSmokeFixture(
   Directory outDir, {
   required String fullSmokeGit,
   required String platformGit,
+  bool writePlatformScreenshots = true,
 }) async {
   await outDir.create(recursive: true);
   final timestamp = DateTime.utc(2026, 1, 2);
@@ -442,11 +463,13 @@ Future<void> _seedCompleteSmokeFixture(
     Directory('${outDir.path}/ios/run-2026-01-02T00-00-00-000000Z'),
     git: platformGit,
     timestamp: timestamp,
+    writeScreenshotFile: writePlatformScreenshots,
   );
   await _seedCompletePlatformRun(
     Directory('${outDir.path}/android/run-2026-01-02T00-00-00-000000Z'),
     git: platformGit,
     timestamp: timestamp,
+    writeScreenshotFile: writePlatformScreenshots,
   );
 }
 
@@ -455,8 +478,16 @@ Future<void> _seedCompletePlatformRun(
   Directory runDir, {
   required String git,
   required DateTime timestamp,
+  bool writeScreenshotFile = true,
 }) async {
   await runDir.create(recursive: true);
+  if (writeScreenshotFile) {
+    final screenshotDir = Directory('${runDir.path}/screenshots');
+    await screenshotDir.create(recursive: true);
+    await File(
+      '${screenshotDir.path}/smoke-initial.png',
+    ).writeAsBytes(<int>[0x89, 0x50, 0x4E, 0x47]);
+  }
   const encoder = JsonEncoder.withIndent('  ');
   await File('${runDir.path}/metadata.json').writeAsString(
     '${encoder.convert(<String, Object?>{'workflowName': 'V4 Smoke', 'startedAt': timestamp.toIso8601String(), 'git': git})}\n',
@@ -466,7 +497,10 @@ Future<void> _seedCompletePlatformRun(
   );
   final events = <Map<String, Object?>>[
     <String, Object?>{'type': 'smokeStart', 'actionsAllowed': true, 'git': git},
-    <String, Object?>{'type': 'smokeScreenshot'},
+    <String, Object?>{
+      'type': 'smokeScreenshot',
+      'screenshot': 'screenshots/smoke-initial.png',
+    },
     <String, Object?>{'type': 'smokeWorkflowStart'},
     <String, Object?>{'type': 'smokeAction', 'action': 'tap'},
     <String, Object?>{'type': 'smokeAction', 'action': 'swipe'},

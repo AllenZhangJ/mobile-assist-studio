@@ -276,6 +276,7 @@ Future<_PlatformRunSummary> _readPlatformRunSummary(
       .map((event) => event['type']?.toString() ?? '')
       .where((type) => type.isNotEmpty)
       .toSet();
+  final screenshotFileCount = await _countPlatformRunScreenshots(dir);
   return _PlatformRunSummary(
     platform: platform,
     runName: _redactText(_entityName(dir)),
@@ -287,10 +288,28 @@ Future<_PlatformRunSummary> _readPlatformRunSummary(
     status: finished?['status']?.toString() ?? 'running',
     actionsAllowed: _eventBool(events, 'smokeStart', 'actionsAllowed'),
     hasScreenshot: eventTypes.contains('smokeScreenshot'),
+    screenshotFileCount: screenshotFileCount,
     workflowExecuted: eventTypes.contains('smokeWorkflowStart'),
     actionNames: _smokeActionNames(events),
     logsCollected: eventTypes.contains('smokeLogs'),
   );
+}
+
+// 统计同一平台 run 目录下的截图文件，避免全局旧截图替代本次证据。
+Future<int> _countPlatformRunScreenshots(Directory runDir) async {
+  final dir = Directory('${runDir.path}/screenshots');
+  if (!await dir.exists()) return 0;
+  var count = 0;
+  await for (final entity in dir.list(recursive: true, followLinks: false)) {
+    if (entity is! File) continue;
+    final name = _entityName(entity);
+    if (!RegExp(r'\.(png|jpg|jpeg)$', caseSensitive: false).hasMatch(name)) {
+      continue;
+    }
+    final stat = await entity.stat();
+    if (stat.size > 0) count += 1;
+  }
+  return count;
 }
 
 // 读取文件或目录名，兼容 Directory URI 尾斜线。
@@ -685,6 +704,7 @@ final class _PlatformRunSummary {
     required this.status,
     required this.actionsAllowed,
     required this.hasScreenshot,
+    required this.screenshotFileCount,
     required this.workflowExecuted,
     required this.actionNames,
     required this.logsCollected,
@@ -696,11 +716,14 @@ final class _PlatformRunSummary {
   final String status;
   final bool? actionsAllowed;
   final bool hasScreenshot;
+  final int screenshotFileCount;
   final bool workflowExecuted;
   final Set<String> actionNames;
   final bool logsCollected;
 
   bool get passed => status == 'success';
+
+  bool get hasScreenshotFile => screenshotFileCount > 0;
 
   bool get tapExecuted => actionNames.contains('tap');
 
@@ -712,6 +735,7 @@ final class _PlatformRunSummary {
       passed &&
       actionsAllowed == true &&
       hasScreenshot &&
+      hasScreenshotFile &&
       workflowExecuted &&
       tapExecuted &&
       swipeExecuted &&
@@ -739,7 +763,11 @@ final class _PlatformRunSummary {
       actionsAllowed == true ? '允许动作' : '动作未授权',
       actions.isEmpty ? '未执行动作' : '动作 ${actions.join('/')}',
       workflowExecuted ? '含流程' : '无流程',
-      hasScreenshot ? '有截图' : '无截图',
+      hasScreenshot
+          ? hasScreenshotFile
+                ? '有截图'
+                : '截图缺文件'
+          : '无截图',
       logsCollected ? '有日志' : '无日志',
     ];
     return parts.join('，');
@@ -754,6 +782,7 @@ final class _PlatformRunSummary {
       'status': status,
       'actionsAllowed': actionsAllowed,
       'hasScreenshot': hasScreenshot,
+      'screenshotFileCount': screenshotFileCount,
       'workflowExecuted': workflowExecuted,
       'actions': actionNames.toList()..sort(),
       'logsCollected': logsCollected,
@@ -978,6 +1007,12 @@ final class _SmokeArchiveReport {
       if (summary.screenshots == 0) '缺少截图留档。请保留 Mac App 或设备 smoke 截图。',
       if (summary.iosRuns == 0) '缺少 iOS 平台 smoke run。',
       if (summary.androidRuns == 0) '缺少 Android 平台 smoke run。',
+      if (summary.latestIosSmoke case final latest?
+          when latest.hasScreenshot && !latest.hasScreenshotFile)
+        '最近 iOS 平台 smoke run 有截图事件但缺少同 run 截图文件。',
+      if (summary.latestAndroidSmoke case final latest?
+          when latest.hasScreenshot && !latest.hasScreenshotFile)
+        '最近 Android 平台 smoke run 有截图事件但缺少同 run 截图文件。',
       if (summary.iosRuns > 0 && !summary.latestIosSmokeFullMatchesGit(git))
         '最近 iOS 平台 smoke run 尚未在当前提交完整通过。',
       if (summary.androidRuns > 0 &&

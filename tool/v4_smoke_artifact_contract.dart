@@ -1533,6 +1533,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   _expect(gitStatus['remote'] is String, 'acceptance gitStatus 必须保留远端状态。');
   final gateGaps = _listAt(json, 'gateGaps');
   _expect(gateGaps.isNotEmpty, 'acceptance 必须生成结构化终验门禁缺口。');
+  _assertAcceptanceCommandsAreWhitelisted(gateGaps, 'gateGaps');
   _expect(
     gateGaps.any(
           (gap) =>
@@ -1578,6 +1579,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   );
   final fieldChecklist = _listAt(json, 'fieldChecklist');
   _expect(fieldChecklist.length >= 4, 'acceptance 必须给出现场补验清单。');
+  _assertAcceptanceCommandsAreWhitelisted(fieldChecklist, 'fieldChecklist');
   final checklistMaps = fieldChecklist.map(_mapFrom).toList(growable: false);
   _expect(
     checklistMaps.any(
@@ -1667,6 +1669,32 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
 
   final steps = _listAt(json, 'steps');
   _expect(steps.length == 4, 'acceptance 必须包含 4 个固定步骤。');
+}
+
+// 断言最终验收 JSON 只输出项目内安全 smoke / 终验命令。
+void _assertAcceptanceCommandsAreWhitelisted(
+  List<Object?> items,
+  String field,
+) {
+  const allowed = <String>{
+    'npm run v4:ios-smoke:full',
+    'npm run v4:ios-smoke:full:password-prompt',
+    'npm run v4:android-smoke:full',
+    'npm run v4:smoke:full',
+    'npm run v4:smoke:full:password-prompt',
+    'npm run v4:smoke-readiness',
+    'npm run v4:smoke-archive',
+    'npm run v4:acceptance-audit',
+    'npm run v4:acceptance-final',
+  };
+  for (final item in items) {
+    final command = _mapFrom(item)['command'];
+    if (command == null) continue;
+    _expect(
+      command is String && allowed.contains(command),
+      'acceptance $field 不得输出非白名单命令：$command',
+    );
+  }
 }
 
 // 断言 final acceptance Markdown 包含人工复盘区域。

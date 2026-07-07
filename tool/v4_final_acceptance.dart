@@ -797,6 +797,26 @@ final class _GitRemoteState {
   String get behindLabel => behind < 0 ? '未知' : '$behind';
 }
 
+// 最终报告只允许输出项目内 V4 smoke / 终验白名单命令。
+const _allowedAcceptanceCommands = <String>{
+  'npm run v4:ios-smoke:full',
+  'npm run v4:ios-smoke:full:password-prompt',
+  'npm run v4:android-smoke:full',
+  'npm run v4:smoke:full',
+  'npm run v4:smoke:full:password-prompt',
+  'npm run v4:smoke-readiness',
+  'npm run v4:smoke-archive',
+  'npm run v4:acceptance-audit',
+  'npm run v4:acceptance-final',
+};
+
+// 过滤建议命令，避免未来报告生成逻辑误写任意 shell 文本。
+String? _safeAcceptanceCommand(String? value) {
+  final command = value?.trim();
+  if (command == null || command.isEmpty) return null;
+  return _allowedAcceptanceCommands.contains(command) ? command : null;
+}
+
 // 终验门禁缺口，描述还差哪类证据才能完成。
 final class _AcceptanceGateGap {
   const _AcceptanceGateGap({
@@ -811,14 +831,16 @@ final class _AcceptanceGateGap {
   final String required;
   final String? command;
 
+  String? get safeCommand => _safeAcceptanceCommand(command);
+
   String get commandMarkdown {
-    final value = command;
+    final value = safeCommand;
     if (value == null || value.isEmpty) return '-';
     return '`$value`';
   }
 
   String get stderrLine {
-    final value = command;
+    final value = safeCommand;
     final suffix = value == null || value.isEmpty ? '' : '；建议命令：$value';
     return '$title：${_trimForStderr(current)}；通过标准：${_trimForStderr(required)}$suffix';
   }
@@ -829,7 +851,7 @@ final class _AcceptanceGateGap {
       'title': title,
       'current': current,
       'required': required,
-      'command': command,
+      'command': safeCommand,
     };
   }
 }
@@ -848,14 +870,16 @@ final class _AcceptanceChecklistItem {
   final String proof;
   final String? command;
 
+  String? get safeCommand => _safeAcceptanceCommand(command);
+
   String get commandMarkdown {
-    final value = command;
+    final value = safeCommand;
     if (value == null || value.isEmpty) return '-';
     return '`$value`';
   }
 
   String get stderrLine {
-    final value = command;
+    final value = safeCommand;
     final commandPart = value == null || value.isEmpty ? '无需命令' : value;
     return '$order. $title：$commandPart；通过标准：$proof';
   }
@@ -865,7 +889,7 @@ final class _AcceptanceChecklistItem {
     return <String, Object?>{
       'order': order,
       'title': title,
-      'command': command,
+      'command': safeCommand,
       'proof': proof,
     };
   }

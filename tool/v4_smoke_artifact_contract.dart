@@ -620,10 +620,11 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   );
   final nextSteps = _stringList(json['nextSteps']);
   _expect(
-    nextSteps.any((step) => step.contains('v4:android-smoke:full')) &&
+    nextSteps.any((step) => step.contains('v4:ios-smoke:full')) &&
+        nextSteps.any((step) => step.contains('v4:android-smoke:full')) &&
         nextSteps.any((step) => step.contains('v4:smoke:full')) &&
         nextSteps.any((step) => step.contains('v4:acceptance-final')),
-    'acceptance nextSteps 必须给出 Android、full smoke 和终验命令。',
+    'acceptance nextSteps 必须给出 iOS、Android、full smoke 和终验命令。',
   );
 
   final evidence = _mapAt(json, 'evidence');
@@ -677,6 +678,9 @@ void _assertAcceptanceMarkdown(String markdown) {
     '## 下一步',
     '完成审计',
     '归档终验',
+    'v4:ios-smoke:full',
+    'v4:android-smoke:full',
+    'v4:smoke:full',
     'v4:acceptance-final',
   ]) {
     _expect(markdown.contains(text), 'Acceptance Markdown 必须包含：$text');

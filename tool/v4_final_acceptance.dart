@@ -449,7 +449,11 @@ final class _AcceptanceReport {
     if (finalFailures.isEmpty) {
       return const <String>['保留本次报告，进入交付复核。'];
     }
-    return _nextStepsForFailures(failures: finalFailures, auditOk: auditOk);
+    return _nextStepsForFailures(
+      failures: finalFailures,
+      auditOk: auditOk,
+      evidence: evidence,
+    );
   }
 
   String toJsonString() {
@@ -660,6 +664,10 @@ Future<Map<String, Object?>?> _loadLatestReadiness(Directory outDir) async {
     'artifacts': <String, Object?>{
       'androidPreflightReports':
           _jsonMapAt(json, 'artifacts')['androidPreflightReports'] ?? 0,
+      'latestIos': _redactJsonValue(_jsonMapAt(json, 'artifacts')['latestIos']),
+      'latestAndroid': _redactJsonValue(
+        _jsonMapAt(json, 'artifacts')['latestAndroid'],
+      ),
       'latestAndroidPreflight': _redactJsonValue(
         _jsonMapAt(json, 'artifacts')['latestAndroidPreflight'],
       ),
@@ -764,28 +772,63 @@ String _localStateLabel(Object? value) {
 List<String> _nextStepsForFailures({
   required List<String> failures,
   required bool auditOk,
+  required _AcceptanceEvidenceSummary evidence,
 }) {
   final joined = failures.join('\n');
   final steps = <String>[];
+  final counts = _jsonMapAt(
+    evidence.archive ?? const <String, Object?>{},
+    'counts',
+  );
+  final readinessArtifacts = _jsonMapAt(
+    evidence.readiness ?? const <String, Object?>{},
+    'artifacts',
+  );
+  final latestFullSmoke = _jsonMapAt(
+    evidence.archive ?? const <String, Object?>{},
+    'latestFullSmoke',
+  );
+  final needsIosSmoke =
+      joined.contains('iOS 平台') ||
+      (counts.isNotEmpty && (counts['iosRuns'] ?? 0) == 0) ||
+      _reportIsNotFullPassed(readinessArtifacts['latestIos']);
+  final needsAndroidSmoke =
+      joined.contains('Android 平台') ||
+      (counts.isNotEmpty && (counts['androidRuns'] ?? 0) == 0) ||
+      _reportIsNotFullPassed(readinessArtifacts['latestAndroid']);
+  final needsFullSmoke =
+      joined.contains('full smoke') ||
+      joined.contains('双平台完整 smoke') ||
+      (latestFullSmoke.isNotEmpty && latestFullSmoke['complete'] != true);
   if (!auditOk) {
     steps.add(
       '基础：先运行 `npm run v4:smoke-readiness` 和 `npm run v4:smoke-archive`。',
     );
   }
-  if (joined.contains('iOS 平台')) {
+  if (needsIosSmoke) {
     steps.add('iOS：连接并信任一台 iPhone，运行 `npm run v4:ios-smoke:full`。');
   }
-  if (joined.contains('Android 平台')) {
+  if (needsAndroidSmoke) {
     steps.add('Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。');
   }
-  if (joined.contains('截图')) {
+  if (joined.contains('截图') ||
+      (counts.isNotEmpty && (counts['screenshots'] ?? 0) == 0)) {
     steps.add('截图：保留 Mac App 或设备 smoke 截图，再重新生成 archive。');
   }
-  if (joined.contains('full smoke') || joined.contains('双平台完整 smoke')) {
+  if (needsFullSmoke) {
     steps.add('双平台：iOS 和 Android 单平台 smoke 都通过后，运行 `npm run v4:smoke:full`。');
   }
   steps.add('终验：补齐留档后运行 `npm run v4:acceptance-final`。');
   return steps.toSet().toList(growable: false);
+}
+
+// 判断单平台 smoke 摘要是否存在但尚未完整通过。
+bool _reportIsNotFullPassed(Object? value) {
+  if (value == null) return false;
+  if (value is Map<String, Object?>) return value['fullPassed'] != true;
+  if (value is Map)
+    return Map<String, Object?>.from(value)['fullPassed'] != true;
+  return false;
 }
 
 const _usage = '''

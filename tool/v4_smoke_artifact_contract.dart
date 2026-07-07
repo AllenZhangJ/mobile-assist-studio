@@ -162,6 +162,17 @@ Future<void> main() async {
       detachedScreenshotReadiness.exitCode == 2,
       '只有全局截图、平台 run 缺少同 run 截图文件时 readiness final 必须拒绝通过。',
     );
+    final detachedScreenshotAcceptance = await _runFinalAcceptance(
+      detachedScreenshotDir,
+      requireComplete: true,
+    );
+    _expect(
+      detachedScreenshotAcceptance.exitCode == 2 &&
+          detachedScreenshotAcceptance.stderr.contains('iOS smoke') &&
+          detachedScreenshotAcceptance.stderr.contains('Android smoke') &&
+          detachedScreenshotAcceptance.stderr.contains('截图缺文件'),
+      '平台 run 缺少同 run 截图文件时 acceptance final 必须输出平台 smoke 缺口。',
+    );
     final detachedScreenshotArchiveFinal = await _runArchiveFinal(
       detachedScreenshotDir,
     );
@@ -407,6 +418,7 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
   await File(
     '${androidDir.path}/ANDROID_SMOKE_PREFLIGHT_2026-01-01T00-00-00-000000Z.json',
   ).writeAsString('${encoder.convert(preflightPayload)}\n');
+  await Directory('${androidDir.path}/diagnostics').create(recursive: true);
 }
 
 // 写入 archive fixture，只放虚拟截图文件，不读取或生成真实隐私图片。
@@ -803,6 +815,11 @@ void _assertReadinessJson(Map<String, Object?> json) {
 
   final artifacts = _mapAt(json, 'artifacts');
   _expect(artifacts['fullSmokeReports'] == 1, 'fullSmokeReports 必须索引 fixture。');
+  _expect(artifacts['iosRuns'] == 1, 'readiness 必须只统计 run-* iOS smoke 目录。');
+  _expect(
+    artifacts['androidRuns'] == 0,
+    'readiness 不得把 Android 普通诊断目录计作 smoke run。',
+  );
   _expect(
     artifacts['androidPreflightReports'] == 1,
     'androidPreflightReports 必须索引 Android 前置诊断。',

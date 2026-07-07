@@ -219,7 +219,9 @@ Future<int> _countRunDirs(Directory dir) async {
   if (!await dir.exists()) return 0;
   var count = 0;
   await for (final entity in dir.list(recursive: false, followLinks: false)) {
-    if (entity is Directory) count += 1;
+    if (entity is Directory && entity.path.split('/').last.startsWith('run-')) {
+      count += 1;
+    }
   }
   return count;
 }

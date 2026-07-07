@@ -1166,13 +1166,6 @@ _AcceptanceGateGap _gateGapFromWarning(String warning, bool iosTunnelNeeded) {
           : 'npm run v4:smoke:full',
     );
   }
-  if (text.contains('截图')) {
-    return _AcceptanceGateGap(
-      title: '截图',
-      current: text,
-      required: '至少保留一张 Mac App 或设备 smoke 截图',
-    );
-  }
   if (text.contains('iOS 平台') && text.contains('当前提交完整通过')) {
     return _AcceptanceGateGap(
       title: 'iOS smoke',
@@ -1207,6 +1200,13 @@ _AcceptanceGateGap _gateGapFromWarning(String warning, bool iosTunnelNeeded) {
       current: text,
       required: 'Android 真机 smoke run 留档存在',
       command: 'npm run v4:android-smoke:full',
+    );
+  }
+  if (text.contains('截图')) {
+    return _AcceptanceGateGap(
+      title: '截图',
+      current: text,
+      required: '至少保留一张 Mac App 或设备 smoke 截图',
     );
   }
   if (text.contains('full smoke')) {

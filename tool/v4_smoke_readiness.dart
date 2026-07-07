@@ -173,16 +173,23 @@ Future<_ArtifactProbe> _probeArtifacts(Directory outDir) async {
     outDir,
     RegExp(r'^SMOKE_READINESS_.*\.json$'),
   );
+  final fullSmokeReports = await _countMatchingFiles(
+    outDir,
+    RegExp(r'^FULL_SMOKE_.*\.json$'),
+  );
   final latestIos = await _probeLatestSmokeRun(iosDir);
   final latestAndroid = await _probeLatestSmokeRun(androidDir);
+  final latestFullSmoke = await _probeLatestFullSmokeReport(outDir);
   return _ArtifactProbe(
     uiScreenshots: uiScreenshots,
     iosRuns: iosRuns,
     androidRuns: androidRuns,
     markdownReports: markdownReports,
     jsonReports: jsonReports,
+    fullSmokeReports: fullSmokeReports,
     latestIos: latestIos,
     latestAndroid: latestAndroid,
+    latestFullSmoke: latestFullSmoke,
   );
 }
 
@@ -220,6 +227,32 @@ Future<_SmokeRunSummary?> _probeLatestSmokeRun(Directory dir) async {
   if (runs.isEmpty) return null;
   runs.sort((left, right) => right.path.compareTo(left.path));
   return _readSmokeRunSummary(runs.first);
+}
+
+// 读取最近一次 full smoke JSON，只读取结构化摘要。
+Future<_FullSmokeReportSummary?> _probeLatestFullSmokeReport(
+  Directory dir,
+) async {
+  if (!await dir.exists()) return null;
+  final reports = <File>[];
+  await for (final entity in dir.list(recursive: false, followLinks: false)) {
+    if (entity is! File) continue;
+    final name = entity.uri.pathSegments.last;
+    if (RegExp(r'^FULL_SMOKE_.*\.json$').hasMatch(name)) {
+      reports.add(entity);
+    }
+  }
+  if (reports.isEmpty) return null;
+  reports.sort((left, right) {
+    return right.uri.pathSegments.last.compareTo(left.uri.pathSegments.last);
+  });
+  final file = reports.first;
+  final decoded = await _readJsonObject(file);
+  if (decoded == null || decoded['kind'] != 'v4FullSmoke') return null;
+  return _FullSmokeReportSummary.fromJson(
+    reportName: _redactText(file.uri.pathSegments.last),
+    json: decoded,
+  );
 }
 
 // 从单个运行目录解析状态、动作、流程、截图和失败摘要。
@@ -345,6 +378,24 @@ String _shortText(String value, {int limit = 120}) {
   final compact = value.replaceAll(RegExp(r'\s+'), ' ').trim();
   if (compact.length <= limit) return compact;
   return '${compact.substring(0, limit)}...';
+}
+
+// 读取嵌套 Map 字段，类型不对时返回空 Map。
+Map<String, Object?> _jsonMapAt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  if (value is Map<String, Object?>) return value;
+  if (value is Map) return Map<String, Object?>.from(value);
+  return const <String, Object?>{};
+}
+
+// 读取 JSON 字符串列表，坏值直接过滤。
+List<String> _jsonStringList(Object? value) {
+  if (value is! Iterable) return const <String>[];
+  return value
+      .map((item) => item?.toString().trim() ?? '')
+      .where((item) => item.isNotEmpty)
+      .map(_redactText)
+      .toList(growable: false);
 }
 
 // 执行短命令并裁剪输出。
@@ -606,8 +657,10 @@ final class _ArtifactProbe {
     required this.androidRuns,
     required this.markdownReports,
     required this.jsonReports,
+    required this.fullSmokeReports,
     this.latestIos,
     this.latestAndroid,
+    this.latestFullSmoke,
   });
 
   final int uiScreenshots;
@@ -615,8 +668,10 @@ final class _ArtifactProbe {
   final int androidRuns;
   final int markdownReports;
   final int jsonReports;
+  final int fullSmokeReports;
   final _SmokeRunSummary? latestIos;
   final _SmokeRunSummary? latestAndroid;
+  final _FullSmokeReportSummary? latestFullSmoke;
 
   // 转成机器可读且脱敏的证据计数。
   Map<String, Object?> toJsonObject({
@@ -629,8 +684,97 @@ final class _ArtifactProbe {
       'androidRuns': androidRuns,
       'markdownReports': markdownReports + markdownReportIncrement,
       'jsonReports': jsonReports + jsonReportIncrement,
+      'fullSmokeReports': fullSmokeReports,
       'latestIos': latestIos?.toJsonObject(),
       'latestAndroid': latestAndroid?.toJsonObject(),
+      'latestFullSmoke': latestFullSmoke?.toJsonObject(),
+    };
+  }
+}
+
+// 最近一次 full smoke 编排报告的脱敏摘要。
+final class _FullSmokeReportSummary {
+  const _FullSmokeReportSummary({
+    required this.reportName,
+    required this.timestamp,
+    required this.complete,
+    required this.label,
+    required this.preflightStatus,
+    required this.blockers,
+    required this.failedSteps,
+    required this.stepCount,
+    required this.stepStatuses,
+  });
+
+  final String reportName;
+  final DateTime? timestamp;
+  final bool complete;
+  final String label;
+  final String preflightStatus;
+  final List<String> blockers;
+  final List<String> failedSteps;
+  final int stepCount;
+  final List<String> stepStatuses;
+
+  // 从 full smoke JSON 解析摘要，坏字段按未知降级。
+  factory _FullSmokeReportSummary.fromJson({
+    required String reportName,
+    required Map<String, Object?> json,
+  }) {
+    final completion = _jsonMapAt(json, 'completion');
+    final preflight = _jsonMapAt(json, 'preflight');
+    final steps = json['steps'] is Iterable
+        ? json['steps'] as Iterable
+        : const [];
+    final stepStatuses = <String>[];
+    for (final step in steps) {
+      if (step is! Map) continue;
+      final stepMap = Map<String, Object?>.from(step);
+      final stepName =
+          _jsonMapAt(stepMap, 'step')['name']?.toString() ?? '未知步骤';
+      final status = stepMap['status']?.toString() ?? '未知';
+      stepStatuses.add('${_redactText(stepName)}：${_redactText(status)}');
+    }
+    return _FullSmokeReportSummary(
+      reportName: reportName,
+      timestamp: _parseDate(json['timestamp']),
+      complete: completion['complete'] == true,
+      label: _redactText(completion['label']?.toString() ?? '未知'),
+      preflightStatus: _redactText(preflight['status']?.toString() ?? '未知'),
+      blockers: _jsonStringList(preflight['blockers']),
+      failedSteps: _jsonStringList(completion['failedSteps']),
+      stepCount: stepStatuses.length,
+      stepStatuses: stepStatuses,
+    );
+  }
+
+  String get summaryLabel {
+    final parts = <String>[
+      complete ? '完整通过' : label,
+      '前置 $preflightStatus',
+      if (blockers.isNotEmpty) '阻断 ${blockers.join('/')}',
+      if (failedSteps.isNotEmpty) '失败 ${failedSteps.join('/')}',
+      '步骤 $stepCount',
+    ];
+    if (timestamp case final value?) {
+      parts.add('时间 ${value.toUtc().toIso8601String()}');
+    }
+    return parts.join('，');
+  }
+
+  // 转成机器可读摘要，不包含报告文件路径。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'reportName': reportName,
+      'timestamp': timestamp?.toUtc().toIso8601String(),
+      'complete': complete,
+      'label': label,
+      'preflightStatus': preflightStatus,
+      'blockers': blockers,
+      'failedSteps': failedSteps,
+      'stepCount': stepCount,
+      'stepStatuses': stepStatuses,
+      'summary': summaryLabel,
     };
   }
 }
@@ -792,6 +936,7 @@ final class _SmokeReadinessReport {
     androidReady: androidFullSmokeReady,
     latestIos: artifacts.latestIos,
     latestAndroid: artifacts.latestAndroid,
+    latestFullSmoke: artifacts.latestFullSmoke,
   );
 
   // 转成机器可读 JSON 字符串，供后续 AI / CI 审计使用。
@@ -844,6 +989,9 @@ final class _SmokeReadinessReport {
       ..writeln(
         '- Android 最近 smoke：${_latestSmokeLabel(artifacts.latestAndroid)}',
       )
+      ..writeln(
+        '- 最近 full smoke：${_latestFullSmokeLabel(artifacts.latestFullSmoke)}',
+      )
       ..writeln()
       ..writeln('## 本机状态')
       ..writeln()
@@ -876,6 +1024,8 @@ final class _SmokeReadinessReport {
       ..writeln('  - 最近：${_latestSmokeDetail(artifacts.latestIos)}')
       ..writeln('- Android smoke 记录：${artifacts.androidRuns}')
       ..writeln('  - 最近：${_latestSmokeDetail(artifacts.latestAndroid)}')
+      ..writeln('- Full smoke 报告：${artifacts.fullSmokeReports}')
+      ..writeln('  - 最近：${_latestFullSmokeDetail(artifacts.latestFullSmoke)}')
       ..writeln('- Markdown 报告：${artifacts.markdownReports + 1}')
       ..writeln('- JSON 摘要：${artifacts.jsonReports + 1}')
       ..writeln()
@@ -934,6 +1084,16 @@ final class _SmokeReadinessReport {
     return '${summary.workflowName} / ${summary.summaryLabel}';
   }
 
+  String _latestFullSmokeLabel(_FullSmokeReportSummary? summary) {
+    if (summary == null) return '无记录';
+    return summary.complete ? '完整通过' : summary.label;
+  }
+
+  String _latestFullSmokeDetail(_FullSmokeReportSummary? summary) {
+    if (summary == null) return '无记录';
+    return summary.summaryLabel;
+  }
+
   List<String> _nextSteps() {
     if (iosFullSmokeReady && androidFullSmokeReady) {
       return const <String>[
@@ -955,6 +1115,7 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
   required bool androidReady,
   required _SmokeRunSummary? latestIos,
   required _SmokeRunSummary? latestAndroid,
+  required _FullSmokeReportSummary? latestFullSmoke,
 }) {
   final latestFullPassed =
       (latestIos?.fullPassed ?? false) && (latestAndroid?.fullPassed ?? false);
@@ -964,7 +1125,7 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
       ? '待完整 smoke'
       : '现场未就绪';
   final smokeEvidence =
-      'iOS 最近 ${_batchSmokeLabel(latestIos)}，Android 最近 ${_batchSmokeLabel(latestAndroid)}，当前现场状态见上表';
+      'iOS 最近 ${_batchSmokeLabel(latestIos)}，Android 最近 ${_batchSmokeLabel(latestAndroid)}，full smoke 最近 ${_batchFullSmokeLabel(latestFullSmoke)}，当前现场状态见上表';
   return <_BatchAcceptanceRow>[
     const _BatchAcceptanceRow(
       name: 'Batch 0 真源治理',
@@ -1021,6 +1182,16 @@ String _batchSmokeLabel(_SmokeRunSummary? summary) {
   if (summary.passed) return '通过但未完整';
   if (summary.status == 'failed') return '失败';
   return '运行中';
+}
+
+// 批次表里使用的最近 full smoke 短状态。
+String _batchFullSmokeLabel(_FullSmokeReportSummary? summary) {
+  if (summary == null) return '无记录';
+  if (summary.complete) return '完整通过';
+  if (summary.blockers.isNotEmpty) return '阻断 ${summary.blockers.join('/')}';
+  if (summary.failedSteps.isNotEmpty)
+    return '失败 ${summary.failedSteps.join('/')}';
+  return summary.label;
 }
 
 // 批次验收索引行。

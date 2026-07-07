@@ -800,13 +800,23 @@ List<String> _nextStepsForFailures({
       joined.contains('full smoke') ||
       joined.contains('双平台完整 smoke') ||
       (latestFullSmoke.isNotEmpty && latestFullSmoke['complete'] != true);
+  final latestFullSmokeBlockers = _jsonStringList(latestFullSmoke['blockers']);
+  final latestFullSmokeNeedsIosTunnel = latestFullSmokeBlockers.any(
+    (blocker) => blocker.contains('iOS 隧道'),
+  );
   if (!auditOk) {
     steps.add(
       '基础：先运行 `npm run v4:smoke-readiness` 和 `npm run v4:smoke-archive`。',
     );
   }
   if (needsIosSmoke) {
-    steps.add('iOS：连接并信任一台 iPhone，运行 `npm run v4:ios-smoke:full`。');
+    if (latestFullSmokeNeedsIosTunnel) {
+      steps.add(
+        'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-stdin` 启动隧道后补验。',
+      );
+    } else {
+      steps.add('iOS：连接并信任一台 iPhone，运行 `npm run v4:ios-smoke:full`。');
+    }
   }
   if (needsAndroidSmoke) {
     steps.add('Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。');

@@ -98,6 +98,12 @@ Future<void> _assertPackageSmokeScripts() async {
   );
   _assertFullSmokeScript(
     scripts,
+    name: 'v4:ios-smoke:full:password-stdin',
+    requiredSkipFlag: '--skip-android',
+    requiresPasswordStdin: true,
+  );
+  _assertFullSmokeScript(
+    scripts,
     name: 'v4:android-smoke:full',
     requiredSkipFlag: '--skip-ios',
   );
@@ -108,6 +114,7 @@ void _assertFullSmokeScript(
   Map<String, Object?> scripts, {
   required String name,
   required String requiredSkipFlag,
+  bool requiresPasswordStdin = false,
 }) {
   final command = scripts[name]?.toString() ?? '';
   _expect(
@@ -117,6 +124,12 @@ void _assertFullSmokeScript(
   _expect(command.contains('--confirm-actions'), '$name 必须显式确认真实动作。');
   _expect(command.contains('--auto-prepare'), '$name 必须自动准备本机环境。');
   _expect(command.contains(requiredSkipFlag), '$name 必须包含 $requiredSkipFlag。');
+  if (requiresPasswordStdin) {
+    _expect(
+      command.contains('--admin-password-stdin'),
+      '$name 必须通过 stdin 一次性读取本机密码。',
+    );
+  }
 }
 
 // 断言平台 driver 探测同时解析 stdout / stderr，兼容 Appium CLI 的实际输出流。
@@ -153,13 +166,19 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
       'skipped': false,
       'status': '有阻断',
       'hasBlockers': true,
-      'blockers': <String>['自动准备', 'Android 准备'],
+      'blockers': <String>['自动准备', 'iOS 隧道', 'Android 准备'],
       'items': <Map<String, Object?>>[
         <String, Object?>{
           'name': '自动准备',
           'ok': false,
           'detail': '缺少密码',
           'nextStep': '输入密码后重试。',
+        },
+        <String, Object?>{
+          'name': 'iOS 隧道',
+          'ok': false,
+          'detail': '缺少密码',
+          'nextStep': '通过 stdin 一次性传入密码后重试。',
         },
         <String, Object?>{
           'name': 'Android 准备',
@@ -519,6 +538,7 @@ void _assertReadinessJson(Map<String, Object?> json) {
   _expect(latestFullSmoke['stepCount'] == 0, '前置阻断时 stepCount 必须为 0。');
   final blockers = _stringList(latestFullSmoke['blockers']);
   _expect(blockers.contains('自动准备'), 'latestFullSmoke.blockers 必须包含自动准备。');
+  _expect(blockers.contains('iOS 隧道'), 'latestFullSmoke.blockers 必须包含 iOS 隧道。');
   _expect(
     blockers.contains('Android 准备'),
     'latestFullSmoke.blockers 必须包含 Android 准备。',
@@ -566,6 +586,7 @@ void _assertArchiveJson(Map<String, Object?> json) {
   );
   final blockers = _stringList(latestFullSmoke['blockers']);
   _expect(blockers.contains('自动准备'), 'archive blockers 必须包含自动准备。');
+  _expect(blockers.contains('iOS 隧道'), 'archive blockers 必须包含 iOS 隧道。');
   _expect(blockers.contains('Android 准备'), 'archive blockers 必须包含 Android 准备。');
   _expect(blockers.contains('Appium'), 'archive blockers 必须包含 Appium。');
 
@@ -621,10 +642,13 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   final nextSteps = _stringList(json['nextSteps']);
   _expect(
     nextSteps.any((step) => step.contains('v4:ios-smoke:full')) &&
+        nextSteps.any(
+          (step) => step.contains('v4:ios-smoke:full:password-stdin'),
+        ) &&
         nextSteps.any((step) => step.contains('v4:android-smoke:full')) &&
         nextSteps.any((step) => step.contains('v4:smoke:full')) &&
         nextSteps.any((step) => step.contains('v4:acceptance-final')),
-    'acceptance nextSteps 必须给出 iOS、Android、full smoke 和终验命令。',
+    'acceptance nextSteps 必须给出 iOS 隧道、Android、full smoke 和终验命令。',
   );
 
   final evidence = _mapAt(json, 'evidence');
@@ -679,6 +703,7 @@ void _assertAcceptanceMarkdown(String markdown) {
     '完成审计',
     '归档终验',
     'v4:ios-smoke:full',
+    'v4:ios-smoke:full:password-stdin',
     'v4:android-smoke:full',
     'v4:smoke:full',
     'v4:acceptance-final',

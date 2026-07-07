@@ -633,6 +633,15 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
     localState['androidDevice'] is Map,
     'acceptance evidence 必须嵌入 Android 本机状态。',
   );
+  final batches = _listAt(readiness, 'batches');
+  _expect(batches.length == 9, 'acceptance evidence 必须嵌入 Batch 0-8。');
+  _expect(
+    batches.any((item) => _mapFrom(item)['name'] == 'Batch 0 真源治理') &&
+        batches.any(
+          (item) => _mapFrom(item)['name'] == 'Batch 8 AI / MCP Core',
+        ),
+    'acceptance evidence 必须嵌入首尾批次。',
+  );
   final readinessArtifacts = _mapAt(readiness, 'artifacts');
   _expect(
     readinessArtifacts['androidPreflightReports'] == 1,
@@ -658,6 +667,9 @@ void _assertAcceptanceMarkdown(String markdown) {
     '## 步骤',
     '## 结论',
     '## 现场摘要',
+    '### 批次验收',
+    'Batch 0 真源治理',
+    'Batch 8 AI / MCP Core',
     'Android 手机',
     'Android smoke 前置诊断',
     '最近完整冒烟',

@@ -580,6 +580,22 @@ final class _AcceptanceEvidenceSummary {
       buffer.writeln();
       final artifacts = _jsonMapAt(readiness!, 'artifacts');
       final androidPreflight = _jsonMapAt(artifacts, 'latestAndroidPreflight');
+      final batches = _jsonMapList(readiness!['batches']);
+      if (batches.isNotEmpty) {
+        buffer
+          ..writeln('### 批次验收')
+          ..writeln()
+          ..writeln('| 批次 | 判定 | 证据 |')
+          ..writeln('|---|---|---|');
+        for (final batch in batches) {
+          buffer.writeln(
+            '| ${_plainText(batch['name']?.toString() ?? '未知批次')} | '
+            '${_plainText(batch['status']?.toString() ?? '未知')} | '
+            '${_plainText(batch['evidence']?.toString() ?? '无')} |',
+          );
+        }
+        buffer.writeln();
+      }
       if (androidPreflight.isNotEmpty) {
         buffer
           ..writeln('### Android smoke 前置诊断')
@@ -640,6 +656,7 @@ Future<Map<String, Object?>?> _loadLatestReadiness(Directory outDir) async {
   return <String, Object?>{
     'completion': _redactJsonValue(_jsonMapAt(json, 'completion')),
     'localState': _redactJsonValue(_jsonMapAt(json, 'localState')),
+    'batches': _redactJsonValue(json['batches']),
     'artifacts': <String, Object?>{
       'androidPreflightReports':
           _jsonMapAt(json, 'artifacts')['androidPreflightReports'] ?? 0,
@@ -703,6 +720,15 @@ Map<String, Object?> _jsonMapAt(Map<String, Object?> json, String key) {
   if (value is Map<String, Object?>) return value;
   if (value is Map) return Map<String, Object?>.from(value);
   return const <String, Object?>{};
+}
+
+// 读取 JSON 对象列表，坏值过滤；用于嵌入 Batch 0-8 验收索引。
+List<Map<String, Object?>> _jsonMapList(Object? value) {
+  if (value is! Iterable) return const <Map<String, Object?>>[];
+  return value
+      .whereType<Map>()
+      .map((item) => Map<String, Object?>.from(item))
+      .toList(growable: false);
 }
 
 // 读取 JSON 字符串列表，坏值直接过滤并脱敏。

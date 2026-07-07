@@ -11,6 +11,8 @@ final class V4AcceptanceSummary {
     required this.statusLabel,
     required this.checkedAt,
     required this.gitRevision,
+    required this.iosStatus,
+    required this.iosDetail,
     required this.androidStatus,
     required this.androidDetail,
     required this.screenshots,
@@ -31,6 +33,8 @@ final class V4AcceptanceSummary {
   final String statusLabel;
   final DateTime? checkedAt;
   final String? gitRevision;
+  final String iosStatus;
+  final String iosDetail;
   final String androidStatus;
   final String androidDetail;
   final int screenshots;
@@ -52,6 +56,8 @@ final class V4AcceptanceSummary {
     statusLabel: '未审计',
     checkedAt: null,
     gitRevision: null,
+    iosStatus: '未知',
+    iosDetail: '尚未读取终验报告。',
     androidStatus: '未知',
     androidDetail: '尚未读取终验报告。',
     screenshots: 0,

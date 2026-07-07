@@ -27,6 +27,11 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             tone: summary.platformTone,
           ),
           _V4AcceptanceFact(
+            label: '手机状态',
+            value: summary.deviceStateLabel,
+            tone: summary.deviceStateTone,
+          ),
+          _V4AcceptanceFact(
             label: '本地记录',
             value: summary.localRunLabel,
             tone: summary.localRunTone,
@@ -271,6 +276,8 @@ final class _V4AcceptanceStatusSummary {
     required this.tone,
     required this.platformLabel,
     required this.platformTone,
+    required this.deviceStateLabel,
+    required this.deviceStateTone,
     required this.localRunLabel,
     required this.localRunTone,
     required this.batchProgressLabel,
@@ -289,6 +296,8 @@ final class _V4AcceptanceStatusSummary {
   final StudioStatusTone tone;
   final String platformLabel;
   final StudioStatusTone platformTone;
+  final String deviceStateLabel;
+  final StudioStatusTone deviceStateTone;
   final String localRunLabel;
   final StudioStatusTone localRunTone;
   final String batchProgressLabel;
@@ -322,6 +331,14 @@ final class _V4AcceptanceStatusSummary {
             : StudioStatusTone.error,
         platformLabel: _v4PlatformLabel(platform),
         platformTone: _v4PlatformTone(platform),
+        deviceStateLabel: _v4DeviceStateLabel(
+          acceptance.iosStatus,
+          acceptance.androidStatus,
+        ),
+        deviceStateTone: _v4CombinedDeviceTone(
+          acceptance.iosStatus,
+          acceptance.androidStatus,
+        ),
         localRunLabel: 'iOS ${acceptance.iosRuns}',
         localRunTone: acceptance.iosRuns > 0
             ? StudioStatusTone.ready
@@ -355,6 +372,8 @@ final class _V4AcceptanceStatusSummary {
           : StudioStatusTone.offline,
       platformLabel: _v4PlatformLabel(platform),
       platformTone: _v4PlatformTone(platform),
+      deviceStateLabel: '未知',
+      deviceStateTone: StudioStatusTone.offline,
       localRunLabel: hasLocalRuns ? '${history.totalRuns} 条' : '暂无',
       localRunTone: hasLocalRuns
           ? StudioStatusTone.ready
@@ -380,6 +399,40 @@ StudioStatusTone _v4BatchProgressTone(V4AcceptanceSummary acceptance) {
   if (acceptance.totalBatchCount == 0) return StudioStatusTone.offline;
   if (acceptance.completedBatchCount == acceptance.totalBatchCount) {
     return StudioStatusTone.ready;
+  }
+  return StudioStatusTone.warning;
+}
+
+// 将 iOS / Android readiness 状态压成一个短标签，避免验收卡过高。
+String _v4DeviceStateLabel(String iosStatus, String androidStatus) {
+  if (iosStatus == androidStatus) {
+    return switch (iosStatus) {
+      '可用' => '都可用',
+      '未就绪' => '都未就绪',
+      '未知' => '都未知',
+      _ => iosStatus,
+    };
+  }
+  return 'iOS${_v4ShortDeviceState(iosStatus)}/安卓${_v4ShortDeviceState(androidStatus)}';
+}
+
+// 将单个平台状态压成路线卡可容纳的短字。
+String _v4ShortDeviceState(String status) {
+  return switch (status) {
+    '可用' => '可',
+    '未就绪' => '未',
+    '未知' => '?',
+    _ => status.length <= 2 ? status : status.substring(0, 2),
+  };
+}
+
+// 将双平台 readiness 状态映射成验收卡状态色。
+StudioStatusTone _v4CombinedDeviceTone(String iosStatus, String androidStatus) {
+  if (iosStatus == '可用' && androidStatus == '可用') {
+    return StudioStatusTone.ready;
+  }
+  if (iosStatus == '未知' && androidStatus == '未知') {
+    return StudioStatusTone.offline;
   }
   return StudioStatusTone.warning;
 }

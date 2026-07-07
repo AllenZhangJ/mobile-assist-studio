@@ -59,6 +59,7 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
   final readiness = _acceptanceMapAt(evidence, 'readiness');
   final archive = _acceptanceMapAt(evidence, 'archive');
   final localState = _acceptanceMapAt(readiness, 'localState');
+  final iosDevice = _acceptanceMapAt(localState, 'iosDevice');
   final androidDevice = _acceptanceMapAt(localState, 'androidDevice');
   final counts = _acceptanceMapAt(archive, 'counts');
   final latestFullSmoke = _acceptanceMapAt(archive, 'latestFullSmoke');
@@ -71,6 +72,8 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
     statusLabel: _safeAcceptanceTextAt(completion, 'label') ?? '终验未知',
     checkedAt: checkedAt,
     gitRevision: _shortGitRevision(_stringAt(json, 'git')),
+    iosStatus: _safeAcceptanceTextAt(iosDevice, 'status') ?? '未知',
+    iosDetail: _safeAcceptanceTextAt(iosDevice, 'detail') ?? '无 iOS 状态。',
     androidStatus: _safeAcceptanceTextAt(androidDevice, 'status') ?? '未知',
     androidDetail: _safeAcceptanceTextAt(androidDevice, 'detail') ?? '无安卓状态。',
     screenshots: _intAt(counts, 'screenshots'),

@@ -28,6 +28,8 @@ void main() {
       expect(summary.complete, isFalse);
       expect(summary.statusLabel, '最终验收未完成');
       expect(summary.gitRevision, '12345678');
+      expect(summary.iosStatus, '未就绪');
+      expect(summary.iosDetail, '可用 0，不可用 1');
       expect(summary.androidStatus, '未就绪');
       expect(summary.androidDetail, '可用 0，未授权 0，离线 0');
       expect(summary.screenshots, 1);
@@ -113,6 +115,8 @@ void main() {
     ).readLatest();
     final visibleText = [
       summary.statusLabel,
+      summary.iosStatus,
+      summary.iosDetail,
       summary.androidStatus,
       summary.androidDetail,
       summary.latestFullSmokeLabel,
@@ -163,6 +167,10 @@ String _acceptanceJson({required String git, required int androidRuns}) {
   "evidence": {
     "readiness": {
       "localState": {
+        "iosDevice": {
+          "status": "未就绪",
+          "detail": "可用 0，不可用 1"
+        },
         "androidDevice": {
           "status": "未就绪",
           "detail": "可用 0，未授权 0，离线 0"
@@ -241,6 +249,10 @@ String _acceptanceJsonWithSensitiveText() {
   "evidence": {
     "readiness": {
       "localState": {
+        "iosDevice": {
+          "status": "未就绪 /Users/example/status",
+          "detail": "路径 /Users/example/project 设备 00008110-000A01E03C3B801E"
+        },
         "androidDevice": {
           "status": "未就绪 /Users/example/status",
           "detail": "路径 /Users/example/project 设备 00008110-000A01E03C3B801E"

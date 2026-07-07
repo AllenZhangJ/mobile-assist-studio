@@ -169,6 +169,8 @@ void main() {
         statusLabel: '最终验收未完成',
         checkedAt: DateTime.utc(2026, 1, 9),
         gitRevision: '12345678',
+        iosStatus: '未就绪',
+        iosDetail: '可用 0，不可用 1',
         androidStatus: '未就绪',
         androidDetail: '可用 0，未授权 0，离线 0',
         screenshots: 1,
@@ -201,6 +203,8 @@ void main() {
 
     expect(find.text('V4 验收'), findsOneWidget);
     expect(find.text('未完成'), findsOneWidget);
+    expect(find.text('手机状态'), findsOneWidget);
+    expect(find.text('都未就绪'), findsOneWidget);
     expect(find.text('iOS 1'), findsOneWidget);
     expect(find.text('8/9'), findsOneWidget);
     expect(find.text('安卓 0'), findsOneWidget);
@@ -238,6 +242,8 @@ void main() {
         statusLabel: '最终验收未完成',
         checkedAt: DateTime.utc(2026, 1, 9),
         gitRevision: '12345678',
+        iosStatus: '未就绪',
+        iosDetail: '可用 0，不可用 1',
         androidStatus: '未就绪',
         androidDetail: '可用 0，未授权 0，离线 0',
         screenshots: 1,

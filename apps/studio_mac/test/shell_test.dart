@@ -438,6 +438,8 @@ void main() {
 
     expect(copiedText(), contains('readCurrentScreenSummary'));
     expect(copiedText(), contains('completed'));
+    expect(copiedText(), contains('appLifecycle'));
+    expect(copiedText(), contains('selectorTarget'));
     expect(copiedText(), isNot(contains('screenshotBase64')));
     expect(copiedText(), isNot(contains('127.0.0.1')));
 

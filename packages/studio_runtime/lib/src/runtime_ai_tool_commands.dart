@@ -209,13 +209,27 @@ Map<String, Object?> _aiScreenSummary(StudioRuntimeSnapshot snapshot) {
       'sourceSummary': inspector?.sourceSummary,
       'selectedElementId': inspector?.selectedElementId,
     },
-    'capabilities': <String, Object?>{
-      'screenshot': capabilities.screenshot,
-      'tap': capabilities.tap,
-      'swipe': capabilities.swipe,
-      'input': capabilities.input,
-      'pageSource': capabilities.pageSource,
-    },
+    'capabilities': _aiCapabilitySummary(capabilities),
+  };
+}
+
+// _aiCapabilitySummary 输出完整但脱敏的 driver 能力摘要。
+Map<String, Object?> _aiCapabilitySummary(
+  MobileDriverCapabilityReport capabilities,
+) {
+  return <String, Object?>{
+    'screenshot': capabilities.screenshot,
+    'tap': capabilities.tap,
+    'swipe': capabilities.swipe,
+    'input': capabilities.input,
+    'pageSource': capabilities.pageSource,
+    'selectorTarget': capabilities.selectorTarget,
+    'imageTarget': capabilities.imageTarget,
+    'ocrTarget': capabilities.ocrTarget,
+    'appLifecycle': capabilities.appLifecycle,
+    'logs': capabilities.logs,
+    'performance': capabilities.performance,
+    'remotePreview': capabilities.remotePreview,
   };
 }
 

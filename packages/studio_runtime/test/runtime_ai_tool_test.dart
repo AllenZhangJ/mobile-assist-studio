@@ -55,6 +55,17 @@ void main() {
 
     expect(result.status, AiToolInvocationStatus.completed);
     expect(result.output['hasScreenshot'], isTrue);
+    expect(
+      result.output,
+      containsPair(
+        'capabilities',
+        allOf(
+          containsPair('appLifecycle', isA<bool>()),
+          containsPair('logs', isA<bool>()),
+          containsPair('selectorTarget', isA<bool>()),
+        ),
+      ),
+    );
     expect(result.toJson().toString(), isNot(contains('raw-base64-image')));
     expect(controller.snapshot.aiAuditLog, hasLength(1));
   });

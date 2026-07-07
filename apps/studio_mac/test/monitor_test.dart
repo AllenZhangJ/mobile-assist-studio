@@ -218,10 +218,101 @@ void main() {
     expect(find.text('代码'), findsOneWidget);
     expect(find.text('干净'), findsOneWidget);
     expect(find.text('远端'), findsOneWidget);
-    expect(find.text('已推'), findsOneWidget);
+    expect(find.text('已同步'), findsOneWidget);
     expect(find.text('安卓 0'), findsOneWidget);
     expect(find.text('补安卓'), findsOneWidget);
     expect(find.text('可用 0，未授权 0，离线 0'), findsOneWidget);
+  });
+
+  testWidgets('monitor prioritizes v4 code-state recovery route', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    final preview = StudioRuntimeSnapshot.initial().copyWith(
+      v4AcceptanceSummary: V4AcceptanceSummary(
+        hasReport: true,
+        auditOk: true,
+        complete: false,
+        statusLabel: '最终验收未完成',
+        checkedAt: DateTime.utc(2026, 1, 9),
+        gitRevision: '12345678',
+        gitBranch: 'main',
+        gitDirty: true,
+        gitRemoteSynced: false,
+        gitAhead: 1,
+        gitBehind: 0,
+        iosStatus: '可用',
+        iosDetail: '可用 1，不可用 0',
+        androidStatus: '可用',
+        androidDetail: '可用 1，未授权 0，离线 0',
+        screenshots: 1,
+        iosRuns: 1,
+        androidRuns: 1,
+        fullSmokeReports: 1,
+        latestFullSmokeLabel: '完整通过',
+        failures: const ['代码工作区：有未提交改动。', '远端同步：未推送。'],
+        nextSteps: const ['代码：提交或撤销本地改动。', '远端：推送当前提交。'],
+        batches: _v4AcceptanceBatchFixture(),
+        gateGaps: const <V4AcceptanceGateGap>[
+          V4AcceptanceGateGap(
+            title: '代码工作区',
+            current: '有未提交改动',
+            requiredText: '工作区干净，无未提交改动',
+          ),
+          V4AcceptanceGateGap(
+            title: '远端同步',
+            current: '未推送，ahead 1，behind 0',
+            requiredText: '当前提交已推送并与上游同步',
+          ),
+        ],
+        fieldChecklist: const <V4AcceptanceChecklistItem>[
+          V4AcceptanceChecklistItem(
+            order: 1,
+            title: '清代码',
+            proof: '工作区干净，没有未提交改动。',
+          ),
+          V4AcceptanceChecklistItem(
+            order: 2,
+            title: '推远端',
+            proof: '当前提交已推送，ahead 0 且 behind 0。',
+          ),
+          V4AcceptanceChecklistItem(
+            order: 3,
+            title: '做终验',
+            command: 'npm run v4:acceptance-final',
+            proof: '终验返回 0。',
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(StudioMacApp(previewScreenshot: preview));
+
+    await tester.tap(find.byKey(const ValueKey('nav-记录')));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('V4 验收'),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('monitor-page-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      const Offset(0, -220),
+      maxIteration: 8,
+    );
+
+    expect(find.text('有改动'), findsOneWidget);
+    expect(find.text('未推'), findsOneWidget);
+    expect(find.text('清代码'), findsWidgets);
+    expect(find.text('先清代码。'), findsOneWidget);
+    expect(find.text('推远端'), findsOneWidget);
+    expect(find.text('终验'), findsOneWidget);
   });
 
   testWidgets('monitor routes v4 iOS tunnel recovery from acceptance report', (

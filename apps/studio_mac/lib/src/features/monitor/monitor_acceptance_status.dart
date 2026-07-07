@@ -596,6 +596,8 @@ List<String> _v4AcceptanceRouteStepsFor(V4AcceptanceSummary acceptance) {
 // 将终验清单标题压缩成路线胶囊短文案。
 String _v4ChecklistStepLabel(String title) {
   final normalized = title.replaceAll(' ', '').replaceAll('Android', '安卓');
+  if (normalized.contains('清代码')) return '清代码';
+  if (normalized.contains('推远端')) return '推远端';
   if (normalized.contains('iOS')) return '补iOS';
   if (normalized.contains('安卓')) return '补安卓';
   if (normalized.contains('全量')) return '跑全量';
@@ -608,6 +610,8 @@ String _v4ChecklistStepLabel(String title) {
 String _v4ChecklistRouteHint(String title) {
   final label = _v4ChecklistStepLabel(title);
   return switch (label) {
+    '清代码' => '先清代码。',
+    '推远端' => '先推远端。',
     '补iOS' => '按清单先补 iOS。',
     '补安卓' => '按清单先补安卓。',
     '跑全量' => '按清单跑全量。',

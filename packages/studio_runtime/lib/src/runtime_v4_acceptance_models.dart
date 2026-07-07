@@ -126,7 +126,7 @@ final class V4AcceptanceSummary {
   // 远端同步短文案，证明当前提交是否已推到上游。
   String get gitRemoteLabel {
     return switch (gitRemoteSynced) {
-      true => '已推',
+      true => '已同步',
       false => _gitRemoteGapLabel,
       null => '未知',
     };

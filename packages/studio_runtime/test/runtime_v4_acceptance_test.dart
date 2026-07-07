@@ -34,7 +34,7 @@ void main() {
       expect(summary.gitRemoteSynced, isTrue);
       expect(summary.gitAhead, 0);
       expect(summary.gitBehind, 0);
-      expect(summary.gitRemoteLabel, '已推');
+      expect(summary.gitRemoteLabel, '已同步');
       expect(summary.iosStatus, '未就绪');
       expect(summary.iosDetail, '可用 0，不可用 1');
       expect(summary.androidStatus, '未就绪');
@@ -64,6 +64,39 @@ void main() {
       );
     },
   );
+
+  test('local v4 acceptance reader keeps code-state gate gaps', () async {
+    final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
+    addTearDown(() async {
+      if (temp.existsSync()) await temp.delete(recursive: true);
+    });
+    await File(
+      '${temp.path}/FINAL_ACCEPTANCE_2026-01-02T00-00-00Z.json',
+    ).writeAsString(_acceptanceJsonWithCodeGate());
+
+    final summary = await LocalV4AcceptanceSummaryReader(
+      directory: temp,
+    ).readLatest();
+
+    expect(summary.hasReport, isTrue);
+    expect(summary.gitDirty, isTrue);
+    expect(summary.gitWorktreeLabel, '有改动');
+    expect(summary.gitRemoteSynced, isFalse);
+    expect(summary.gitAhead, 1);
+    expect(summary.gitBehind, 0);
+    expect(summary.gitRemoteLabel, '未推');
+    expect(summary.gateGaps.map((gap) => gap.title), <String>['代码工作区', '远端同步']);
+    expect(summary.gateGaps.every((gap) => gap.command == null), isTrue);
+    expect(summary.fieldChecklist.map((item) => item.title), <String>[
+      '清代码',
+      '推远端',
+    ]);
+    expect(
+      summary.fieldChecklist.every((item) => item.command == null),
+      isTrue,
+    );
+    expect(summary.primaryNextStep, startsWith('代码：'));
+  });
 
   test('runtime controller refreshes v4 acceptance summary safely', () async {
     final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
@@ -323,6 +356,91 @@ String _acceptanceJsonWithSensitiveText() {
       "title": "补 iOS",
       "command": "osascript -e bad",
       "proof": "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E"
+    }
+  ]
+}
+''';
+}
+
+String _acceptanceJsonWithCodeGate() {
+  return '''
+{
+  "schemaVersion": 1,
+  "kind": "v4FinalAcceptance",
+  "timestamp": "2026-01-02T00:00:00.000000Z",
+  "git": "abcdef12",
+  "gitStatus": {
+    "revision": "abcdef12",
+    "branch": "main",
+    "dirty": true,
+    "worktree": "有未提交改动",
+    "upstream": "origin/main",
+    "ahead": 1,
+    "behind": 0,
+    "synced": false,
+    "remote": "未推送"
+  },
+  "completion": {
+    "auditOk": true,
+    "complete": false,
+    "label": "最终验收未完成",
+    "failures": [
+      "代码工作区：有未提交改动。",
+      "远端同步：未推送。"
+    ]
+  },
+  "evidence": {
+    "readiness": {
+      "localState": {
+        "iosDevice": {
+          "status": "可用",
+          "detail": "可用 1，不可用 0"
+        },
+        "androidDevice": {
+          "status": "可用",
+          "detail": "可用 1，未授权 0，离线 0"
+        }
+      },
+      "batches": ${_batchRowsJson()}
+    },
+    "archive": {
+      "counts": {
+        "screenshots": 1,
+        "iosRuns": 1,
+        "androidRuns": 1,
+        "fullSmokeReports": 1
+      },
+      "latestFullSmoke": {
+        "label": "完整通过"
+      }
+    }
+  },
+  "nextSteps": [
+    "代码：提交或撤销本地改动，保持工作区干净。",
+    "远端：推送当前提交，并确认本地与上游同步。"
+  ],
+  "gateGaps": [
+    {
+      "title": "代码工作区",
+      "current": "有未提交改动",
+      "required": "工作区干净，无未提交改动"
+    },
+    {
+      "title": "远端同步",
+      "current": "未推送，ahead 1，behind 0",
+      "required": "当前提交已推送并与上游同步"
+    }
+  ],
+  "fieldChecklist": [
+    {
+      "order": 1,
+      "title": "清代码",
+      "proof": "工作区干净，没有未提交改动。"
+    },
+    {
+      "order": 2,
+      "title": "推远端",
+      "proof": "当前提交已推送，ahead 0 且 behind 0。"
     }
   ]
 }

@@ -7,6 +7,9 @@ class _NodeInspectorEditor extends StatefulWidget {
     required this.node,
     required this.subWorkflows,
     required this.diagnostics,
+    required this.latestRun,
+    required this.evidenceSummary,
+    required this.loadingEvidence,
     required this.locked,
     required this.saving,
     required this.savingGraphEdit,
@@ -19,12 +22,16 @@ class _NodeInspectorEditor extends StatefulWidget {
     required this.onAddStarterSubWorkflow,
     required this.onAddCurrentAsSubWorkflow,
     required this.onDeleteSubWorkflow,
+    required this.onOpenEvidence,
   });
 
   final WorkflowDefinition workflow;
   final WorkflowNode node;
   final List<SubWorkflowSummary> subWorkflows;
   final List<_WorkflowSourceDiagnostic> diagnostics;
+  final RunHistoryEntry? latestRun;
+  final _WorkflowNodeEvidenceSummary? evidenceSummary;
+  final bool loadingEvidence;
   final bool locked;
   final bool saving;
   final bool savingGraphEdit;
@@ -37,6 +44,7 @@ class _NodeInspectorEditor extends StatefulWidget {
   final VoidCallback? onAddStarterSubWorkflow;
   final VoidCallback? onAddCurrentAsSubWorkflow;
   final ValueChanged<SubWorkflowSummary>? onDeleteSubWorkflow;
+  final VoidCallback? onOpenEvidence;
 
   // 创建节点编辑器状态，具体控制器生命周期由 State 分片维护。
   @override

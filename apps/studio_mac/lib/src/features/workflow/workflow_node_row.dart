@@ -7,6 +7,7 @@ class _WorkflowNodeRow extends StatelessWidget {
     required this.node,
     required this.entry,
     required this.diagnostics,
+    required this.evidenceSummary,
     required this.executionState,
     required this.selected,
     required this.locked,
@@ -17,6 +18,7 @@ class _WorkflowNodeRow extends StatelessWidget {
   final WorkflowNode node;
   final bool entry;
   final List<_WorkflowSourceDiagnostic> diagnostics;
+  final _WorkflowNodeEvidenceSummary? evidenceSummary;
   final _WorkflowNodeExecutionState executionState;
   final bool selected;
   final bool locked;
@@ -27,6 +29,8 @@ class _WorkflowNodeRow extends StatelessWidget {
     final tone = _toneForNodes(node.type);
     final executionColor = _colorForExecutionState(executionState, tone);
     final hasDiagnostics = diagnostics.isNotEmpty;
+    final evidenceSummary = this.evidenceSummary;
+    final hasEvidence = evidenceSummary?.hasEvidence ?? false;
     return InkWell(
       key: ValueKey('workflow-node-${node.id}'),
       borderRadius: BorderRadius.circular(8),
@@ -90,6 +94,7 @@ class _WorkflowNodeRow extends StatelessWidget {
                       ),
                       if (entry ||
                           hasDiagnostics ||
+                          hasEvidence ||
                           executionState !=
                               _WorkflowNodeExecutionState.idle) ...[
                         const SizedBox(width: 8),
@@ -106,6 +111,7 @@ class _WorkflowNodeRow extends StatelessWidget {
                                     tone: StudioStatusTone.running,
                                   ),
                                 if ((entry && hasDiagnostics) ||
+                                    (entry && hasEvidence) ||
                                     (entry &&
                                         executionState !=
                                             _WorkflowNodeExecutionState.idle))
@@ -120,7 +126,19 @@ class _WorkflowNodeRow extends StatelessWidget {
                                       tone: StudioStatusTone.warning,
                                     ),
                                   ),
-                                if (hasDiagnostics &&
+                                if (hasDiagnostics && hasEvidence)
+                                  const SizedBox(width: 8),
+                                if (evidenceSummary != null && hasEvidence)
+                                  KeyedSubtree(
+                                    key: ValueKey(
+                                      'workflow-node-evidence-${node.id}',
+                                    ),
+                                    child: StatusPill(
+                                      label: evidenceSummary.badgeLabel,
+                                      tone: evidenceSummary.badgeTone,
+                                    ),
+                                  ),
+                                if ((hasDiagnostics || hasEvidence) &&
                                     executionState !=
                                         _WorkflowNodeExecutionState.idle)
                                   const SizedBox(width: 8),

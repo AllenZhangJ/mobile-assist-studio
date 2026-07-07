@@ -79,6 +79,124 @@ void main() {
     expect(find.text('tap_d'), findsNothing);
   });
 
+  testWidgets('workflow canvas surfaces latest node evidence', (tester) async {
+    final run = RunHistoryEntry(
+      runId: 'run-latest',
+      workflowName: 'A-F 基础流程',
+      status: 'failed',
+      loops: 1,
+      completedLoops: 0,
+      startedAt: DateTime.utc(2026, 1, 10, 8),
+      finishedAt: DateTime.utc(2026, 1, 10, 8, 0, 2),
+    );
+    final detail = RunDetail(
+      entry: run,
+      events: [
+        RunEvidenceEvent(
+          type: 'stepStart',
+          status: 'running',
+          nodeId: 'tap_b',
+          nodeType: 'tap',
+          label: '点击 B',
+          loopIndex: 0,
+          error: null,
+          screenshotPath: null,
+          at: DateTime.utc(2026, 1, 10, 8),
+        ),
+        RunEvidenceEvent(
+          type: 'stepEnd',
+          status: 'failed',
+          nodeId: 'tap_b',
+          nodeType: 'tap',
+          label: '点击 B',
+          loopIndex: 0,
+          error: '低置信暂停',
+          screenshotPath: 'screens/tap_b.png',
+          at: DateTime.utc(2026, 1, 10, 8, 0, 1),
+        ),
+        RunEvidenceEvent(
+          type: 'visualCheck',
+          status: 'ok',
+          nodeId: 'tap_b',
+          nodeType: 'tap',
+          label: '点击 B',
+          loopIndex: 0,
+          error: null,
+          screenshotPath: null,
+          at: DateTime.utc(2026, 1, 10, 8, 0, 1),
+          visualEvidence: const RunVisualEvidence(
+            rule: 'targetRef=login',
+            screenshotAvailable: true,
+            confidence: 0.42,
+            confidenceThreshold: 0.7,
+            result: false,
+            action: 'pause',
+            reason: '低置信',
+            selectedNext: null,
+          ),
+        ),
+      ],
+    );
+    final preview = StudioRuntimeSnapshot.initial().copyWith(
+      runHistory: RunHistorySummary(
+        totalRuns: 1,
+        completedRuns: 0,
+        failedRuns: 1,
+        pausedRuns: 0,
+        stoppedRuns: 0,
+        dailyRuns: const <RunHistoryDay>[],
+        recentRuns: [run],
+      ),
+    );
+    final controller = StudioRuntimeController(
+      runDetailReader: FakeRunDetailReader({'run-latest': detail}),
+    );
+
+    await tester.pumpWidget(
+      StudioMacApp(
+        controllerFactory: () => controller,
+        previewScreenshot: preview,
+      ),
+    );
+    await tester.tap(find.byKey(const ValueKey('nav-流程')));
+    await tester.pumpAndSettle();
+
+    final node = find.byKey(const ValueKey('workflow-node-tap_b'));
+    expect(
+      find.descendant(
+        of: node,
+        matching: find.byKey(const ValueKey('workflow-node-evidence-tap_b')),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: node, matching: find.text('问题')),
+      findsOneWidget,
+    );
+
+    await selectWorkflowNode(tester, 'tap_b');
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey('node-inspector-evidence-card')),
+      findsOneWidget,
+    );
+    expect(find.text('上次留档'), findsOneWidget);
+    expect(find.textContaining('1 步'), findsOneWidget);
+    expect(find.textContaining('1 图'), findsOneWidget);
+    expect(find.textContaining('1 视觉'), findsOneWidget);
+    expect(find.textContaining('1 问题'), findsOneWidget);
+
+    final openMonitorButton = tester.widget<ButtonStyleButton>(
+      find.byKey(const ValueKey('node-inspector-open-monitor')),
+    );
+    expect(openMonitorButton.onPressed, isNotNull);
+    openMonitorButton.onPressed!();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('monitor-page-scroll')), findsOneWidget);
+  });
+
   testWidgets('workflow node navigator searches and focuses nodes', (
     tester,
   ) async {

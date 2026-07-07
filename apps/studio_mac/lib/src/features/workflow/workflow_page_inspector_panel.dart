@@ -24,6 +24,11 @@ extension _WorkflowPageInspectorPanel on _WorkflowPageState {
         diagnosticsByNodeId: diagnosticsByNodeId,
         selectedNode: selectedNode,
         selectedNodes: selectedNodes,
+        latestRun: _latestWorkflowRunEntry,
+        selectedNodeEvidence: selectedNode == null
+            ? null
+            : _latestNodeEvidenceByNodeId[selectedNode.id],
+        loadingNodeEvidence: _loadingLatestNodeEvidence,
         savingNodes: _savingNodes,
         savingGraphEdit: _savingGraphEdit,
         onSaveNode: (node) => unawaited(_saveNodesDraft(node)),
@@ -60,6 +65,7 @@ extension _WorkflowPageInspectorPanel on _WorkflowPageState {
             unawaited(_registerCurrentWorkflowAsSubWorkflow()),
         onDeleteSubWorkflow: (summary) =>
             unawaited(_confirmDeleteSubWorkflow(summary)),
+        onOpenNodeEvidence: _openLatestRunEvidenceInMonitor,
       ),
     );
   }

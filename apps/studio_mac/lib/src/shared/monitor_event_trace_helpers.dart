@@ -39,12 +39,12 @@ List<RunEvidenceEvent> _filterRunEvents(
 
 // 判断节点轨迹是否代表失败或暂停。
 bool _runTraceHasIssue(RunNodeTrace trace) {
-  return trace.error != null || trace.status == '失败' || trace.status == '暂停';
+  return trace.error != null || _workflowStatusHasIssue(trace.status);
 }
 
 // 判断运行事件是否代表失败或暂停。
 bool _runEventHasIssue(RunEvidenceEvent event) {
-  return event.error != null || event.status == '失败' || event.status == '暂停';
+  return event.error != null || _workflowStatusHasIssue(event.status);
 }
 
 // 返回运行事件筛选按钮的短标签。

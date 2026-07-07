@@ -143,6 +143,13 @@ class _NodeInspectorEditorState extends State<_NodeInspectorEditor> {
           label: '类型',
           value: _workflowNodeTypeLabel(widget.node.type),
         ),
+        const SizedBox(height: 10),
+        _NodeInspectorEvidenceCard(
+          summary: widget.evidenceSummary,
+          loading: widget.loadingEvidence,
+          latestRun: widget.latestRun,
+          onOpenMonitor: widget.onOpenEvidence,
+        ),
         if (widget.diagnostics.isNotEmpty) ...[
           const SizedBox(height: 10),
           _NodeInspectorDiagnostics(

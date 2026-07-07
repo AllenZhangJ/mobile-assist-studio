@@ -5,6 +5,7 @@ class _WorkflowVisualTab extends StatelessWidget {
   const _WorkflowVisualTab({
     required this.workflow,
     required this.diagnosticsByNodeId,
+    required this.nodeEvidenceByNodeId,
     required this.executionFocus,
     required this.selectedNode,
     required this.selectedNodeId,
@@ -41,6 +42,7 @@ class _WorkflowVisualTab extends StatelessWidget {
 
   final WorkflowDefinition workflow;
   final Map<String, List<_WorkflowSourceDiagnostic>> diagnosticsByNodeId;
+  final Map<String, _WorkflowNodeEvidenceSummary> nodeEvidenceByNodeId;
   final RuntimeExecutionFocus executionFocus;
   final WorkflowNode? selectedNode;
   final String? selectedNodeId;
@@ -154,6 +156,7 @@ class _WorkflowVisualTab extends StatelessWidget {
                   child: _WorkflowVisualList(
                     workflow: workflow,
                     diagnosticsByNodeId: diagnosticsByNodeId,
+                    nodeEvidenceByNodeId: nodeEvidenceByNodeId,
                     executionFocus: executionFocus,
                     selectedNodeId: selectedNodeId,
                     selectedNodeIds: selectedNodeIds,

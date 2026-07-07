@@ -35,6 +35,11 @@ class _WorkflowPageState extends State<_WorkflowPage> {
   bool _savingSource = false;
   bool _savingNodes = false;
   bool _savingGraphEdit = false;
+  Map<String, _WorkflowNodeEvidenceSummary> _latestNodeEvidenceByNodeId =
+      const {};
+  String? _latestNodeEvidenceKey;
+  bool _loadingLatestNodeEvidence = false;
+  int _latestNodeEvidenceRequestToken = 0;
 
   // 初始化源码编辑器与历史同步基线，避免首次进入页面就被标记为脏数据。
   @override
@@ -43,6 +48,9 @@ class _WorkflowPageState extends State<_WorkflowPage> {
     _lastSyncedSource = _workflowSourceText(widget.snapshot.workflow);
     _sourceController = TextEditingController(text: _lastSyncedSource);
     _sourceController.addListener(_handleSourceChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_refreshWorkflowNodeEvidence());
+    });
   }
 
   // 接收 Runtime 新快照后同步源码、选区和连线状态。
@@ -76,6 +84,7 @@ class _WorkflowPageState extends State<_WorkflowPage> {
         !_workflowHasSelectedEdge(widget.snapshot.workflow, selectedEdge)) {
       _selectedEdge = null;
     }
+    unawaited(_refreshWorkflowNodeEvidence());
   }
 
   // 释放源码编辑器和画布焦点，防止页面切换后仍保留监听。

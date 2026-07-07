@@ -39,6 +39,7 @@ extension _WorkflowCanvasNodeLayers on _WorkflowVisualListState {
           diagnostics:
               widget.diagnosticsByNodeId[node.id] ??
               const <_WorkflowSourceDiagnostic>[],
+          evidenceSummary: widget.nodeEvidenceByNodeId[node.id],
           executionState: _executionStateForNodes(
             node.id,
             widget.executionFocus,

@@ -5,6 +5,7 @@ class _WorkflowVisualList extends StatefulWidget {
   const _WorkflowVisualList({
     required this.workflow,
     required this.diagnosticsByNodeId,
+    required this.nodeEvidenceByNodeId,
     required this.executionFocus,
     required this.selectedNodeId,
     required this.selectedNodeIds,
@@ -27,6 +28,7 @@ class _WorkflowVisualList extends StatefulWidget {
 
   final WorkflowDefinition workflow;
   final Map<String, List<_WorkflowSourceDiagnostic>> diagnosticsByNodeId;
+  final Map<String, _WorkflowNodeEvidenceSummary> nodeEvidenceByNodeId;
   final RuntimeExecutionFocus executionFocus;
   final String? selectedNodeId;
   final Set<String> selectedNodeIds;

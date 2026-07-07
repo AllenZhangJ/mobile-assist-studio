@@ -13,6 +13,9 @@ class _WorkflowInspector extends StatelessWidget {
     required this.diagnosticsByNodeId,
     required this.selectedNode,
     required this.selectedNodes,
+    required this.latestRun,
+    required this.selectedNodeEvidence,
+    required this.loadingNodeEvidence,
     required this.savingNodes,
     required this.savingGraphEdit,
     required this.onSaveNode,
@@ -28,6 +31,7 @@ class _WorkflowInspector extends StatelessWidget {
     required this.onAddStarterSubWorkflow,
     required this.onAddCurrentAsSubWorkflow,
     required this.onDeleteSubWorkflow,
+    required this.onOpenNodeEvidence,
   });
 
   final WorkflowDefinition workflow;
@@ -40,6 +44,9 @@ class _WorkflowInspector extends StatelessWidget {
   final Map<String, List<_WorkflowSourceDiagnostic>> diagnosticsByNodeId;
   final WorkflowNode? selectedNode;
   final List<WorkflowNode> selectedNodes;
+  final RunHistoryEntry? latestRun;
+  final _WorkflowNodeEvidenceSummary? selectedNodeEvidence;
+  final bool loadingNodeEvidence;
   final bool savingNodes;
   final bool savingGraphEdit;
   final ValueChanged<WorkflowNode> onSaveNode;
@@ -55,6 +62,7 @@ class _WorkflowInspector extends StatelessWidget {
   final VoidCallback? onAddStarterSubWorkflow;
   final VoidCallback? onAddCurrentAsSubWorkflow;
   final ValueChanged<SubWorkflowSummary>? onDeleteSubWorkflow;
+  final VoidCallback? onOpenNodeEvidence;
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +124,9 @@ class _WorkflowInspector extends StatelessWidget {
                 diagnostics:
                     diagnosticsByNodeId[selectedNode!.id] ??
                     const <_WorkflowSourceDiagnostic>[],
+                latestRun: latestRun,
+                evidenceSummary: selectedNodeEvidence,
+                loadingEvidence: loadingNodeEvidence,
                 locked: runStatus != RunStatus.idle,
                 saving: savingNodes,
                 savingGraphEdit: savingGraphEdit,
@@ -128,6 +139,7 @@ class _WorkflowInspector extends StatelessWidget {
                 onAddStarterSubWorkflow: onAddStarterSubWorkflow,
                 onAddCurrentAsSubWorkflow: onAddCurrentAsSubWorkflow,
                 onDeleteSubWorkflow: onDeleteSubWorkflow,
+                onOpenEvidence: onOpenNodeEvidence,
               ),
           ],
         ),

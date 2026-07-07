@@ -168,6 +168,10 @@ Future<_ArtifactProbe> _probeArtifacts(Directory outDir) async {
   final androidDir = Directory('${outDir.path}/android');
   final iosRuns = await _countRunDirs(iosDir);
   final androidRuns = await _countRunDirs(androidDir);
+  final androidPreflightReports = await _countMatchingFiles(
+    androidDir,
+    RegExp(r'^ANDROID_SMOKE_PREFLIGHT_.*\.json$'),
+  );
   final markdownReports = await _countMatchingFiles(outDir, RegExp(r'\.md$'));
   final jsonReports = await _countMatchingFiles(
     outDir,
@@ -179,16 +183,21 @@ Future<_ArtifactProbe> _probeArtifacts(Directory outDir) async {
   );
   final latestIos = await _probeLatestSmokeRun(iosDir);
   final latestAndroid = await _probeLatestSmokeRun(androidDir);
+  final latestAndroidPreflight = await _probeLatestAndroidPreflightReport(
+    androidDir,
+  );
   final latestFullSmoke = await _probeLatestFullSmokeReport(outDir);
   return _ArtifactProbe(
     uiScreenshots: uiScreenshots,
     iosRuns: iosRuns,
     androidRuns: androidRuns,
+    androidPreflightReports: androidPreflightReports,
     markdownReports: markdownReports,
     jsonReports: jsonReports,
     fullSmokeReports: fullSmokeReports,
     latestIos: latestIos,
     latestAndroid: latestAndroid,
+    latestAndroidPreflight: latestAndroidPreflight,
     latestFullSmoke: latestFullSmoke,
   );
 }
@@ -250,6 +259,34 @@ Future<_FullSmokeReportSummary?> _probeLatestFullSmokeReport(
   final decoded = await _readJsonObject(file);
   if (decoded == null || decoded['kind'] != 'v4FullSmoke') return null;
   return _FullSmokeReportSummary.fromJson(
+    reportName: _redactText(file.uri.pathSegments.last),
+    json: decoded,
+  );
+}
+
+// 读取最近一次 Android smoke 前置诊断，不把诊断计作真实 smoke run。
+Future<_AndroidSmokePreflightSummary?> _probeLatestAndroidPreflightReport(
+  Directory dir,
+) async {
+  if (!await dir.exists()) return null;
+  final reports = <File>[];
+  await for (final entity in dir.list(recursive: false, followLinks: false)) {
+    if (entity is! File) continue;
+    final name = entity.uri.pathSegments.last;
+    if (RegExp(r'^ANDROID_SMOKE_PREFLIGHT_.*\.json$').hasMatch(name)) {
+      reports.add(entity);
+    }
+  }
+  if (reports.isEmpty) return null;
+  reports.sort((left, right) {
+    return right.uri.pathSegments.last.compareTo(left.uri.pathSegments.last);
+  });
+  final file = reports.first;
+  final decoded = await _readJsonObject(file);
+  if (decoded == null || decoded['kind'] != 'v4AndroidSmokePreflight') {
+    return null;
+  }
+  return _AndroidSmokePreflightSummary.fromJson(
     reportName: _redactText(file.uri.pathSegments.last),
     json: decoded,
   );
@@ -667,22 +704,26 @@ final class _ArtifactProbe {
     required this.uiScreenshots,
     required this.iosRuns,
     required this.androidRuns,
+    required this.androidPreflightReports,
     required this.markdownReports,
     required this.jsonReports,
     required this.fullSmokeReports,
     this.latestIos,
     this.latestAndroid,
+    this.latestAndroidPreflight,
     this.latestFullSmoke,
   });
 
   final int uiScreenshots;
   final int iosRuns;
   final int androidRuns;
+  final int androidPreflightReports;
   final int markdownReports;
   final int jsonReports;
   final int fullSmokeReports;
   final _SmokeRunSummary? latestIos;
   final _SmokeRunSummary? latestAndroid;
+  final _AndroidSmokePreflightSummary? latestAndroidPreflight;
   final _FullSmokeReportSummary? latestFullSmoke;
 
   // 转成机器可读且脱敏的证据计数。
@@ -694,12 +735,74 @@ final class _ArtifactProbe {
       'uiScreenshots': uiScreenshots,
       'iosRuns': iosRuns,
       'androidRuns': androidRuns,
+      'androidPreflightReports': androidPreflightReports,
       'markdownReports': markdownReports + markdownReportIncrement,
       'jsonReports': jsonReports + jsonReportIncrement,
       'fullSmokeReports': fullSmokeReports,
       'latestIos': latestIos?.toJsonObject(),
       'latestAndroid': latestAndroid?.toJsonObject(),
+      'latestAndroidPreflight': latestAndroidPreflight?.toJsonObject(),
       'latestFullSmoke': latestFullSmoke?.toJsonObject(),
+    };
+  }
+}
+
+// 最近一次 Android smoke 前置诊断摘要。
+final class _AndroidSmokePreflightSummary {
+  const _AndroidSmokePreflightSummary({
+    required this.reportName,
+    required this.timestamp,
+    required this.ready,
+    required this.label,
+    required this.blockers,
+    required this.nextSteps,
+  });
+
+  final String reportName;
+  final DateTime? timestamp;
+  final bool ready;
+  final String label;
+  final List<String> blockers;
+  final List<String> nextSteps;
+
+  // 从 Android smoke preflight JSON 解析最小摘要，坏字段按未知降级。
+  factory _AndroidSmokePreflightSummary.fromJson({
+    required String reportName,
+    required Map<String, Object?> json,
+  }) {
+    final completion = _jsonMapAt(json, 'completion');
+    return _AndroidSmokePreflightSummary(
+      reportName: reportName,
+      timestamp: _parseDate(json['timestamp']),
+      ready: completion['ready'] == true,
+      label: _redactText(completion['label']?.toString() ?? '未知'),
+      blockers: _jsonStringList(completion['blockers']),
+      nextSteps: _jsonStringList(json['nextSteps']),
+    );
+  }
+
+  String get summaryLabel {
+    final parts = <String>[
+      ready ? '可运行' : label,
+      if (blockers.isNotEmpty) '阻断 ${blockers.join('/')}',
+      if (nextSteps.isNotEmpty) '下一步 ${nextSteps.first}',
+    ];
+    if (timestamp case final value?) {
+      parts.add('时间 ${value.toUtc().toIso8601String()}');
+    }
+    return parts.join('，');
+  }
+
+  // 转成机器可读摘要，不包含报告路径。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'reportName': reportName,
+      'timestamp': timestamp?.toUtc().toIso8601String(),
+      'ready': ready,
+      'label': label,
+      'blockers': blockers,
+      'nextSteps': nextSteps,
+      'summary': summaryLabel,
     };
   }
 }
@@ -1037,6 +1140,10 @@ final class _SmokeReadinessReport {
       ..writeln('  - 最近：${_latestSmokeDetail(artifacts.latestIos)}')
       ..writeln('- Android smoke 记录：${artifacts.androidRuns}')
       ..writeln('  - 最近：${_latestSmokeDetail(artifacts.latestAndroid)}')
+      ..writeln('- Android 前置诊断：${artifacts.androidPreflightReports}')
+      ..writeln(
+        '  - 最近：${_latestAndroidPreflightDetail(artifacts.latestAndroidPreflight)}',
+      )
       ..writeln('- Full smoke 报告：${artifacts.fullSmokeReports}')
       ..writeln('  - 最近：${_latestFullSmokeDetail(artifacts.latestFullSmoke)}')
       ..writeln('- Markdown 报告：${artifacts.markdownReports + 1}')
@@ -1095,6 +1202,11 @@ final class _SmokeReadinessReport {
   String _latestSmokeDetail(_SmokeRunSummary? summary) {
     if (summary == null) return '无记录';
     return '${summary.workflowName} / ${summary.summaryLabel}';
+  }
+
+  String _latestAndroidPreflightDetail(_AndroidSmokePreflightSummary? summary) {
+    if (summary == null) return '无记录';
+    return summary.summaryLabel;
   }
 
   String _latestFullSmokeLabel(_FullSmokeReportSummary? summary) {

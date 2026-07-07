@@ -160,6 +160,8 @@ full smoke 编排器会为每个平台设置步骤超时；超时后会终止子
 
 不带 `--allow-actions` 时只创建会话、截图并写入本地 evidence；加上后会在当前手机屏幕上执行真实 Tap、Swipe 和 Input。`--workflow-basic` 会把动作冒烟切换为基础 Project DSL workflow，用于验证 DSL、driver 和 evidence 是同一条链路。单平台排障优先使用 `npm run v4:ios-smoke:full` 或 `npm run v4:android-smoke:full`。
 
+Android 单平台 smoke 在驱动不可达、无手机、未授权、离线或多设备时会失败退出，并在输出目录写入 `ANDROID_SMOKE_PREFLIGHT` 脱敏 Markdown / JSON。该文件用于排障和 readiness 索引，不会计作一次真实 Android run。
+
 测试文件按职责拆分：
 
 - `test/runtime_snapshot_test.dart`：Runtime 初始快照和只读摘要。

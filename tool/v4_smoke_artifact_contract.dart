@@ -131,6 +131,42 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
   const encoder = JsonEncoder.withIndent('  ');
   await File('$base.json').writeAsString('${encoder.convert(payload)}\n');
   await File('$base.md').writeAsString('# V4 Full Smoke\n\n- 前置检查：有阻断\n');
+  final androidDir = Directory('${outDir.path}/android');
+  await androidDir.create(recursive: true);
+  final preflightPayload = <String, Object?>{
+    'schemaVersion': 1,
+    'kind': 'v4AndroidSmokePreflight',
+    'timestamp': timestamp.toIso8601String(),
+    'completion': <String, Object?>{
+      'ready': false,
+      'label': '有阻断',
+      'blockers': <String>['驱动'],
+    },
+    'request': <String, Object?>{'allowActions': true, 'workflowBasic': true},
+    'checks': <Map<String, Object?>>[
+      <String, Object?>{
+        'name': '驱动',
+        'ok': false,
+        'status': '阻断',
+        'detail': '不可达',
+        'nextStep': '先连接设备。',
+      },
+      <String, Object?>{
+        'name': '安卓手机',
+        'ok': true,
+        'status': '通过',
+        'detail': 'Pixel 9 ZY22...CDEF',
+        'nextStep': '-',
+        'ready': 1,
+        'unauthorized': 0,
+        'offline': 0,
+      },
+    ],
+    'nextSteps': <String>['先连接设备。'],
+  };
+  await File(
+    '${androidDir.path}/ANDROID_SMOKE_PREFLIGHT_2026-01-01T00-00-00-000000Z.json',
+  ).writeAsString('${encoder.convert(preflightPayload)}\n');
 }
 
 // 写入 archive fixture，只放虚拟截图文件，不读取或生成真实隐私图片。
@@ -395,6 +431,19 @@ void _assertReadinessJson(Map<String, Object?> json) {
 
   final artifacts = _mapAt(json, 'artifacts');
   _expect(artifacts['fullSmokeReports'] == 1, 'fullSmokeReports 必须索引 fixture。');
+  _expect(
+    artifacts['androidPreflightReports'] == 1,
+    'androidPreflightReports 必须索引 Android 前置诊断。',
+  );
+  final latestAndroidPreflight = _mapAt(artifacts, 'latestAndroidPreflight');
+  _expect(
+    latestAndroidPreflight['label'] == '有阻断',
+    'latestAndroidPreflight.label 必须保留阻断状态。',
+  );
+  _expect(
+    _stringList(latestAndroidPreflight['blockers']).contains('驱动'),
+    'latestAndroidPreflight.blockers 必须包含驱动。',
+  );
   final latestFullSmoke = _mapAt(artifacts, 'latestFullSmoke');
   _expect(
     latestFullSmoke['label'] == '前置检查阻断',
@@ -426,6 +475,7 @@ void _assertReadinessMarkdown(String markdown) {
   for (final text in <String>[
     '# V4 Smoke Readiness',
     '最近 full smoke',
+    'Android 前置诊断',
     'Full smoke 报告',
     '## 批次验收索引',
     '## 下一步',

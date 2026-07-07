@@ -20,6 +20,7 @@
     "v4:smoke:full": "fvm dart run tool/v4_full_smoke.dart --confirm-actions",
     "v4:smoke:full:dry-run": "fvm dart run tool/v4_full_smoke.dart --dry-run",
     "v4:smoke-readiness": "fvm dart run tool/v4_smoke_readiness.dart",
+    "v4:smoke-artifact-contract": "fvm dart run tool/v4_smoke_artifact_contract.dart",
     "v4:completion-audit": "fvm dart run tool/v4_smoke_readiness.dart --require-complete",
     "smoke:v2-boundary": "fvm dart run tool/v2_boundary_check.dart",
     "smoke:v4-boundary": "fvm dart run tool/v4_boundary_check.dart",

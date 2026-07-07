@@ -2,6 +2,11 @@ import 'dart:io';
 
 const _steps = [
   _VerifyStep('V4 边界检查', 'fvm', ['dart', 'run', 'tool/v4_boundary_check.dart']),
+  _VerifyStep('V4 冒烟留档合同', 'fvm', [
+    'dart',
+    'run',
+    'tool/v4_smoke_artifact_contract.dart',
+  ]),
   _VerifyStep('V2 完整验证', 'fvm', ['dart', 'run', 'tool/v2_verify.dart']),
 ];
 
@@ -14,7 +19,7 @@ class _VerifyStep {
   final List<String> args;
 }
 
-// 程序入口：先验证 V4 边界，再复用既有 V2 完整验证矩阵。
+// 程序入口：先验证 V4 边界和冒烟留档合同，再复用既有 V2 完整验证矩阵。
 Future<void> main() async {
   for (final step in _steps) {
     stdout.writeln('\n== ${step.name} ==');

@@ -11,6 +11,8 @@
 - 读取截图、页面结构和 viewport 尺寸。
 - 发送 W3C pointer tap / swipe。
 - 发送当前焦点文本输入。
+- 发送受控 App 启动 / 停止命令。
+- 发送受控平台硬件键命令。
 - 释放 pointer actions。
 - 把 socket、HTTP 和响应结构错误映射为 `AppiumClientException`。
 
@@ -52,6 +54,7 @@ import 'package:appium_client/appium_client.dart';
 - `appium_viewport.dart`：viewport 坐标与尺寸模型。
 - `appium_transport.dart`：最小 JSON HTTP transport。
 - `appium_actions.dart`：W3C pointer action payload。
+- `appium_mobile_command.dart`：受控移动端硬件键枚举。
 - `appium_client_core.dart`：对 Runtime 暴露的最小 client 门面。
 
 `appium_client.dart` 只作为公共入口和 part 汇总，不承载具体实现。

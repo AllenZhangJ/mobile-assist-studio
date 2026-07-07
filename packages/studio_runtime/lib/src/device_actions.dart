@@ -76,6 +76,10 @@ abstract interface class DeviceActionExecutor {
 
   Future<void> inputText(String sessionId, RuntimeInput input);
 
+  Future<void> launchApp(String sessionId, String appId);
+
+  Future<void> stopApp(String sessionId, String appId);
+
   Future<void> pressButton(String sessionId, RuntimeDeviceButton button);
 
   Future<void> releaseActions(String sessionId);
@@ -133,6 +137,18 @@ final class AppiumDeviceActionExecutor implements DeviceActionExecutor {
   @override
   Future<void> inputText(String sessionId, RuntimeInput input) {
     return _client.inputText(sessionId, text: input.text);
+  }
+
+  // 启动指定 App，具体 appId 语义由平台 adapter 保证。
+  @override
+  Future<void> launchApp(String sessionId, String appId) {
+    return _client.activateApp(sessionId, appId: appId);
+  }
+
+  // 停止指定 App，具体 appId 语义由平台 adapter 保证。
+  @override
+  Future<void> stopApp(String sessionId, String appId) {
+    return _client.terminateApp(sessionId, appId: appId);
   }
 
   // 只转发 Runtime 允许的硬件键，不暴露任意 mobile script。

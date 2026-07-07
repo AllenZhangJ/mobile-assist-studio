@@ -288,6 +288,16 @@ final class FakeDeviceActionExecutor implements DeviceActionExecutor {
   }
 
   @override
+  Future<void> launchApp(String sessionId, String appId) async {
+    calls.add('launch:$appId');
+  }
+
+  @override
+  Future<void> stopApp(String sessionId, String appId) async {
+    calls.add('stop:$appId');
+  }
+
+  @override
   Future<void> pressButton(String sessionId, RuntimeDeviceButton button) async {
     calls.add('button:${button.label}');
   }

@@ -10,7 +10,7 @@ const _iosAppiumCapabilities = MobileDriverCapabilityReport(
   selectorTarget: true,
   imageTarget: false,
   ocrTarget: false,
-  appLifecycle: false,
+  appLifecycle: true,
   logs: false,
   performance: false,
   remotePreview: false,
@@ -26,7 +26,7 @@ const _androidAppiumCapabilities = MobileDriverCapabilityReport(
   selectorTarget: true,
   imageTarget: false,
   ocrTarget: false,
-  appLifecycle: false,
+  appLifecycle: true,
   logs: true,
   performance: false,
   remotePreview: false,
@@ -146,12 +146,12 @@ final class IosAppiumMobileDriver implements MobileDeviceDriver {
 
   @override
   Future<void> launchApp(String appId) {
-    throw UnsupportedError('iOS App 启动能力尚未接入 V4 driver。');
+    return _deviceActions.launchApp(_requireSessionId(), appId);
   }
 
   @override
   Future<void> stopApp(String appId) {
-    throw UnsupportedError('iOS App 停止能力尚未接入 V4 driver。');
+    return _deviceActions.stopApp(_requireSessionId(), appId);
   }
 
   @override
@@ -347,17 +347,20 @@ final class AndroidAppiumMobileDriver implements MobileDeviceDriver {
 
   @override
   Future<void> launchApp(String appId) {
-    throw UnsupportedError('Android App 启动能力尚未接入。');
+    return _deviceActions.launchApp(_requireSessionId(), appId);
   }
 
   @override
   Future<void> stopApp(String appId) {
-    throw UnsupportedError('Android App 停止能力尚未接入。');
+    return _deviceActions.stopApp(_requireSessionId(), appId);
   }
 
   @override
   Future<void> pressHome() {
-    throw UnsupportedError('Android 主页键能力尚未接入。');
+    return _client.pressAndroidKey(
+      _requireSessionId(),
+      key: AppiumAndroidKey.home,
+    );
   }
 
   @override

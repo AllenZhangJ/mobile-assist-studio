@@ -139,6 +139,12 @@ final class _FailingSourceActions implements DeviceActionExecutor {
   Future<void> inputText(String sessionId, RuntimeInput input) async {}
 
   @override
+  Future<void> launchApp(String sessionId, String appId) async {}
+
+  @override
+  Future<void> stopApp(String sessionId, String appId) async {}
+
+  @override
   Future<void> pressButton(
     String sessionId,
     RuntimeDeviceButton button,

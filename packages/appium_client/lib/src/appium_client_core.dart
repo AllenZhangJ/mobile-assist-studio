@@ -137,6 +137,24 @@ final class AppiumClient {
     );
   }
 
+  // 启动指定 App；iOS 传 bundle id，Android 传 package name。
+  Future<void> activateApp(String sessionId, {required String appId}) async {
+    await _transport.sendJson(
+      method: 'POST',
+      path: '/session/$sessionId/appium/device/activate_app',
+      payload: <String, Object?>{'appId': appId},
+    );
+  }
+
+  // 停止指定 App；iOS 传 bundle id，Android 传 package name。
+  Future<void> terminateApp(String sessionId, {required String appId}) async {
+    await _transport.sendJson(
+      method: 'POST',
+      path: '/session/$sessionId/appium/device/terminate_app',
+      payload: <String, Object?>{'appId': appId},
+    );
+  }
+
   // 执行受控 iOS 移动端硬件键命令。
   // 当前只开放白名单按钮，不接受调用方传入任意脚本。
   Future<void> pressButton(
@@ -152,6 +170,19 @@ final class AppiumClient {
           <String, Object?>{'name': button.wireName},
         ],
       },
+    );
+  }
+
+  // 执行受控 Android 硬件键命令。
+  // 仅接受白名单枚举，不让 Runtime 传入任意 keycode。
+  Future<void> pressAndroidKey(
+    String sessionId, {
+    required AppiumAndroidKey key,
+  }) async {
+    await _transport.sendJson(
+      method: 'POST',
+      path: '/session/$sessionId/appium/device/press_keycode',
+      payload: <String, Object?>{'keycode': key.keyCode},
     );
   }
 

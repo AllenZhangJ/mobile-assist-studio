@@ -236,6 +236,18 @@ final class FakePreviewDeviceActionExecutor implements DeviceActionExecutor {
     calls.add('input:${input.label}:${input.text.length}');
   }
 
+  // 记录 App 启动动作，验证 UI fake 不连接真实设备。
+  @override
+  Future<void> launchApp(String sessionId, String appId) async {
+    calls.add('launch:$appId');
+  }
+
+  // 记录 App 停止动作，验证 UI fake 不连接真实设备。
+  @override
+  Future<void> stopApp(String sessionId, String appId) async {
+    calls.add('stop:$appId');
+  }
+
   // 记录硬件键动作，验证 Flutter 只触发受控 Runtime 命令。
   @override
   Future<void> pressButton(String sessionId, RuntimeDeviceButton button) async {

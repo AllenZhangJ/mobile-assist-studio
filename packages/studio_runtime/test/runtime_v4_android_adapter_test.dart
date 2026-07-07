@@ -58,6 +58,7 @@ void main() {
     () async {
       final requests = <String>[];
       Map<String, Object?>? sessionPayload;
+      Map<String, Object?>? homePayload;
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final subscription = server.listen((request) async {
         requests.add('${request.method} ${request.uri.path}');
@@ -75,6 +76,18 @@ void main() {
                 },
               }),
             )
+            ..close();
+          return;
+        }
+        if (request.method == 'POST' &&
+            request.uri.path ==
+                '/session/android-session/appium/device/press_keycode') {
+          homePayload =
+              jsonDecode(await utf8.decodeStream(request))
+                  as Map<String, Object?>;
+          request.response
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({'value': null}))
             ..close();
           return;
         }
@@ -129,6 +142,9 @@ void main() {
       );
       await driver.inputText('hello');
       final logs = await driver.collectLogs();
+      await driver.launchApp('com.example');
+      await driver.stopApp('com.example');
+      await driver.pressHome();
       await driver.releaseActions();
       await driver.disconnect();
 
@@ -138,6 +154,7 @@ void main() {
               as Map<String, Object?>;
 
       expect(capabilities.supportsCoreActions, isTrue);
+      expect(capabilities.appLifecycle, isTrue);
       expect(capabilities.logs, isTrue);
       expect(discovered?.displayName, 'Pixel 9');
       expect(discovered?.maskedIdentifier, 'ZY22...CDEF');
@@ -155,8 +172,15 @@ void main() {
       expect(actions.calls, contains('tap:安卓点按:18,24:80'));
       expect(actions.calls, contains('swipe:安卓滑动:10,300->10,80:320'));
       expect(actions.calls, contains('input:安卓输入:5'));
+      expect(actions.calls, contains('launch:com.example'));
+      expect(actions.calls, contains('stop:com.example'));
       expect(actions.calls, contains('release'));
-      expect(requests, ['POST /session', 'DELETE /session/android-session']);
+      expect(homePayload, {'keycode': 3});
+      expect(requests, [
+        'POST /session',
+        'POST /session/android-session/appium/device/press_keycode',
+        'DELETE /session/android-session',
+      ]);
 
       client.close(force: true);
       await subscription.cancel();

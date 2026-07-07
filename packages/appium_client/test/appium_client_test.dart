@@ -343,6 +343,45 @@ void main() {
     await server.close(force: true);
   });
 
+  test(
+    'activates and terminates app through Appium lifecycle endpoints',
+    () async {
+      final requests = <String>[];
+      final payloads = <Map<String, Object?>>[];
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final subscription = server.listen((request) async {
+        requests.add('${request.method} ${request.uri.path}');
+        payloads.add(
+          jsonDecode(await utf8.decodeStream(request)) as Map<String, Object?>,
+        );
+        request.response
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'value': null}))
+          ..close();
+      });
+
+      final client = AppiumClient(
+        config: AppiumServerConfig(port: server.port),
+      );
+
+      await client.activateApp('session-1234', appId: 'com.example.app');
+      await client.terminateApp('session-1234', appId: 'com.example.app');
+
+      expect(requests, [
+        'POST /session/session-1234/appium/device/activate_app',
+        'POST /session/session-1234/appium/device/terminate_app',
+      ]);
+      expect(payloads, [
+        {'appId': 'com.example.app'},
+        {'appId': 'com.example.app'},
+      ]);
+
+      client.close(force: true);
+      await subscription.cancel();
+      await server.close(force: true);
+    },
+  );
+
   test('performs viewport pinch with two touch pointers', () async {
     Map<String, Object?>? pinchPayload;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -439,6 +478,35 @@ void main() {
         {'name': 'home'},
       ],
     });
+
+    client.close(force: true);
+    await server.close(force: true);
+  });
+
+  test('presses whitelisted Android home key', () async {
+    Map<String, Object?>? payload;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    unawaited(
+      server.first.then((request) async {
+        expect(request.method, 'POST');
+        expect(
+          request.uri.path,
+          '/session/session-1234/appium/device/press_keycode',
+        );
+        final body = await utf8.decodeStream(request);
+        payload = jsonDecode(body) as Map<String, Object?>;
+        request.response
+          ..headers.contentType = ContentType.json
+          ..write(jsonEncode({'value': null}))
+          ..close();
+      }),
+    );
+
+    final client = AppiumClient(config: AppiumServerConfig(port: server.port));
+
+    await client.pressAndroidKey('session-1234', key: AppiumAndroidKey.home);
+
+    expect(payload, {'keycode': 3});
 
     client.close(force: true);
     await server.close(force: true);

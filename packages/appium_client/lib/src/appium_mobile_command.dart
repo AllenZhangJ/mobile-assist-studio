@@ -9,3 +9,13 @@ enum AppiumMobileButton {
 
   final String wireName;
 }
+
+// 受控 Android 硬件键枚举，只暴露 Runtime 明确允许的动作。
+// 避免上层直接传入任意 keycode 形成不受控设备命令。
+enum AppiumAndroidKey {
+  home(3);
+
+  const AppiumAndroidKey(this.keyCode);
+
+  final int keyCode;
+}

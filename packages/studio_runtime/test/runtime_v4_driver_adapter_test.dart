@@ -39,10 +39,13 @@ void main() {
       duration: const Duration(milliseconds: 250),
     );
     await driver.inputText('secret');
+    await driver.launchApp('com.example.ios');
+    await driver.stopApp('com.example.ios');
     await driver.pressHome();
     await driver.releaseActions();
 
     expect(capabilities.supportsCoreActions, isTrue);
+    expect(capabilities.appLifecycle, isTrue);
     expect(session.sessionId, 'ios-session');
     expect(session.device?.maskedIdentifier, 'device...');
     expect(heartbeat.ready, isTrue);
@@ -52,6 +55,8 @@ void main() {
     expect(actions.calls, contains('tap:移动点按:12,24:80'));
     expect(actions.calls, contains('swipe:移动滑动:10,20->10,100:250'));
     expect(actions.calls, contains('input:移动输入:6'));
+    expect(actions.calls, contains('launch:com.example.ios'));
+    expect(actions.calls, contains('stop:com.example.ios'));
     expect(actions.calls, contains('button:回主页'));
     expect(actions.calls, contains('release'));
   });

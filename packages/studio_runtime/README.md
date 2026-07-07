@@ -102,6 +102,7 @@ V4.0 合同层继续按职责拆分：
 - `runtime_device_preview_tap_commands.dart`：设备预览点击、双击和长按。
 - `runtime_device_preview_gesture_commands.dart`：设备预览滑动和双指缩放。
 - `runtime_device_preview_input_commands.dart`：设备预览当前焦点输入和受控主页键。
+- `runtime_mobile_driver_adapters.dart`：iOS / Android Appium driver adapter，承载截图、点击、滑动、输入、页面结构、App 生命周期和平台日志能力。
 - `runtime_device_preview_helpers.dart`：设备预览共用的会话校验、坐标校验、时长校验、pinch 坐标构造和 actions 释放。
 - `runtime_run_commands.dart`：工作流启动、安全停止和暂停收口。
 - `runtime_workflow_project_commands.dart`：当前 workflow 保存、复制和重置。

@@ -8,49 +8,38 @@ V2.0 主入口是 Flutter Desktop Mac App：`apps/studio_mac`。旧 Node/Web/CLI
 
 进入项目根目录后运行：
 
-V2.0 Flutter Desktop 开发入口：
+Flutter Desktop 主入口：
 
 ```bash
 melos bootstrap
-melos run analyze
-melos run test
 cd apps/studio_mac
 fvm flutter run -d macos
 ```
 
-Legacy 本地 Web 看板仅用于对照调试：
+常用验证：
+
+```bash
+npm run check
+npm run verify:all
+npm run v4:smoke:full:dry-run
+```
+
+V4 现场冒烟入口：
+
+```bash
+npm run v4:ios-smoke:full:password-prompt
+npm run v4:android-smoke:full
+npm run v4:smoke:full:password-prompt
+npm run v4:acceptance-audit
+```
+
+Legacy Node/Web/CLI 只作为迁移参考，不是主入口。确需对照旧行为时使用 `legacy:*` 前缀，例如：
 
 ```bash
 npm run legacy:console:connected
 ```
 
-默认地址：
-
-```text
-http://127.0.0.1:4877/
-```
-
-Legacy CLI 入口仅用于对照调试：
-
-```bash
-npm run legacy:init:connected
-npm run legacy:click:connected 1 -- --log-level progress
-```
-
-V2.0 常用验证：
-
-```bash
-fvm dart run tool/v2_boundary_check.dart
-fvm dart run melos run analyze
-fvm dart run melos run test
-fvm dart run tool/macos_build_smoke.dart
-```
-
-完整本地验证：
-
-```bash
-fvm dart run tool/v2_verify.dart
-```
+不要把 Legacy 命令作为新功能实现、日常入口或 V4 验收依据。
 
 ## 文档入口
 

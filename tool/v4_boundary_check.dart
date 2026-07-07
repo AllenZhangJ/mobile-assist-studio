@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 const _scanRoots = [
@@ -31,6 +32,23 @@ const _internalPubspecFiles = [
 const _metadataTemplateFiles = [
   ..._internalPubspecFiles,
   'packages/studio_design_system/LICENSE',
+];
+
+const _packageJsonPath = 'package.json';
+
+const _reservedLegacyScriptNames = [
+  'init:connected',
+  'console:connected',
+  'click:connected',
+  'record:connected',
+  'record:html:connected',
+  'pick-d:connected',
+  'dry-run:connected',
+  'start:connected',
+  'dry-run',
+  'start',
+  'validate:connected',
+  'validate',
 ];
 
 final _forbiddenProductRules = [
@@ -154,6 +172,7 @@ Future<void> main() async {
   violations.addAll(await _checkV4Docs());
   violations.addAll(await _checkPrivacy());
   violations.addAll(await _checkPackageMetadata());
+  violations.addAll(await _checkPackageScripts());
   violations.addAll(_checkThirdPartyGovernance());
 
   if (violations.isNotEmpty) {
@@ -283,6 +302,53 @@ Future<List<String>> _checkPackageMetadata() async {
       }
     }
   }
+  return violations;
+}
+
+// 检查根 package.json 脚本，防止无前缀旧入口或默认脚本绕回 Legacy Node。
+Future<List<String>> _checkPackageScripts() async {
+  final violations = <String>[];
+  final file = File(_packageJsonPath);
+  if (!file.existsSync()) {
+    violations.add('package.json missing root script manifest');
+    return violations;
+  }
+
+  final content = await file.readAsString();
+  final json = jsonDecode(content);
+  if (json is! Map<String, Object?>) {
+    violations.add('package.json must be a JSON object');
+    return violations;
+  }
+  final scripts = json['scripts'];
+  if (scripts is! Map<String, Object?>) {
+    violations.add('package.json missing scripts object');
+    return violations;
+  }
+
+  for (final name in _reservedLegacyScriptNames) {
+    if (scripts.containsKey(name)) {
+      violations.add(
+        'package.json script "$name" must stay under legacy:* prefix',
+      );
+    }
+  }
+
+  for (final entry in scripts.entries) {
+    final name = entry.key;
+    final command = entry.value;
+    if (command is! String || name.startsWith('legacy:')) {
+      continue;
+    }
+    if (RegExp(r'\blegacy/node/src/').hasMatch(command) ||
+        RegExp(r'\bnpm\s+run\s+legacy:').hasMatch(command) ||
+        RegExp(r'\bnode\s+src/').hasMatch(command)) {
+      violations.add(
+        'package.json script "$name" must not route the V4 path through Legacy Node',
+      );
+    }
+  }
+
   return violations;
 }
 

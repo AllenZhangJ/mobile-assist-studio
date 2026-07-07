@@ -143,6 +143,9 @@ Future<_FullSmokePreparation> _runAutoPreparation(
       ),
     );
   }
+  if (!options.skipAndroid) {
+    items.add(await _prepareAndroidForSmoke(options));
+  }
 
   return _FullSmokePreparation(items: items);
 }
@@ -266,6 +269,69 @@ Future<_FullSmokePreparationItem> _prepareIosTunnelForSmoke(
       nextStep: '解锁手机，点允许；若失败请重试密码。',
     );
   }
+}
+
+// 准备 Android ADB 可见性。
+// 这里只启动 ADB server 并检查授权状态，不创建 Appium 会话、不执行设备动作。
+Future<_FullSmokePreparationItem> _prepareAndroidForSmoke(
+  _FullSmokeOptions options,
+) async {
+  final startServer = await _runShortProcess('adb', const [
+    'start-server',
+  ], timeout: options.preflightTimeout);
+  if (startServer.exitCode != 0) {
+    return _FullSmokePreparationItem(
+      name: 'Android 手机',
+      ok: false,
+      detail: _shortProcessIssue(startServer),
+      nextStep: '确认 ADB 已安装并可运行，再连接一台已开启 USB 调试的手机。',
+    );
+  }
+
+  final android = await _probeAndroidDevices(options.preflightTimeout);
+  if (android.available && android.ready == 1) {
+    return const _FullSmokePreparationItem(
+      name: 'Android 手机',
+      ok: true,
+      detail: '已发现一台已授权 Android 手机',
+      nextStep: '-',
+    );
+  }
+  if (android.ready > 1) {
+    return _FullSmokePreparationItem(
+      name: 'Android 手机',
+      ok: false,
+      detail:
+          '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
+      nextStep: '只保留一台已授权 Android 手机后重试。',
+    );
+  }
+  if (android.unauthorized > 0) {
+    return _FullSmokePreparationItem(
+      name: 'Android 手机',
+      ok: false,
+      detail:
+          '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
+      nextStep: '在 Android 手机上允许 USB 调试后重试。',
+    );
+  }
+  if (android.offline > 0) {
+    return _FullSmokePreparationItem(
+      name: 'Android 手机',
+      ok: false,
+      detail:
+          '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
+      nextStep: '重插数据线并保持 Android 手机亮屏。',
+    );
+  }
+  return _FullSmokePreparationItem(
+    name: 'Android 手机',
+    ok: false,
+    detail:
+        android.detail ??
+        '可用 ${android.ready}，未授权 ${android.unauthorized}，离线 ${android.offline}',
+    nextStep: '连接一台开启 USB 调试的 Android 手机，并在手机上允许调试。',
+  );
 }
 
 // 等待 HTTP ready，供自动准备后的 Appium 服务复核。
@@ -672,6 +738,9 @@ void _printDryRun(List<_FullSmokeStep> steps, _FullSmokeOptions options) {
     stdout.writeln(
       '- iOS 隧道密码: 未从 stdin 读取，需要 Mac App 已连接或改用 password-stdin 入口',
     );
+  }
+  if (options.autoPrepare && !options.skipAndroid) {
+    stdout.writeln('- Android 准备: 启动 ADB server 并检查唯一已授权手机');
   }
   for (final step in steps) {
     stdout.writeln('- ${step.name}: ${_redactText(step.commandLine)}');

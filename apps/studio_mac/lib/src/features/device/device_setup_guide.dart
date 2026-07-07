@@ -16,6 +16,7 @@ class _LocalSetupGuideDrawer extends StatelessWidget {
     final deviceTools = report.checkById('ios-device-tools');
     final tunnel = report.checkById('ios-tunnel');
     final wda = report.checkById('wda-prerequisites');
+    final android = report.checkById('android-adb');
     return Material(
       color: StudioColors.panel,
       child: SizedBox(
@@ -116,7 +117,7 @@ class _LocalSetupGuideDrawer extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      const _AndroidSetupCard(),
+                      _AndroidSetupCard(check: android),
                       const SizedBox(height: 12),
                       const _LocalSetupBoundaryCard(),
                     ],

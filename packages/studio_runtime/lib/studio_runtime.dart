@@ -42,6 +42,7 @@ part 'src/runtime_python_sidecar.dart';
 part 'src/runtime_connection_diagnostics.dart';
 part 'src/dependency_probe.dart';
 part 'src/dependency_command_probe.dart';
+part 'src/dependency_android_probe.dart';
 part 'src/dependency_tunnel_probe.dart';
 part 'src/dependency_wda_prerequisites.dart';
 part 'src/appium_availability_probe.dart';

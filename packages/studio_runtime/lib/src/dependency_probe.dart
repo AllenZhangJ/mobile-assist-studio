@@ -87,6 +87,7 @@ final class LocalDependencyProbe implements LocalDependencyChecker {
       errorSummary: '本机设备工具不可用。',
       errorNextStep: '请先打开一次开发工具并确认可用。',
     );
+    final androidAdb = await _checkAndroidAdb();
     final tunnel = await _checkTunnelProcess();
     final wda = _wdaPrerequisiteCheck(appium, xcode, deviceTools, tunnel);
     final checks = <LocalDependencyCheck>[
@@ -95,6 +96,7 @@ final class LocalDependencyProbe implements LocalDependencyChecker {
       deviceTools,
       tunnel,
       wda,
+      androidAdb,
     ];
     return LocalDependencyReport(
       checks: checks,

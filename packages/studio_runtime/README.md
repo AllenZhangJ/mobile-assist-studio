@@ -90,6 +90,7 @@ V4.0 合同层继续按职责拆分：
 - `dependency_command_probe.dart`：本机命令执行、输出裁剪和路径脱敏。
 - `dependency_tunnel_probe.dart`：本机隧道进程检查，不启动命令、不请求权限。
 - `dependency_wda_prerequisites.dart`：把工具链和隧道状态汇总为会话准备状态。
+- `dependency_android_probe.dart`：Android ADB 可见性和唯一授权手机准备度检查；结果只作为 V4 Android 提醒，不阻断 iOS 连接。
 - `appium_availability_probe.dart`：Appium `/status` 可用性检查。
 
 控制器继续按命令分片：

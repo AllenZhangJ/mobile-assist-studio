@@ -202,7 +202,7 @@ void main() {
   );
 
   test(
-    'local dependency probe checks toolchain without listing devices',
+    'local dependency probe checks toolchain and Android adb without leaking serial',
     () async {
       final commands = <String>[];
       final probe = LocalDependencyProbe(
@@ -228,6 +228,15 @@ void main() {
               '',
             );
           }
+          if (executable == 'adb') {
+            return ProcessResult(
+              1,
+              0,
+              'List of devices attached\n'
+                  'android-serial-123 device model:Pixel_8 release:15\n',
+              '',
+            );
+          }
           return ProcessResult(1, 0, 'ok', '');
         },
       );
@@ -236,7 +245,7 @@ void main() {
         appiumProcess: const AppiumProcessConfig(executable: 'appium'),
       );
 
-      expect(report.readyCount, 5);
+      expect(report.readyCount, 6);
       expect(report.hasError, isFalse);
       expect(
         report.checkById('appium-cli')?.status,
@@ -264,14 +273,106 @@ void main() {
         report.checkById('wda-prerequisites')?.status,
         LocalDependencyStatus.ready,
       );
+      expect(
+        report.checkById('android-adb')?.status,
+        LocalDependencyStatus.ready,
+      );
+      expect(report.checkById('android-adb')?.detail, 'Pixel 8 / Android 15');
+      expect(
+        report.checkById('android-adb')?.detail,
+        isNot(contains('android-serial-123')),
+      );
       expect(commands, [
         'appium --version',
         'xcodebuild -version',
         'xcrun devicectl --help',
+        'adb devices -l',
         'ps aux',
       ]);
     },
   );
+
+  test(
+    'local dependency probe warns when Android phone is unauthorized',
+    () async {
+      final probe = LocalDependencyProbe(
+        tunnelRegistryReader: (_) async => {'device-1'},
+        runner: (executable, arguments) async {
+          if (executable == 'ps') {
+            return ProcessResult(
+              1,
+              0,
+              'appium driver run xcuitest tunnel-creation',
+              '',
+            );
+          }
+          if (executable == 'adb') {
+            return ProcessResult(
+              1,
+              0,
+              'List of devices attached\n'
+                  'android-secret-serial unauthorized model:Pixel_8 release:15\n',
+              '',
+            );
+          }
+          return ProcessResult(1, 0, 'ok', '');
+        },
+      );
+
+      final report = await probe.check(
+        appiumProcess: const AppiumProcessConfig(executable: 'appium'),
+      );
+
+      final android = report.checkById('android-adb');
+      expect(report.hasError, isFalse);
+      expect(report.hasWarning, isTrue);
+      expect(android?.status, LocalDependencyStatus.warning);
+      expect(android?.summary, '安卓手机未授权。');
+      expect(android?.nextStep, '在手机上允许 USB 调试后重试。');
+      expect(
+        '${android?.summary} ${android?.detail}',
+        isNot(contains('android-secret-serial')),
+      );
+    },
+  );
+
+  test('local dependency probe keeps missing adb as Android warning', () async {
+    final probe = LocalDependencyProbe(
+      tunnelRegistryReader: (_) async => {'device-1'},
+      runner: (executable, arguments) async {
+        if (executable == 'ps') {
+          return ProcessResult(
+            1,
+            0,
+            'appium driver run xcuitest tunnel-creation',
+            '',
+          );
+        }
+        if (executable == 'adb') {
+          return ProcessResult(
+            1,
+            127,
+            '',
+            '/Users/dev/bin/adb: command not found',
+          );
+        }
+        return ProcessResult(1, 0, 'ok', '');
+      },
+    );
+
+    final report = await probe.check(
+      appiumProcess: const AppiumProcessConfig(executable: 'appium'),
+    );
+
+    final android = report.checkById('android-adb');
+    expect(report.hasError, isFalse);
+    expect(report.hasWarning, isTrue);
+    expect(android?.status, LocalDependencyStatus.warning);
+    expect(android?.summary, '无法读取安卓手机。');
+    expect(android?.nextStep, '确认 ADB 已安装并开启 USB 调试。');
+    expect(android?.detail, contains('[本机路径]'));
+    expect(android?.detail, isNot(contains('/Users/dev')));
+  });
 
   test(
     'local dependency probe warns when local tunnel is not running',

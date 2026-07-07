@@ -570,6 +570,14 @@ void main() {
               summary: '会话条件已就绪。',
               nextStep: '如有提示，请处理信任。',
             ),
+            LocalDependencyCheck(
+              id: 'android-adb',
+              label: '安卓调试',
+              status: LocalDependencyStatus.ready,
+              summary: '已发现一台安卓手机。',
+              nextStep: '可运行安卓冒烟。',
+              detail: 'Pixel 8 / Android 15',
+            ),
           ],
           checkedAt: DateTime(2026, 1, 7, 3, 4, 5),
           message: '本机检查通过。',
@@ -608,7 +616,12 @@ void main() {
     expect(find.text('开发工具'), findsWidgets);
     expect(find.text('本机隧道'), findsWidgets);
     expect(find.text('会话准备'), findsOneWidget);
+    expect(find.text('安卓调试'), findsOneWidget);
     expect(controller.snapshot.dependencyReport.message, '本机检查通过。');
+    expect(
+      controller.snapshot.dependencyReport.checkById('android-adb')?.detail,
+      'Pixel 8 / Android 15',
+    );
     expect(find.textContaining('127.0.0.1'), findsNothing);
     expect(find.textContaining('0000'), findsNothing);
   });
@@ -755,6 +768,13 @@ void main() {
             summary: '会话等待本机隧道或手机允许。',
             nextStep: '点连接设备并按手机提示允许。',
           ),
+          LocalDependencyCheck(
+            id: 'android-adb',
+            label: '安卓调试',
+            status: LocalDependencyStatus.warning,
+            summary: '未发现安卓手机。',
+            nextStep: '开启 USB 调试，插线并在手机上点允许。',
+          ),
         ],
         checkedAt: DateTime(2026, 1, 7, 3, 4, 5),
         message: '本机检查需要处理。',
@@ -817,6 +837,8 @@ void main() {
       maxIteration: 8,
     );
     expect(find.text('安卓准备'), findsOneWidget);
+    expect(find.text('未发现安卓手机。'), findsWidgets);
+    expect(find.text('开启 USB 调试，插线并在手机上点允许。'), findsWidgets);
     expect(find.text('开调试'), findsOneWidget);
     expect(find.text('插数据线'), findsOneWidget);
     expect(find.text('点允许'), findsWidgets);

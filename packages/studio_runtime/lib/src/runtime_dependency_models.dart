@@ -101,6 +101,13 @@ final class LocalDependencyReport {
         summary: '会话依赖驱动、开发工具和手机信任。',
         nextStep: '先处理本机检查项。',
       ),
+      LocalDependencyCheck(
+        id: 'android-adb',
+        label: '安卓调试',
+        status: LocalDependencyStatus.unknown,
+        summary: '尚未检查安卓调试。',
+        nextStep: '连接安卓手机前先查环境。',
+      ),
     ],
     checkedAt: null,
     message: '尚未检查本机环境。',

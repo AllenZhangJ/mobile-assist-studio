@@ -41,6 +41,7 @@ IconData _iconForDependency(String id) {
     'ios-device-tools' => Icons.usb_outlined,
     'ios-tunnel' => Icons.cable_outlined,
     'wda-prerequisites' => Icons.settings_input_component_outlined,
+    'android-adb' => Icons.android_outlined,
     _ => Icons.rule_folder_outlined,
   };
 }

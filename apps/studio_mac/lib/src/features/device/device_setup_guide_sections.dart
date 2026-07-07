@@ -221,12 +221,18 @@ class _LocalTunnelSteps extends StatelessWidget {
 }
 
 class _AndroidSetupCard extends StatelessWidget {
-  const _AndroidSetupCard();
+  const _AndroidSetupCard({required this.check});
+
+  final LocalDependencyCheck? check;
 
   /// 渲染 Android 真机 smoke 的现场准备说明。
   /// 这里只复制安全命令，不启动 ADB、驱动或真机动作。
   @override
   Widget build(BuildContext context) {
+    final current = check;
+    final tone = current == null
+        ? StudioStatusTone.offline
+        : _toneForDependency(current.status);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: StudioColors.cyan.withValues(alpha: 0.06),
@@ -249,6 +255,13 @@ class _AndroidSetupCard extends StatelessWidget {
                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
                   ),
                 ),
+                StatusPill(
+                  label: current == null
+                      ? '未知'
+                      : _dependencyStatusLabel(current.status),
+                  tone: tone,
+                ),
+                const SizedBox(width: 8),
                 OutlinedButton.icon(
                   key: const ValueKey('copy-android-smoke-command'),
                   icon: const Icon(Icons.content_copy, size: 16),
@@ -260,12 +273,21 @@ class _AndroidSetupCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            const Text(
-              '终验还缺安卓真机留档。接一台安卓手机后，按下面顺序走。',
+            Text(
+              current?.summary ?? '终验还缺安卓真机留档。',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: StudioColors.muted, height: 1.4),
             ),
+            const SizedBox(height: 8),
+            _ReadinessInlineStep(
+              label: '下个',
+              value: current?.nextStep ?? '开 USB 调试，插线并点允许。',
+            ),
+            if (current?.detail != null) ...[
+              const SizedBox(height: 8),
+              _ReadinessInlineStep(label: '详情', value: current!.detail!),
+            ],
             const SizedBox(height: 10),
             Wrap(
               spacing: 6,

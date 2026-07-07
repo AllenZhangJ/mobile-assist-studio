@@ -67,7 +67,32 @@ bool _acceptanceJsonLooksStructurallyValid(Map<String, Object?> json) {
   if (readiness.isEmpty || archive.isEmpty) return false;
   final localState = _acceptanceMapAt(readiness, 'localState');
   final counts = _acceptanceMapAt(archive, 'counts');
-  return localState.isNotEmpty && counts.isNotEmpty;
+  final iosDevice = _acceptanceMapAt(localState, 'iosDevice');
+  final androidDevice = _acceptanceMapAt(localState, 'androidDevice');
+  return _deviceStateLooksValid(iosDevice) &&
+      _deviceStateLooksValid(androidDevice) &&
+      _archiveCountsLookValid(counts) &&
+      _batchRowsLookValid(readiness);
+}
+
+// 判断本机设备摘要是否足以支撑 UI 展示，不让空壳状态进入快照。
+bool _deviceStateLooksValid(Map<String, Object?> device) {
+  return _stringAt(device, 'status') != null &&
+      _stringAt(device, 'detail') != null;
+}
+
+// 判断归档计数是否包含终验卡需要的四个非负计数字段。
+bool _archiveCountsLookValid(Map<String, Object?> counts) {
+  return _nullableIntAt(counts, 'screenshots') != null &&
+      _nullableIntAt(counts, 'iosRuns') != null &&
+      _nullableIntAt(counts, 'androidRuns') != null &&
+      _nullableIntAt(counts, 'fullSmokeReports') != null;
+}
+
+// 判断 Batch 0-8 摘要是否存在，避免旧报告或半报告误导批次进度。
+bool _batchRowsLookValid(Map<String, Object?> readiness) {
+  final value = readiness['batches'];
+  return value is List && value.length >= 9;
 }
 
 // 把终验 JSON 转为脱敏摘要。

@@ -183,6 +183,35 @@ void main() {
   }
 }
 ''');
+      await File(
+        '${temp.path}/FINAL_ACCEPTANCE_2026-01-04T00-00-00Z.json',
+      ).writeAsString('''
+{
+  "schemaVersion": 1,
+  "kind": "v4FinalAcceptance",
+  "timestamp": "2026-01-04T00:00:00.000000Z",
+  "completion": {
+    "auditOk": true,
+    "complete": false
+  },
+  "evidence": {
+    "readiness": {
+      "localState": {
+        "iosDevice": {"status": "未就绪"},
+        "androidDevice": {"status": "未就绪", "detail": "可用 0"}
+      },
+      "batches": []
+    },
+    "archive": {
+      "counts": {
+        "screenshots": 0,
+        "iosRuns": 0,
+        "androidRuns": 0
+      }
+    }
+  }
+}
+''');
 
       final summary = await LocalV4AcceptanceSummaryReader(
         directory: temp,

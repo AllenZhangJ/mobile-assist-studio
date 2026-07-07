@@ -1835,6 +1835,90 @@ void _assertAcceptanceMarkdown(String markdown) {
   ]) {
     _expect(markdown.contains(text), 'Acceptance Markdown 必须包含：$text');
   }
+  _assertAcceptanceMarkdownChecklistContract(markdown);
+}
+
+// 断言人类阅读的 Markdown 现场清单也保持和 JSON 一致的安全路线。
+void _assertAcceptanceMarkdownChecklistContract(String markdown) {
+  final section = _markdownSection(markdown, '## 现场补验清单');
+  final rows = <({String? command, int order, String proof, String title})>[];
+  for (final line in section.split('\n')) {
+    final trimmed = line.trim();
+    if (!trimmed.startsWith('|')) continue;
+    final cells = _markdownTableCells(trimmed);
+    if (cells.length < 4 ||
+        cells.first == '顺序' ||
+        cells.first.contains('---')) {
+      continue;
+    }
+    final order = int.tryParse(cells[0]);
+    _expect(order != null, 'Acceptance Markdown 现场清单顺序必须是数字：${cells[0]}');
+    rows.add((
+      order: order!,
+      title: cells[1],
+      command: _markdownCommand(cells[2]),
+      proof: cells[3],
+    ));
+  }
+
+  _expect(rows.length >= 4, 'Acceptance Markdown 必须输出现场补验清单表格。');
+  final nonCommandTitles = <String>{'清代码', '推远端', '保留报告'};
+  final seenOrders = <int>{};
+  var expectedOrder = 1;
+  for (final row in rows) {
+    _expect(row.order > 0, 'Acceptance Markdown 现场清单 order 必须为正。');
+    _expect(
+      seenOrders.add(row.order),
+      'Acceptance Markdown 现场清单 order 不得重复：${row.order}',
+    );
+    _expect(
+      row.order == expectedOrder,
+      'Acceptance Markdown 现场清单必须连续正序，当前 ${row.order}，期望 $expectedOrder。',
+    );
+    expectedOrder += 1;
+    _expect(row.title.isNotEmpty, 'Acceptance Markdown 现场清单标题不能为空。');
+    _expect(row.proof.isNotEmpty, 'Acceptance Markdown 现场清单通过标准不能为空。');
+
+    if (row.command != null) {
+      _expect(
+        _allowedReportCommands.contains(row.command),
+        'Acceptance Markdown 现场清单不得输出非白名单命令：${row.command}',
+      );
+    }
+    if (!nonCommandTitles.contains(row.title)) {
+      _expect(
+        row.command != null && _allowedReportCommands.contains(row.command),
+        'Acceptance Markdown 执行项必须携带白名单命令：${row.title} / ${row.command}',
+      );
+    }
+  }
+}
+
+// 截取指定 Markdown 二级标题到下一个二级标题之间的正文。
+String _markdownSection(String markdown, String heading) {
+  final start = markdown.indexOf(heading);
+  _expect(start >= 0, 'Markdown 必须包含章节：$heading');
+  final rest = markdown.substring(start + heading.length);
+  final nextHeading = RegExp(r'\n##\s+').firstMatch(rest);
+  return nextHeading == null ? rest : rest.substring(0, nextHeading.start);
+}
+
+// 解析简单 Markdown 表格行，保留单元格内文本供合同断言使用。
+List<String> _markdownTableCells(String line) {
+  final normalized = line.endsWith('|')
+      ? line.substring(0, line.length - 1)
+      : line;
+  return normalized
+      .substring(1)
+      .split('|')
+      .map((cell) => cell.trim())
+      .toList(growable: false);
+}
+
+// 提取 Markdown 表格里的反引号命令；短横线代表无需命令。
+String? _markdownCommand(String cell) {
+  final match = RegExp(r'`([^`]+)`').firstMatch(cell);
+  return match?.group(1)?.trim();
 }
 
 // 扫描生成文本，防止合同 fixture 或 readiness 输出泄露真实本机信息。

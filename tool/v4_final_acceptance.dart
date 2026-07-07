@@ -1173,11 +1173,25 @@ String _platformSmokeIssueText(
   required String currentGit,
 }) {
   if (latest.isEmpty) return '未发现 $platformLabel 平台 smoke run。';
-  if (latest['fullPassed'] != true) {
-    return '$platformLabel 最近未完整通过：${_plainText(latest['summary']?.toString() ?? latest['status']?.toString() ?? '无摘要')}';
+  final fullPassed = latest['fullPassed'] == true;
+  final matchesCurrentGit = _reportMatchesGit(latest, currentGit);
+  final summary = _plainText(
+    latest['summary']?.toString() ?? latest['status']?.toString() ?? '无摘要',
+  );
+  if (!matchesCurrentGit) {
+    final git = latest['git']?.toString().trim();
+    final versionText = git == null || git.isEmpty || git == 'unknown'
+        ? '$platformLabel 最近 smoke 缺少当前提交指纹，当前提交 $currentGit'
+        : '$platformLabel 最近 smoke 属于提交 ${_plainText(git)}，当前提交 $currentGit';
+    if (!fullPassed) {
+      return '$versionText；最近也未完整通过：$summary';
+    }
+    return '$versionText。';
   }
-  final git = _plainText(latest['git']?.toString() ?? '未知');
-  return '$platformLabel 最近 smoke 属于提交 $git，当前提交 $currentGit。';
+  if (!fullPassed) {
+    return '$platformLabel 最近未完整通过：$summary';
+  }
+  return '$platformLabel 当前提交 smoke 仍有其它门禁缺口。';
 }
 
 // 平台或 full smoke 报告必须带当前短提交号。

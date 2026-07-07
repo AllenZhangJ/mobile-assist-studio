@@ -234,6 +234,37 @@ Future<void> main() async {
           platformMismatchArchiveFinal.stderr.contains('当前提交完整通过'),
       '旧提交平台 run 的 archive final 必须提示平台 smoke 不属于当前提交完整通过。',
     );
+    final platformMismatchAcceptance = await _runFinalAcceptance(
+      platformMismatchDir,
+      requireComplete: true,
+    );
+    _expect(
+      platformMismatchAcceptance.exitCode == 2 &&
+          platformMismatchAcceptance.stderr.contains('iOS smoke') &&
+          platformMismatchAcceptance.stderr.contains('Android smoke') &&
+          platformMismatchAcceptance.stderr.contains('属于提交') &&
+          platformMismatchAcceptance.stderr.contains('当前提交'),
+      '旧提交平台 run 的 acceptance final 必须提示平台 smoke 不属于当前提交。',
+    );
+
+    final staleFailedPlatformDir = Directory(
+      '${tempDir.path}/failed-old-platform-run',
+    );
+    await _seedFullSmokeFixture(
+      staleFailedPlatformDir,
+      platformGit: _differentGit(currentGit),
+    );
+    final staleFailedAcceptance = await _runFinalAcceptance(
+      staleFailedPlatformDir,
+      requireComplete: true,
+    );
+    _expect(
+      staleFailedAcceptance.exitCode == 2 &&
+          staleFailedAcceptance.stderr.contains('iOS smoke') &&
+          staleFailedAcceptance.stderr.contains('属于提交') &&
+          staleFailedAcceptance.stderr.contains('最近也未完整通过'),
+      '旧提交且失败的平台 run 必须同时提示提交不匹配和未完整通过。',
+    );
 
     final detachedScreenshotDir = Directory(
       '${tempDir.path}/complete-detached-screenshots',
@@ -739,10 +770,14 @@ Future<void> _writeFakeExecutable(File file, String content) async {
 }
 
 // 写入最小 full smoke fixture，用于验证 readiness 能索引最近编排报告。
-Future<void> _seedFullSmokeFixture(Directory outDir) async {
+Future<void> _seedFullSmokeFixture(
+  Directory outDir, {
+  String? platformGit,
+}) async {
   await outDir.create(recursive: true);
   final timestamp = DateTime.utc(2026);
   final git = await _currentGitRevision();
+  final platformRunGit = platformGit ?? git;
   final base = '${outDir.path}/FULL_SMOKE_2026-01-01T00-00-00-000000Z';
   final payload = <String, Object?>{
     'schemaVersion': 1,
@@ -816,7 +851,11 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
     '${encoder.convert(<String, Object?>{'status': 'failed', 'finishedAt': timestamp.toIso8601String()})}\n',
   );
   final iosEvents = <Map<String, Object?>>[
-    <String, Object?>{'type': 'smokeStart', 'actionsAllowed': true, 'git': git},
+    <String, Object?>{
+      'type': 'smokeStart',
+      'actionsAllowed': true,
+      'git': platformRunGit,
+    },
     <String, Object?>{'type': 'smokeWorkflowStart'},
     <String, Object?>{'type': 'smokeAction', 'action': 'tap'},
     <String, Object?>{'type': 'smokeFailure', 'message': 'WDA 会话失败'},

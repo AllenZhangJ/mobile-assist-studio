@@ -20,7 +20,7 @@ Future<void> main(List<String> args) async {
   await file.writeAsString(report.toMarkdown(), flush: true);
   stdout.writeln('Smoke readiness report: ${file.path}');
   if (options.requireComplete && !report.isComplete) {
-    stderr.writeln('V4 smoke completion audit failed: 双平台 smoke 尚未成功留档。');
+    stderr.writeln('V4 smoke completion audit failed: 双平台完整 smoke 尚未成功留档。');
     exit(2);
   }
 }
@@ -220,6 +220,7 @@ Future<_SmokeRunSummary> _readSmokeRunSummary(Directory dir) async {
       .map((event) => event['type']?.toString() ?? '')
       .where((type) => type.isNotEmpty)
       .toSet();
+  final actionNames = _smokeActionNames(events);
   final failure = events
       .where((event) => event['type'] == 'smokeFailure')
       .map((event) => event['message']?.toString() ?? '')
@@ -235,11 +236,46 @@ Future<_SmokeRunSummary> _readSmokeRunSummary(Directory dir) async {
     finishedAt: _parseDate(finished?['finishedAt']),
     actionsAllowed: _eventBool(events, 'smokeStart', 'actionsAllowed'),
     hasScreenshot: eventTypes.contains('smokeScreenshot'),
-    actionsExecuted: eventTypes.contains('smokeAction'),
+    actionsExecuted: actionNames.isNotEmpty,
+    actionNames: actionNames,
     workflowExecuted: eventTypes.contains('smokeWorkflowStart'),
     logsCollected: eventTypes.contains('smokeLogs'),
     failureSummary: failure == null ? null : _shortText(_redactText(failure)),
   );
+}
+
+// 从 smoke 事件里提取已执行的关键动作，用于判断是否完整冒烟。
+Set<String> _smokeActionNames(List<Map<String, Object?>> events) {
+  final actions = <String>{};
+  for (final event in events) {
+    final type = event['type']?.toString();
+    if (type == 'smokeAction') {
+      _addSmokeAction(actions, event['action']);
+      continue;
+    }
+    if (type == 'smokeWorkflowStep') {
+      _addSmokeAction(actions, event['nodeType']);
+      _addSmokeAction(actions, event['action']);
+    }
+  }
+  return actions;
+}
+
+// 只归一化 V4 基础冒烟必须覆盖的真实交互动作。
+void _addSmokeAction(Set<String> actions, Object? raw) {
+  final normalized = _normalizeSmokeAction(raw);
+  if (normalized != null) actions.add(normalized);
+}
+
+// 将 Appium / workflow 事件中的动作名归一成稳定集合。
+String? _normalizeSmokeAction(Object? raw) {
+  final value = raw?.toString().trim().toLowerCase();
+  return switch (value) {
+    'tap' || 'click' || 'press' => 'tap',
+    'swipe' || 'drag' => 'swipe',
+    'input' || 'text' || 'sendkeys' || 'send_keys' => 'input',
+    _ => null,
+  };
 }
 
 // 读取 JSON object，失败时返回 null。
@@ -543,6 +579,7 @@ final class _SmokeRunSummary {
     required this.actionsAllowed,
     required this.hasScreenshot,
     required this.actionsExecuted,
+    required this.actionNames,
     required this.workflowExecuted,
     required this.logsCollected,
     required this.failureSummary,
@@ -556,20 +593,49 @@ final class _SmokeRunSummary {
   final bool? actionsAllowed;
   final bool hasScreenshot;
   final bool actionsExecuted;
+  final Set<String> actionNames;
   final bool workflowExecuted;
   final bool logsCollected;
   final String? failureSummary;
 
   bool get passed => status == 'success';
 
+  bool get tapExecuted => actionNames.contains('tap');
+
+  bool get swipeExecuted => actionNames.contains('swipe');
+
+  bool get inputExecuted => actionNames.contains('input');
+
+  bool get fullPassed =>
+      passed &&
+      actionsAllowed == true &&
+      hasScreenshot &&
+      workflowExecuted &&
+      tapExecuted &&
+      swipeExecuted &&
+      inputExecuted;
+
+  String get actionSummary {
+    if (!actionsExecuted) return '未执行动作';
+    final ordered = [
+      if (tapExecuted) 'tap',
+      if (swipeExecuted) 'swipe',
+      if (inputExecuted) 'input',
+    ];
+    return ordered.isEmpty ? '动作未知' : '动作 ${ordered.join('/')}';
+  }
+
   String get summaryLabel {
     final parts = <String>[
-      status == 'success'
-          ? '通过'
+      passed
+          ? fullPassed
+                ? '完整通过'
+                : '通过但未完整'
           : status == 'failed'
           ? '失败'
           : '运行中',
-      actionsAllowed == true ? '允许动作' : '未执行动作',
+      actionsAllowed == true ? '允许动作' : '动作未授权',
+      actionSummary,
       workflowExecuted ? '含流程' : '无流程',
       hasScreenshot ? '有截图' : '无截图',
       logsCollected ? '有日志' : '无日志',
@@ -627,11 +693,12 @@ final class _SmokeReadinessReport {
 
   bool get _hasTunnel => tunnel.reachable && (tunnel.count ?? 0) > 0;
 
-  bool get _latestIosPassed => artifacts.latestIos?.passed ?? false;
+  bool get _latestIosFullPassed => artifacts.latestIos?.fullPassed ?? false;
 
-  bool get _latestAndroidPassed => artifacts.latestAndroid?.passed ?? false;
+  bool get _latestAndroidFullPassed =>
+      artifacts.latestAndroid?.fullPassed ?? false;
 
-  bool get isComplete => _latestIosPassed && _latestAndroidPassed;
+  bool get isComplete => _latestIosFullPassed && _latestAndroidFullPassed;
 
   // 转成可留档的脱敏 Markdown。
   String toMarkdown() {
@@ -725,7 +792,7 @@ final class _SmokeReadinessReport {
 
   String _completionLabel() {
     if (isComplete) {
-      return '最近双平台 smoke 已成功留档';
+      return '最近双平台完整 smoke 已成功留档';
     }
     if (iosFullSmokeReady && androidFullSmokeReady) {
       return '待执行完整 smoke';
@@ -735,8 +802,10 @@ final class _SmokeReadinessReport {
 
   String _latestSmokeLabel(_SmokeRunSummary? summary) {
     if (summary == null) return '无记录';
-    return summary.passed
-        ? '通过'
+    return summary.fullPassed
+        ? '完整通过'
+        : summary.passed
+        ? '通过但未完整'
         : summary.status == 'failed'
         ? '失败'
         : '运行中';
@@ -756,10 +825,10 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
   required _SmokeRunSummary? latestIos,
   required _SmokeRunSummary? latestAndroid,
 }) {
-  final latestPassed =
-      (latestIos?.passed ?? false) && (latestAndroid?.passed ?? false);
-  final smokeStatus = latestPassed
-      ? '已完成 smoke 留档'
+  final latestFullPassed =
+      (latestIos?.fullPassed ?? false) && (latestAndroid?.fullPassed ?? false);
+  final smokeStatus = latestFullPassed
+      ? '已完成完整 smoke 留档'
       : iosReady && androidReady
       ? '待完整 smoke'
       : '现场未就绪';
@@ -817,7 +886,8 @@ List<_BatchAcceptanceRow> _batchAcceptanceRows({
 // 批次表里使用的最近 smoke 短状态。
 String _batchSmokeLabel(_SmokeRunSummary? summary) {
   if (summary == null) return '无记录';
-  if (summary.passed) return '通过';
+  if (summary.fullPassed) return '完整通过';
+  if (summary.passed) return '通过但未完整';
   if (summary.status == 'failed') return '失败';
   return '运行中';
 }
@@ -847,6 +917,6 @@ V4 smoke readiness
   --appium-port <port>   Appium 端口，默认 4723
   --tunnel-port <port>   XCUITest tunnel registry 端口，默认 42314
   --timeout <seconds>    单项探测超时，默认 4
-  --require-complete     最近双平台 smoke 未成功留档时返回非 0
+  --require-complete     最近双平台完整 smoke 未成功留档时返回非 0
   --help                 查看帮助
 ''';

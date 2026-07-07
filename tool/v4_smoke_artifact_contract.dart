@@ -19,6 +19,16 @@ Future<void> main() async {
     _assertReadinessJson(artifacts.json);
     _assertReadinessMarkdown(artifacts.markdown);
     _assertNoSensitiveText(artifacts.allText);
+
+    await _seedArchiveFixture(tempDir);
+    final archiveResult = await _runArchive(tempDir);
+    if (archiveResult.exitCode != 0) {
+      _fail('archive 合同生成失败：${_shortText(archiveResult.stderr)}');
+    }
+    final archive = await _loadArchiveArtifacts(tempDir);
+    _assertArchiveJson(archive.json);
+    _assertArchiveMarkdown(archive.markdown);
+    _assertNoSensitiveText(archive.allText);
     stdout.writeln('V4 smoke artifact contract passed');
   } finally {
     await tempDir.delete(recursive: true);
@@ -66,17 +76,42 @@ Future<void> _seedFullSmokeFixture(Directory outDir) async {
   await File('$base.md').writeAsString('# V4 Full Smoke\n\n- 前置检查：有阻断\n');
 }
 
+// 写入 archive fixture，只放虚拟截图文件，不读取或生成真实隐私图片。
+Future<void> _seedArchiveFixture(Directory outDir) async {
+  await File(
+    '${outDir.path}/studio-ui-fixture.png',
+  ).writeAsBytes(<int>[0x89, 0x50, 0x4E, 0x47]);
+}
+
 // 调用现有 readiness 工具端到端生成报告，保持合同覆盖真实 CLI 输出。
 Future<_ProcessResult> _runReadiness(Directory outDir) async {
+  return _runDartTool(<String>[
+    'tool/v4_smoke_readiness.dart',
+    '--out-dir',
+    outDir.path,
+    '--timeout',
+    '1',
+  ]);
+}
+
+// 调用现有 archive 工具端到端生成本地索引。
+Future<_ProcessResult> _runArchive(Directory outDir) async {
+  return _runDartTool(<String>[
+    'tool/v4_smoke_archive.dart',
+    '--out-dir',
+    outDir.path,
+    '--archive-dir',
+    '${outDir.path}/archives',
+    '--timeout',
+    '1',
+  ]);
+}
+
+// 启动 Dart 工具并设置统一超时，合同不依赖真实设备。
+Future<_ProcessResult> _runDartTool(List<String> arguments) async {
   final process = await Process.start(
     Platform.resolvedExecutable,
-    <String>[
-      'tool/v4_smoke_readiness.dart',
-      '--out-dir',
-      outDir.path,
-      '--timeout',
-      '1',
-    ],
+    arguments,
     environment: <String, String>{
       ...Platform.environment,
       'DART_SUPPRESS_ANALYTICS': 'true',
@@ -148,6 +183,34 @@ Future<_ReadinessArtifacts> _loadGeneratedArtifacts(Directory outDir) async {
   final decoded = jsonDecode(jsonText);
   _expect(decoded is Map, 'readiness JSON 必须是对象。');
   return _ReadinessArtifacts(
+    json: Map<String, Object?>.from(decoded as Map),
+    markdown: markdown,
+    allText: '$jsonText\n$markdown',
+  );
+}
+
+// 读取 archive 生成的最新 JSON 和 Markdown。
+Future<_ArchiveArtifacts> _loadArchiveArtifacts(Directory outDir) async {
+  final archiveDir = Directory('${outDir.path}/archives');
+  final jsonFiles = await _matchingFiles(
+    archiveDir,
+    RegExp(r'^SMOKE_ARCHIVE_.*\.json$'),
+  );
+  final markdownFiles = await _matchingFiles(
+    archiveDir,
+    RegExp(r'^SMOKE_ARCHIVE_.*\.md$'),
+  );
+  _expect(jsonFiles.length == 1, 'archive JSON 数量应为 1，实际 ${jsonFiles.length}');
+  _expect(
+    markdownFiles.length == 1,
+    'archive Markdown 数量应为 1，实际 ${markdownFiles.length}',
+  );
+
+  final jsonText = await jsonFiles.single.readAsString();
+  final markdown = await markdownFiles.single.readAsString();
+  final decoded = jsonDecode(jsonText);
+  _expect(decoded is Map, 'archive JSON 必须是对象。');
+  return _ArchiveArtifacts(
     json: Map<String, Object?>.from(decoded as Map),
     markdown: markdown,
     allText: '$jsonText\n$markdown',
@@ -241,6 +304,51 @@ void _assertReadinessMarkdown(String markdown) {
   }
 }
 
+// 断言 archive JSON 的稳定合同字段，覆盖截图、报告和自排除。
+void _assertArchiveJson(Map<String, Object?> json) {
+  _expect(json['schemaVersion'] == 1, 'archive schemaVersion 必须为 1。');
+  _expect(json['kind'] == 'v4SmokeArchive', 'archive kind 必须正确。');
+
+  final summary = _mapAt(json, 'summary');
+  _expect(summary['readinessReports'] == 1, 'archive 必须索引 readiness JSON。');
+  _expect(summary['fullSmokeReports'] == 1, 'archive 必须索引 full smoke JSON。');
+  _expect(summary['screenshots'] == 1, 'archive 必须索引截图。');
+
+  final latestFullSmoke = _mapAt(summary, 'latestFullSmoke');
+  _expect(
+    latestFullSmoke['label'] == '前置检查阻断',
+    'archive latestFullSmoke.label 必须保留阻断状态。',
+  );
+  final blockers = _stringList(latestFullSmoke['blockers']);
+  _expect(blockers.contains('Appium'), 'archive blockers 必须包含 Appium。');
+
+  final warnings = _stringList(json['warnings']);
+  _expect(warnings.isNotEmpty, 'archive 必须保留当前缺口提醒。');
+
+  final artifacts = _listAt(json, 'artifacts');
+  _expect(artifacts.length >= 5, 'archive 必须索引 fixture 文件。');
+  _expect(
+    artifacts.every((item) {
+      final path = _mapFrom(item)['relativePath']?.toString() ?? '';
+      return !path.startsWith('archives/');
+    }),
+    'archive 不得把自身输出目录纳入索引。',
+  );
+}
+
+// 断言 archive Markdown 包含最终人工复盘需要的区域。
+void _assertArchiveMarkdown(String markdown) {
+  for (final text in <String>[
+    '# V4 Smoke Archive',
+    '## 汇总',
+    '## 最近报告',
+    '## 截图索引',
+    '## 提醒',
+  ]) {
+    _expect(markdown.contains(text), 'Archive Markdown 必须包含：$text');
+  }
+}
+
 // 扫描生成文本，防止合同 fixture 或 readiness 输出泄露真实本机信息。
 void _assertNoSensitiveText(String text) {
   final patterns = <RegExp>[
@@ -320,6 +428,19 @@ final class _ProcessResult {
 // readiness 生成物集合。
 final class _ReadinessArtifacts {
   const _ReadinessArtifacts({
+    required this.json,
+    required this.markdown,
+    required this.allText,
+  });
+
+  final Map<String, Object?> json;
+  final String markdown;
+  final String allText;
+}
+
+// archive 生成物集合。
+final class _ArchiveArtifacts {
+  const _ArchiveArtifacts({
     required this.json,
     required this.markdown,
     required this.allText,

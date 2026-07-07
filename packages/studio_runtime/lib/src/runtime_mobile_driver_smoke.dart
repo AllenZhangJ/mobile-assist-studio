@@ -78,6 +78,8 @@ final class MobileDriverSmokeRunner {
         'platform': _driver.platform.name,
         'actionsAllowed': plan.allowActions,
       });
+      final capabilities = await _driver.capabilityReport();
+      await _record(runId, 'smokeCapabilities', _capabilityJson(capabilities));
       session = await _driver.connect();
       await _record(runId, 'smokeSession', {
         'platform': session.platform.name,
@@ -459,6 +461,27 @@ final class MobileDriverSmokeRunner {
       'id': device.maskedIdentifier,
       'version': device.osVersion,
       'connection': device.connectionKind.name,
+    };
+  }
+
+  // 把 driver 能力写成 evidence 可读的脱敏字段。
+  Map<String, Object?> _capabilityJson(
+    MobileDriverCapabilityReport capabilities,
+  ) {
+    return {
+      'platform': capabilities.platform.name,
+      'screenshot': capabilities.screenshot,
+      'tap': capabilities.tap,
+      'swipe': capabilities.swipe,
+      'input': capabilities.input,
+      'pageSource': capabilities.pageSource,
+      'selectorTarget': capabilities.selectorTarget,
+      'imageTarget': capabilities.imageTarget,
+      'ocrTarget': capabilities.ocrTarget,
+      'appLifecycle': capabilities.appLifecycle,
+      'logs': capabilities.logs,
+      'performance': capabilities.performance,
+      'remotePreview': capabilities.remotePreview,
     };
   }
 

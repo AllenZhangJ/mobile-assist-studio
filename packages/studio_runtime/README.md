@@ -70,7 +70,7 @@ V4.0 合同层继续按职责拆分：
 - `runtime_mobile_driver_models.dart`：跨平台移动设备、资源锁和能力报告模型。
 - `runtime_mobile_driver_contracts.dart`：平台中立 `MobileDeviceDriver` 接口和会话 / 心跳 / 截图合同。
 - `runtime_android_adb.dart`：Android ADB 设备发现、状态归类、serial 脱敏和 logcat 摘要。
-- `runtime_mobile_driver_smoke.dart`：跨平台 driver 冒烟 runner、脱敏报告和本地 evidence 写入。
+- `runtime_mobile_driver_smoke.dart`：跨平台 driver 冒烟 runner、driver 能力摘要、脱敏报告和本地 evidence 写入。
 - `runtime_mobile_driver_adapters.dart`：iOS Appium adapter 包装、Android 安全骨架和 Android UiAutomator2 adapter。
 - `runtime_vision_contracts.dart`：Target Resolver、Vision Provider、目标定义和解析结果模型。
 - `runtime_vision_providers.dart`：Composite TargetResolver、坐标 provider、区域 provider、selector provider、text source provider、Python OCR text provider、Pyxelator fixture provider、Airtest fixture provider、小尺寸 PNG 模板匹配兜底，以及“视觉增强”开启后的 Pyxelator / Airtest / builtin Python sidecar 解析链。

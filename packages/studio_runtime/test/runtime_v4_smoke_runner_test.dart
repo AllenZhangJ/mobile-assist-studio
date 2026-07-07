@@ -44,11 +44,18 @@ void main() {
           events.map((event) => event['type']),
           containsAllInOrder([
             'smokeStart',
+            'smokeCapabilities',
             'smokeSession',
             'smokeScreenshot',
             'smokeActionsSkipped',
             'smokeLogs',
           ]),
+        );
+        expect(
+          events
+              .where((event) => event['type'] == 'smokeCapabilities')
+              .single['appLifecycle'],
+          isTrue,
         );
         expect(finished['status'], 'success');
         expect(
@@ -233,7 +240,7 @@ final class _FakeMobileDriver implements MobileDeviceDriver {
       selectorTarget: true,
       imageTarget: false,
       ocrTarget: false,
-      appLifecycle: false,
+      appLifecycle: true,
       logs: true,
       performance: false,
       remotePreview: false,
@@ -262,7 +269,7 @@ final class _FakeMobileDriver implements MobileDeviceDriver {
         selectorTarget: true,
         imageTarget: false,
         ocrTarget: false,
-        appLifecycle: false,
+        appLifecycle: true,
         logs: true,
         performance: false,
         remotePreview: false,

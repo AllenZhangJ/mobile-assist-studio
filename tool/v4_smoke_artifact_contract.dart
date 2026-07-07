@@ -86,6 +86,10 @@ Future<void> main() async {
           finalAcceptance.stderr.contains('先补齐单平台 smoke'),
       'acceptance final 必须提示最终验收缺口、现场补验清单和可执行门禁命令。',
     );
+    _assertAcceptanceFinalStderrChecklistContract(
+      finalAcceptance.stderr,
+      _listAt(acceptanceArtifacts.json, 'fieldChecklist'),
+    );
     final currentGit = await _currentGitRevision();
     final completeDir = Directory('${tempDir.path}/complete-current');
     await _seedCompleteSmokeFixture(
@@ -1909,6 +1913,64 @@ void _assertAcceptanceMarkdownChecklistContract(
   }
 }
 
+// 断言 acceptance-final 终端错误输出也给出同一条安全现场路线。
+void _assertAcceptanceFinalStderrChecklistContract(
+  String stderr,
+  List<Object?> jsonItems,
+) {
+  final rows = _acceptanceFinalStderrChecklistRows(stderr);
+  _expect(rows.length >= 4, 'acceptance-final stderr 必须输出现场补验清单。');
+  final nonCommandTitles = <String>{'清代码', '推远端', '保留报告'};
+  final seenOrders = <int>{};
+  var expectedOrder = 1;
+  for (final row in rows) {
+    _expect(row.order > 0, 'acceptance-final stderr 现场清单 order 必须为正。');
+    _expect(
+      seenOrders.add(row.order),
+      'acceptance-final stderr 现场清单 order 不得重复：${row.order}',
+    );
+    _expect(
+      row.order == expectedOrder,
+      'acceptance-final stderr 现场清单必须连续正序，当前 ${row.order}，期望 $expectedOrder。',
+    );
+    expectedOrder += 1;
+    _expect(row.title.isNotEmpty, 'acceptance-final stderr 现场清单标题不能为空。');
+    _expect(row.proof.isNotEmpty, 'acceptance-final stderr 通过标准不能为空。');
+    if (!nonCommandTitles.contains(row.title)) {
+      _expect(
+        row.command != null && _allowedReportCommands.contains(row.command),
+        'acceptance-final stderr 执行项必须携带白名单命令：${row.title} / ${row.command}',
+      );
+    }
+  }
+
+  final jsonMaps = jsonItems.map(_mapFrom).toList(growable: false);
+  _expect(
+    rows.length == jsonMaps.length,
+    'acceptance-final stderr 现场清单必须和 JSON fieldChecklist 行数一致。',
+  );
+  for (var index = 0; index < rows.length; index += 1) {
+    final row = rows[index];
+    final json = jsonMaps[index];
+    _expect(
+      row.order == json['order'],
+      'acceptance-final stderr 第 ${index + 1} 行顺序必须和 JSON 一致。',
+    );
+    _expect(
+      row.title == json['title'],
+      'acceptance-final stderr 第 ${index + 1} 行标题必须和 JSON 一致。',
+    );
+    _expect(
+      row.command == json['command'],
+      'acceptance-final stderr 第 ${index + 1} 行命令必须和 JSON 一致。',
+    );
+    _expect(
+      row.proof == json['proof'],
+      'acceptance-final stderr 第 ${index + 1} 行通过标准必须和 JSON 一致。',
+    );
+  }
+}
+
 // 提取现场补验清单表格，供 Markdown 自身合同和 JSON 一致性合同复用。
 List<({String? command, int order, String proof, String title})>
 _acceptanceMarkdownChecklistRows(String markdown) {
@@ -1935,12 +1997,41 @@ _acceptanceMarkdownChecklistRows(String markdown) {
   return rows;
 }
 
+// 提取终端 stderr 的现场补验清单，避免 CLI 现场路线和报告路线漂移。
+List<({String? command, int order, String proof, String title})>
+_acceptanceFinalStderrChecklistRows(String stderr) {
+  final section = _plainTextSection(stderr, '现场补验清单：');
+  final rows = <({String? command, int order, String proof, String title})>[];
+  final pattern = RegExp(r'^-\s+(\d+)\.\s+([^：]+)：([^；]+)；通过标准：(.+)$');
+  for (final line in section.split('\n')) {
+    final match = pattern.firstMatch(line.trim());
+    if (match == null) continue;
+    final command = match.group(3)?.trim();
+    rows.add((
+      order: int.parse(match.group(1)!),
+      title: match.group(2)!.trim(),
+      command: command == null || command == '无需命令' ? null : command,
+      proof: match.group(4)!.trim(),
+    ));
+  }
+  return rows;
+}
+
 // 截取指定 Markdown 二级标题到下一个二级标题之间的正文。
 String _markdownSection(String markdown, String heading) {
   final start = markdown.indexOf(heading);
   _expect(start >= 0, 'Markdown 必须包含章节：$heading');
   final rest = markdown.substring(start + heading.length);
   final nextHeading = RegExp(r'\n##\s+').firstMatch(rest);
+  return nextHeading == null ? rest : rest.substring(0, nextHeading.start);
+}
+
+// 截取普通文本中指定标题到下一段二级语义标题之间的正文。
+String _plainTextSection(String text, String heading) {
+  final start = text.indexOf(heading);
+  _expect(start >= 0, '文本必须包含章节：$heading');
+  final rest = text.substring(start + heading.length);
+  final nextHeading = RegExp(r'\n[^-\s].+：').firstMatch(rest);
   return nextHeading == null ? rest : rest.substring(0, nextHeading.start);
 }
 

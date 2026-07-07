@@ -1620,7 +1620,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   );
   final fieldChecklist = _listAt(json, 'fieldChecklist');
   _expect(fieldChecklist.length >= 4, 'acceptance 必须给出现场补验清单。');
-  _assertAcceptanceCommandsAreWhitelisted(fieldChecklist, 'fieldChecklist');
+  _assertAcceptanceFieldChecklistContract(fieldChecklist);
   final checklistMaps = fieldChecklist.map(_mapFrom).toList(growable: false);
   _expect(
     checklistMaps.any(
@@ -1758,6 +1758,44 @@ void _assertAcceptanceCommandsAreWhitelisted(
       command is String && _allowedReportCommands.contains(command),
       'acceptance $field 不得输出非白名单命令：$command',
     );
+  }
+}
+
+// 断言现场补验清单保持稳定路线：正序、无重复，执行项必须有安全命令。
+void _assertAcceptanceFieldChecklistContract(List<Object?> items) {
+  _assertAcceptanceCommandsAreWhitelisted(items, 'fieldChecklist');
+  final seenOrders = <int>{};
+  final nonCommandTitles = <String>{'清代码', '推远端', '保留报告'};
+  var expectedOrder = 1;
+  for (final item in items) {
+    final map = _mapFrom(item);
+    final order = map['order'];
+    _expect(
+      order is int && order > 0,
+      'acceptance fieldChecklist 的 order 必须是正整数：$order',
+    );
+    _expect(
+      seenOrders.add(order as int),
+      'acceptance fieldChecklist 的 order 不得重复：$order',
+    );
+    _expect(
+      order == expectedOrder,
+      'acceptance fieldChecklist 必须按 1,2,3 连续正序输出，当前 $order，期望 $expectedOrder。',
+    );
+    expectedOrder += 1;
+
+    final title = map['title'];
+    _expect(
+      title is String && title.trim().isNotEmpty,
+      'acceptance fieldChecklist 必须有短标题。',
+    );
+    final command = map['command'];
+    if (!nonCommandTitles.contains((title as String).trim())) {
+      _expect(
+        command is String && _allowedReportCommands.contains(command),
+        'acceptance fieldChecklist 执行项必须携带白名单命令：$title / $command',
+      );
+    }
   }
 }
 

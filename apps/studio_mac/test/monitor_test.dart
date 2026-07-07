@@ -103,7 +103,18 @@ void main() {
     expect(find.text('iOS'), findsOneWidget);
     expect(find.text('3 条'), findsOneWidget);
     expect(find.text('1 条'), findsOneWidget);
-    expect(find.text('跑全量'), findsOneWidget);
+    expect(find.text('跑全量'), findsWidgets);
+    expect(find.text('现场路线'), findsOneWidget);
+    expect(find.text('补安卓后，再跑全量。'), findsOneWidget);
+    expect(find.text('接安卓'), findsOneWidget);
+    expect(find.text('跑安卓'), findsWidgets);
+    expect(find.text('终验'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('monitor-copy-v4-route')));
+    await tester.pumpAndSettle();
+    expect(copiedCommand, contains('npm run v4:android-smoke:full'));
+    expect(copiedCommand, contains('npm run v4:smoke:full'));
+    expect(copiedCommand, contains('npm run v4:acceptance-final'));
 
     await tester.tap(find.byKey(const ValueKey('monitor-copy-v4-full-smoke')));
     await tester.pumpAndSettle();
@@ -126,6 +137,12 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(copiedCommand, 'npm run v4:acceptance-audit');
+
+    await tester.tap(
+      find.byKey(const ValueKey('monitor-copy-v4-acceptance-final')),
+    );
+    await tester.pumpAndSettle();
+    expect(copiedCommand, 'npm run v4:acceptance-final');
   });
 
   testWidgets('monitor renders local trend and status distribution', (

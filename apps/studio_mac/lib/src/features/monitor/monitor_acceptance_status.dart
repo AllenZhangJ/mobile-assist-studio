@@ -4,6 +4,11 @@ const String _v4FullSmokeCommand = 'npm run v4:smoke:full';
 const String _v4PasswordSmokeCommand = 'npm run v4:smoke:full:password-stdin';
 const String _v4AndroidSmokeCommand = 'npm run v4:android-smoke:full';
 const String _v4AcceptanceAuditCommand = 'npm run v4:acceptance-audit';
+const String _v4AcceptanceFinalCommand = 'npm run v4:acceptance-final';
+const String _v4AcceptanceRouteCommands =
+    'npm run v4:android-smoke:full\n'
+    'npm run v4:smoke:full\n'
+    'npm run v4:acceptance-final';
 
 // V4 验收入口只展示本地线索和复制命令，不直接启动真机动作。
 class _V4AcceptanceStatusPanel extends StatelessWidget {
@@ -46,6 +51,7 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             value: summary.nextStepLabel,
             tone: StudioStatusTone.running,
           ),
+          _V4AcceptanceRouteCard(summary: summary),
           _CommandButton(
             controlKey: const ValueKey('monitor-copy-v4-full-smoke'),
             label: '复制全量',
@@ -86,7 +92,114 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
               message: '审计命令已复制',
             ),
           ),
+          _CommandButton(
+            controlKey: const ValueKey('monitor-copy-v4-acceptance-final'),
+            label: '复制终验',
+            icon: Icons.task_alt_outlined,
+            onPressed: () => _copyPlainText(
+              context,
+              text: _v4AcceptanceFinalCommand,
+              message: '终验命令已复制',
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+// V4AcceptanceRouteCard 展示现场最短路线，避免用户在多条命令间迷路。
+class _V4AcceptanceRouteCard extends StatelessWidget {
+  const _V4AcceptanceRouteCard({required this.summary});
+
+  final _V4AcceptanceStatusSummary summary;
+
+  // 渲染 Android 到终验的本地路线，只复制命令不直接执行。
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 274,
+      child: _InsetSurface(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.route_outlined, size: 16),
+                const SizedBox(width: 6),
+                const Expanded(
+                  child: Text(
+                    '现场路线',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                ),
+                _CommandButton(
+                  controlKey: const ValueKey('monitor-copy-v4-route'),
+                  label: '复制路线',
+                  icon: Icons.copy_all_outlined,
+                  onPressed: () => _copyPlainText(
+                    context,
+                    text: _v4AcceptanceRouteCommands,
+                    message: '路线已复制',
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              summary.routeHint,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: StudioColors.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: const [
+                _V4AcceptanceRouteStep(label: '接安卓'),
+                _V4AcceptanceRouteStep(label: '跑安卓'),
+                _V4AcceptanceRouteStep(label: '跑全量'),
+                _V4AcceptanceRouteStep(label: '终验'),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// V4AcceptanceRouteStep 是路线中的短步骤胶囊。
+class _V4AcceptanceRouteStep extends StatelessWidget {
+  const _V4AcceptanceRouteStep({required this.label});
+
+  final String label;
+
+  // 渲染固定宽度短步骤，防止中文换行撑开验收卡。
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 56,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: StudioColors.panel.withValues(alpha: 0.82),
+        border: Border.all(color: StudioColors.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
       ),
     );
   }
@@ -155,6 +268,7 @@ final class _V4AcceptanceStatusSummary {
     required this.issueLabel,
     required this.issueTone,
     required this.nextStepLabel,
+    required this.routeHint,
   });
 
   final String statusLabel;
@@ -166,6 +280,7 @@ final class _V4AcceptanceStatusSummary {
   final String issueLabel;
   final StudioStatusTone issueTone;
   final String nextStepLabel;
+  final String routeHint;
 
   // 根据当前连接平台和本地历史生成保守验收状态。
   factory _V4AcceptanceStatusSummary.fromSnapshot(
@@ -194,6 +309,7 @@ final class _V4AcceptanceStatusSummary {
           ? StudioStatusTone.warning
           : StudioStatusTone.ready,
       nextStepLabel: _v4NextStepLabel(platform, hasLocalRuns),
+      routeHint: _v4RouteHint(platform),
     );
   }
 }
@@ -220,4 +336,13 @@ String _v4NextStepLabel(MobilePlatform platform, bool hasLocalRuns) {
   if (platform == MobilePlatform.android) return '跑安卓';
   if (platform == MobilePlatform.ios) return hasLocalRuns ? '跑全量' : '先冒烟';
   return '先连接';
+}
+
+// 根据当前平台给出现场路线里的短提示。
+String _v4RouteHint(MobilePlatform platform) {
+  return switch (platform) {
+    MobilePlatform.android => '保持亮屏，先跑安卓。',
+    MobilePlatform.ios => '补安卓后，再跑全量。',
+    MobilePlatform.unknown => '接安卓，开调试，点允许。',
+  };
 }

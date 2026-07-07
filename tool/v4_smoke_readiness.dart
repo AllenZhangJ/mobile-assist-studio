@@ -19,6 +19,10 @@ Future<void> main(List<String> args) async {
   );
   await file.writeAsString(report.toMarkdown(), flush: true);
   stdout.writeln('Smoke readiness report: ${file.path}');
+  if (options.requireComplete && !report.isComplete) {
+    stderr.writeln('V4 smoke completion audit failed: 双平台 smoke 尚未成功留档。');
+    exit(2);
+  }
 }
 
 // 收集 Appium、iOS、Android、隧道和本地证据状态。
@@ -385,6 +389,7 @@ final class _SmokeReadinessOptions {
     required this.appiumPort,
     required this.tunnelPort,
     required this.timeout,
+    required this.requireComplete,
     required this.help,
   });
 
@@ -393,6 +398,7 @@ final class _SmokeReadinessOptions {
   final int appiumPort;
   final int tunnelPort;
   final Duration timeout;
+  final bool requireComplete;
   final bool help;
 
   // 解析命令行参数。
@@ -402,6 +408,7 @@ final class _SmokeReadinessOptions {
     var appiumPort = 4723;
     var tunnelPort = 42314;
     var timeoutSeconds = 4;
+    var requireComplete = false;
     var help = false;
 
     for (var index = 0; index < args.length; index += 1) {
@@ -425,6 +432,8 @@ final class _SmokeReadinessOptions {
         case '--timeout':
           timeoutSeconds = int.parse(_nextValue(args, index, arg));
           index += 1;
+        case '--require-complete':
+          requireComplete = true;
         default:
           throw ArgumentError('未知参数：$arg');
       }
@@ -436,6 +445,7 @@ final class _SmokeReadinessOptions {
       appiumPort: appiumPort,
       tunnelPort: tunnelPort,
       timeout: Duration(seconds: timeoutSeconds),
+      requireComplete: requireComplete,
       help: help,
     );
   }
@@ -621,6 +631,8 @@ final class _SmokeReadinessReport {
 
   bool get _latestAndroidPassed => artifacts.latestAndroid?.passed ?? false;
 
+  bool get isComplete => _latestIosPassed && _latestAndroidPassed;
+
   // 转成可留档的脱敏 Markdown。
   String toMarkdown() {
     final buffer = StringBuffer()
@@ -712,7 +724,7 @@ final class _SmokeReadinessReport {
   }
 
   String _completionLabel() {
-    if (_latestIosPassed && _latestAndroidPassed) {
+    if (isComplete) {
       return '最近双平台 smoke 已成功留档';
     }
     if (iosFullSmokeReady && androidFullSmokeReady) {
@@ -835,5 +847,6 @@ V4 smoke readiness
   --appium-port <port>   Appium 端口，默认 4723
   --tunnel-port <port>   XCUITest tunnel registry 端口，默认 42314
   --timeout <seconds>    单项探测超时，默认 4
+  --require-complete     最近双平台 smoke 未成功留档时返回非 0
   --help                 查看帮助
 ''';

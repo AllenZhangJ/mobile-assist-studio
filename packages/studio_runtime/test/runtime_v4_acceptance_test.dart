@@ -143,6 +143,58 @@ void main() {
     expect(summary.androidRuns, 1);
   });
 
+  test(
+    'local v4 acceptance reader skips structurally invalid reports',
+    () async {
+      final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
+      addTearDown(() async {
+        if (temp.existsSync()) await temp.delete(recursive: true);
+      });
+      await File(
+        '${temp.path}/FINAL_ACCEPTANCE_2026-01-01T00-00-00Z.json',
+      ).writeAsString(_acceptanceJson(git: 'good', androidRuns: 1));
+      await File(
+        '${temp.path}/FINAL_ACCEPTANCE_2026-01-02T00-00-00Z.json',
+      ).writeAsString('''
+{
+  "schemaVersion": 1,
+  "kind": "v4FinalAcceptance",
+  "timestamp": "2026-01-02T00:00:00.000000Z",
+  "completion": {
+    "auditOk": true,
+    "complete": false
+  }
+}
+''');
+      await File(
+        '${temp.path}/FINAL_ACCEPTANCE_2026-01-03T00-00-00Z.json',
+      ).writeAsString('''
+{
+  "schemaVersion": 1,
+  "kind": "notFinalAcceptance",
+  "timestamp": "2026-01-03T00:00:00.000000Z",
+  "completion": {
+    "auditOk": true,
+    "complete": false
+  },
+  "evidence": {
+    "readiness": {"localState": {}},
+    "archive": {"counts": {}}
+  }
+}
+''');
+
+      final summary = await LocalV4AcceptanceSummaryReader(
+        directory: temp,
+      ).readLatest();
+
+      expect(summary.hasReport, isTrue);
+      expect(summary.gitRevision, 'good');
+      expect(summary.androidRuns, 1);
+      expect(summary.statusLabel, '最终验收未完成');
+    },
+  );
+
   test('local v4 acceptance reader redacts visible report text', () async {
     final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
     addTearDown(() async {

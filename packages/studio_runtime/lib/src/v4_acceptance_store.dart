@@ -45,11 +45,29 @@ final class LocalV4AcceptanceSummaryReader
     try {
       final decoded = jsonDecode(file.readAsStringSync());
       if (decoded is! Map<String, Object?>) return null;
+      if (!_acceptanceJsonLooksStructurallyValid(decoded)) return null;
       return _acceptanceSummaryFromJson(decoded);
     } on Object {
       return null;
     }
   }
+}
+
+// 判断终验 JSON 是否具备最小稳定结构，避免半写入 JSON 覆盖旧有效报告。
+bool _acceptanceJsonLooksStructurallyValid(Map<String, Object?> json) {
+  if (_stringAt(json, 'kind') != 'v4FinalAcceptance') return false;
+  final timestamp = _stringAt(json, 'timestamp');
+  if (timestamp == null || DateTime.tryParse(timestamp) == null) return false;
+  final completion = _acceptanceMapAt(json, 'completion');
+  if (_boolAt(completion, 'auditOk') == null) return false;
+  if (_boolAt(completion, 'complete') == null) return false;
+  final evidence = _acceptanceMapAt(json, 'evidence');
+  final readiness = _acceptanceMapAt(evidence, 'readiness');
+  final archive = _acceptanceMapAt(evidence, 'archive');
+  if (readiness.isEmpty || archive.isEmpty) return false;
+  final localState = _acceptanceMapAt(readiness, 'localState');
+  final counts = _acceptanceMapAt(archive, 'counts');
+  return localState.isNotEmpty && counts.isNotEmpty;
 }
 
 // 把终验 JSON 转为脱敏摘要。

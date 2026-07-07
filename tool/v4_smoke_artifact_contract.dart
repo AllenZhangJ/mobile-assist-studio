@@ -711,6 +711,19 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
         failures.any((failure) => failure.contains('归档终验')),
     'acceptance 必须保留两个最终门禁失败摘要。',
   );
+  final gitStatus = _mapAt(json, 'gitStatus');
+  _expect(json['git'] is String, 'acceptance 必须保留短提交号。');
+  _expect(
+    gitStatus['revision'] is String,
+    'acceptance gitStatus 必须保留 revision。',
+  );
+  _expect(gitStatus['branch'] is String, 'acceptance gitStatus 必须保留 branch。');
+  _expect(gitStatus.containsKey('dirty'), 'acceptance gitStatus 必须保留 dirty。');
+  _expect(gitStatus['worktree'] is String, 'acceptance gitStatus 必须保留工作区状态。');
+  _expect(gitStatus.containsKey('synced'), 'acceptance gitStatus 必须保留 synced。');
+  _expect(gitStatus['ahead'] is int, 'acceptance gitStatus 必须保留 ahead 数字。');
+  _expect(gitStatus['behind'] is int, 'acceptance gitStatus 必须保留 behind 数字。');
+  _expect(gitStatus['remote'] is String, 'acceptance gitStatus 必须保留远端状态。');
   final gateGaps = _listAt(json, 'gateGaps');
   _expect(gateGaps.isNotEmpty, 'acceptance 必须生成结构化终验门禁缺口。');
   _expect(
@@ -841,6 +854,8 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
 void _assertAcceptanceMarkdown(String markdown) {
   for (final text in <String>[
     '# V4 Final Acceptance',
+    '- 工作区：',
+    '- 远端：',
     '## 步骤',
     '## 结论',
     '## 现场摘要',

@@ -537,13 +537,16 @@ final class _AcceptanceReport {
         .every((result) => result.passed);
   }
 
-  bool get complete => results.every((result) => result.passed);
+  bool get complete =>
+      results.every((result) => result.passed) && gitStatus.ready;
 
   List<String> get finalFailures {
-    return results
+    final failures = results
         .where((result) => !result.passed)
         .map((result) => result.failureLabel)
-        .toList(growable: false);
+        .toList();
+    failures.addAll(gitStatus.failures);
+    return failures;
   }
 
   // 根据最终失败摘要生成可执行下一步，不读取本机隐私信息。
@@ -569,7 +572,10 @@ final class _AcceptanceReport {
 
   // 生成结构化终验门禁缺口，便于 AI / 人工按证据补齐。
   List<_AcceptanceGateGap> get gateGaps {
-    return _gateGapsFromEvidence(evidence);
+    return <_AcceptanceGateGap>[
+      ...gitStatus.gateGaps,
+      ..._gateGapsFromEvidence(evidence),
+    ];
   }
 
   String toJsonString() {
@@ -718,6 +724,43 @@ final class _GitStatus {
     return '未知';
   }
 
+  bool get ready => dirty == false && remoteState.synced == true;
+
+  List<String> get failures {
+    final failures = <String>[];
+    if (dirty != false) {
+      failures.add('代码工作区：$worktreeLabel。');
+    }
+    if (remoteState.synced != true) {
+      failures.add('远端同步：$remoteLabel。');
+    }
+    return failures;
+  }
+
+  List<_AcceptanceGateGap> get gateGaps {
+    final gaps = <_AcceptanceGateGap>[];
+    if (dirty != false) {
+      gaps.add(
+        _AcceptanceGateGap(
+          title: '代码工作区',
+          current: worktreeLabel,
+          required: '工作区干净，无未提交改动',
+        ),
+      );
+    }
+    if (remoteState.synced != true) {
+      gaps.add(
+        _AcceptanceGateGap(
+          title: '远端同步',
+          current:
+              '$remoteLabel，ahead ${remoteState.aheadLabel}，behind ${remoteState.behindLabel}',
+          required: '当前提交已推送并与上游同步',
+        ),
+      );
+    }
+    return gaps;
+  }
+
   // 转为 JSON，保持旧顶层 git 字段之外的扩展指纹。
   Map<String, Object?> toJsonObject() {
     return <String, Object?>{
@@ -747,6 +790,10 @@ final class _GitRemoteState {
     if (ahead < 0 || behind < 0) return null;
     return ahead == 0 && behind == 0;
   }
+
+  String get aheadLabel => ahead < 0 ? '未知' : '$ahead';
+
+  String get behindLabel => behind < 0 ? '未知' : '$behind';
 }
 
 // 终验门禁缺口，描述还差哪类证据才能完成。
@@ -1299,6 +1346,12 @@ List<String> _nextStepsForFailures({
       '基础：先运行 `npm run v4:smoke-readiness` 和 `npm run v4:smoke-archive`。',
     );
   }
+  if (joined.contains('代码工作区')) {
+    steps.add('代码：提交或撤销本地改动，保持工作区干净。');
+  }
+  if (joined.contains('远端同步')) {
+    steps.add('远端：推送当前提交，并确认本地与上游同步。');
+  }
   if (needsIosSmoke) {
     if (latestFullSmokeNeedsIosTunnel) {
       steps.add(
@@ -1361,6 +1414,14 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
       ),
     );
     order += 1;
+  }
+
+  if (joined.contains('提交或撤销本地改动')) {
+    add(title: '清代码', proof: '工作区干净，没有未提交改动。');
+  }
+
+  if (joined.contains('推送当前提交')) {
+    add(title: '推远端', proof: '当前提交已推送，ahead 0 且 behind 0。');
   }
 
   if (joined.contains('v4:ios-smoke:full:password-prompt')) {

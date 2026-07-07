@@ -378,6 +378,41 @@ Future<void> _assertReadinessNextStepStateContracts() async {
     'ias-v4-readiness-state-',
   );
   try {
+    await _assertIosReadinessState(
+      tempDir,
+      name: 'ios-none',
+      usbmuxOutput: '[]',
+      usbDevices: 0,
+      available: false,
+      expectedTexts: const <String>[
+        '未发现 USB iPhone',
+        '先插线、解锁并信任',
+        'npm run v4:ios-smoke:full:password-prompt',
+      ],
+    );
+    await _assertIosReadinessState(
+      tempDir,
+      name: 'ios-single',
+      usbmuxOutput: '[{"ConnectionType":"USB"}]',
+      usbDevices: 1,
+      available: true,
+      expectedTexts: const <String>[
+        '运行 `npm run v4:ios-smoke:full:password-prompt`',
+        '按提示输入 Mac 密码',
+      ],
+    );
+    await _assertIosReadinessState(
+      tempDir,
+      name: 'ios-multi',
+      usbmuxOutput: '[{"ConnectionType":"USB"},{"ConnectionType":"USB"}]',
+      usbDevices: 2,
+      available: false,
+      expectedTexts: const <String>[
+        '发现多台 USB iPhone',
+        '只连接一台 iPhone',
+        'npm run v4:ios-smoke:full:password-prompt',
+      ],
+    );
     await _assertAndroidReadinessState(
       tempDir,
       name: 'none',
@@ -450,6 +485,52 @@ Future<void> _assertReadinessNextStepStateContracts() async {
   }
 }
 
+// 用 fake usbmux 输出生成 readiness，校验 iOS USB 单设备边界。
+Future<void> _assertIosReadinessState(
+  Directory rootDir, {
+  required String name,
+  required String usbmuxOutput,
+  required int usbDevices,
+  required bool available,
+  required List<String> expectedTexts,
+}) async {
+  final binDir = Directory('${rootDir.path}/bin-$name');
+  await _writeFakeProbeCommands(
+    binDir,
+    adbDevicesOutput: 'List of devices attached\n\n',
+    usbmuxOutput: usbmuxOutput,
+  );
+  final outDir = Directory('${rootDir.path}/out-$name');
+  final result = await _runReadiness(
+    outDir,
+    environment: <String, String>{
+      'PATH': '${binDir.path}:${Platform.environment['PATH'] ?? ''}',
+    },
+  );
+  _expect(
+    result.exitCode == 0,
+    'readiness iOS 状态 fixture $name 应生成成功，实际 ${result.exitCode}：${_shortText(result.stderr)}',
+  );
+
+  final artifacts = await _loadGeneratedArtifacts(outDir);
+  final localState = _mapAt(artifacts.json, 'localState');
+  final iosUsbMux = _mapAt(localState, 'iosUsbMux');
+  _expect(
+    iosUsbMux['usbDevices'] == usbDevices,
+    '$name usbDevices 计数应为 $usbDevices。',
+  );
+  _expect(
+    iosUsbMux['available'] == available,
+    '$name iOS USB available 状态不正确。',
+  );
+
+  final nextSteps = _stringList(artifacts.json['nextSteps']).join('\n');
+  for (final text in expectedTexts) {
+    _expect(nextSteps.contains(text), '$name 下一步必须包含：$text');
+  }
+  _assertNoSensitiveText(artifacts.allText);
+}
+
 // 用 fake adb 输出生成 readiness，校验机器可读状态和用户下一步一致。
 Future<void> _assertAndroidReadinessState(
   Directory rootDir, {
@@ -497,6 +578,7 @@ Future<void> _assertAndroidReadinessState(
 Future<void> _writeFakeProbeCommands(
   Directory binDir, {
   required String adbDevicesOutput,
+  String usbmuxOutput = '[]',
 }) async {
   await binDir.create(recursive: true);
   await _writeFakeExecutable(File('${binDir.path}/git'), '''
@@ -521,7 +603,9 @@ exit 0
   await _writeFakeExecutable(File('${binDir.path}/pymobiledevice3'), '''
 #!/bin/sh
 if [ "\$1" = "usbmux" ]; then
-  echo '[]'
+  cat <<'EOF'
+$usbmuxOutput
+EOF
   exit 0
 fi
 exit 0

@@ -1477,6 +1477,10 @@ String _iosNextStepForFailures({
   final command = needsPasswordPrompt
       ? 'npm run v4:ios-smoke:full:password-prompt'
       : 'npm run v4:ios-smoke:full';
+  final usbDevices = _intAt(iosUsbMux, 'usbDevices');
+  if (usbState != null && !usbState.available && usbDevices > 1) {
+    return 'iOS：当前发现多台 USB iPhone（${usbState.label}）。只连接一台 iPhone，解锁并信任，再运行 `$command`。';
+  }
   if (usbState != null && !usbState.available) {
     return 'iOS：当前未发现 USB iPhone（${usbState.label}）。先插线、解锁并信任，再运行 `$command`。';
   }
@@ -1628,6 +1632,10 @@ String _iosChecklistProof(
   required bool needsPasswordPrompt,
 }) {
   final usbState = _localChecklistState(iosUsbMux);
+  final usbDevices = _intAt(iosUsbMux, 'usbDevices');
+  if (usbState != null && !usbState.available && usbDevices > 1) {
+    return '当前发现多台 USB iPhone（${usbState.label}）。只连接一台 iPhone，解锁并信任，再补 iOS。';
+  }
   if (usbState != null && !usbState.available) {
     return '当前未发现 USB iPhone（${usbState.label}）。先插线、解锁并信任，再补 iOS。';
   }
@@ -1689,6 +1697,12 @@ _ChecklistLocalState? _localChecklistState(Map<String, Object?> device) {
     available: device['available'] == true,
     label: _plainText(_localStateLabel(device)),
   );
+}
+
+// 从本机状态中安全读取整数计数，坏字段按 0 降级。
+int _intAt(Map<String, Object?> map, String key) {
+  final value = map[key];
+  return value is int ? value : 0;
 }
 
 // 现场清单里的本机设备短状态。

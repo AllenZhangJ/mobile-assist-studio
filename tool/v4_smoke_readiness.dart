@@ -143,7 +143,7 @@ Future<_IosUsbMuxProbe> _probeIosUsbMux(Duration timeout) async {
   if (result.exitCode == 0) {
     final count = _countUsbmuxDevices(result.stdout);
     return _IosUsbMuxProbe(
-      available: count > 0,
+      available: count == 1,
       toolAvailable: true,
       usbDevices: count,
     );
@@ -1477,6 +1477,11 @@ final class _SmokeReadinessReport {
 
   String _iosNextStep() {
     const command = 'npm run v4:ios-smoke:full:password-prompt';
+    if (iosUsbMux.toolAvailable &&
+        !iosUsbMux.permissionDenied &&
+        iosUsbMux.usbDevices > 1) {
+      return 'iOS：发现多台 USB iPhone（${_iosUsbMuxDetail()}）。只连接一台 iPhone，解锁并信任，再运行 `$command`。';
+    }
     if (iosUsbMux.toolAvailable &&
         !iosUsbMux.permissionDenied &&
         !iosUsbMux.available) {

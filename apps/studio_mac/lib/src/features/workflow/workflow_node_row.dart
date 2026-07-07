@@ -6,6 +6,7 @@ class _WorkflowNodeRow extends StatelessWidget {
     required this.workflow,
     required this.node,
     required this.entry,
+    required this.capabilityBadge,
     required this.diagnostics,
     required this.evidenceSummary,
     required this.executionState,
@@ -17,6 +18,7 @@ class _WorkflowNodeRow extends StatelessWidget {
   final WorkflowDefinition workflow;
   final WorkflowNode node;
   final bool entry;
+  final _WorkflowNodeCapabilityBadge? capabilityBadge;
   final List<_WorkflowSourceDiagnostic> diagnostics;
   final _WorkflowNodeEvidenceSummary? evidenceSummary;
   final _WorkflowNodeExecutionState executionState;
@@ -31,6 +33,38 @@ class _WorkflowNodeRow extends StatelessWidget {
     final hasDiagnostics = diagnostics.isNotEmpty;
     final evidenceSummary = this.evidenceSummary;
     final hasEvidence = evidenceSummary?.hasEvidence ?? false;
+    final statusPills = <Widget>[
+      if (entry) const StatusPill(label: '入口', tone: StudioStatusTone.running),
+      if (hasDiagnostics)
+        KeyedSubtree(
+          key: ValueKey('workflow-node-issue-${node.id}'),
+          child: StatusPill(
+            label: '${diagnostics.length} 个问题',
+            tone: StudioStatusTone.warning,
+          ),
+        ),
+      if (evidenceSummary != null && hasEvidence)
+        KeyedSubtree(
+          key: ValueKey('workflow-node-evidence-${node.id}'),
+          child: StatusPill(
+            label: evidenceSummary.badgeLabel,
+            tone: evidenceSummary.badgeTone,
+          ),
+        ),
+      if (capabilityBadge case final _WorkflowNodeCapabilityBadge badge)
+        Tooltip(
+          message: badge.detail,
+          child: KeyedSubtree(
+            key: ValueKey('workflow-node-capability-${node.id}'),
+            child: StatusPill(label: badge.label, tone: badge.tone),
+          ),
+        ),
+      if (executionState != _WorkflowNodeExecutionState.idle)
+        StatusPill(
+          label: _labelForExecutionState(executionState),
+          tone: _toneForExecutionState(executionState),
+        ),
+    ];
     return InkWell(
       key: ValueKey('workflow-node-${node.id}'),
       borderRadius: BorderRadius.circular(8),
@@ -92,11 +126,7 @@ class _WorkflowNodeRow extends StatelessWidget {
                           style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                       ),
-                      if (entry ||
-                          hasDiagnostics ||
-                          hasEvidence ||
-                          executionState !=
-                              _WorkflowNodeExecutionState.idle) ...[
+                      if (statusPills.isNotEmpty) ...[
                         const SizedBox(width: 8),
                         Flexible(
                           child: FittedBox(
@@ -104,55 +134,7 @@ class _WorkflowNodeRow extends StatelessWidget {
                             alignment: Alignment.centerRight,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (entry)
-                                  const StatusPill(
-                                    label: '入口',
-                                    tone: StudioStatusTone.running,
-                                  ),
-                                if ((entry && hasDiagnostics) ||
-                                    (entry && hasEvidence) ||
-                                    (entry &&
-                                        executionState !=
-                                            _WorkflowNodeExecutionState.idle))
-                                  const SizedBox(width: 8),
-                                if (hasDiagnostics)
-                                  KeyedSubtree(
-                                    key: ValueKey(
-                                      'workflow-node-issue-${node.id}',
-                                    ),
-                                    child: StatusPill(
-                                      label: '${diagnostics.length} 个问题',
-                                      tone: StudioStatusTone.warning,
-                                    ),
-                                  ),
-                                if (hasDiagnostics && hasEvidence)
-                                  const SizedBox(width: 8),
-                                if (evidenceSummary != null && hasEvidence)
-                                  KeyedSubtree(
-                                    key: ValueKey(
-                                      'workflow-node-evidence-${node.id}',
-                                    ),
-                                    child: StatusPill(
-                                      label: evidenceSummary.badgeLabel,
-                                      tone: evidenceSummary.badgeTone,
-                                    ),
-                                  ),
-                                if ((hasDiagnostics || hasEvidence) &&
-                                    executionState !=
-                                        _WorkflowNodeExecutionState.idle)
-                                  const SizedBox(width: 8),
-                                if (executionState !=
-                                    _WorkflowNodeExecutionState.idle)
-                                  StatusPill(
-                                    label: _labelForExecutionState(
-                                      executionState,
-                                    ),
-                                    tone: _toneForExecutionState(
-                                      executionState,
-                                    ),
-                                  ),
-                              ],
+                              children: _workflowNodePillsWithGaps(statusPills),
                             ),
                           ),
                         ),
@@ -192,4 +174,14 @@ class _WorkflowNodeRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// 给节点卡片状态胶囊添加统一间距，避免每个状态组合手写条件。
+List<Widget> _workflowNodePillsWithGaps(List<Widget> pills) {
+  return <Widget>[
+    for (var index = 0; index < pills.length; index += 1) ...[
+      if (index > 0) const SizedBox(width: 8),
+      pills[index],
+    ],
+  ];
 }

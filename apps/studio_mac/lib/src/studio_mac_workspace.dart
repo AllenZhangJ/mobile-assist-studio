@@ -144,6 +144,7 @@ part 'features/workflow/workflow_canvas_minimap_painter.dart';
 part 'features/workflow/workflow_canvas_layout.dart';
 part 'features/workflow/workflow_canvas_painter.dart';
 part 'features/workflow/workflow_node_evidence_model.dart';
+part 'features/workflow/workflow_node_capability_model.dart';
 part 'features/workflow/workflow_node_row.dart';
 part 'features/workflow/workflow_node_branch_helpers.dart';
 part 'features/workflow/workflow_node_execution_helpers.dart';

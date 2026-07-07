@@ -4,6 +4,10 @@ part of '../../studio_mac_workspace.dart';
 class _WorkflowVisualList extends StatefulWidget {
   const _WorkflowVisualList({
     required this.workflow,
+    required this.targetLibrary,
+    required this.connectionStatus,
+    required this.mobileRuntime,
+    required this.settings,
     required this.diagnosticsByNodeId,
     required this.nodeEvidenceByNodeId,
     required this.executionFocus,
@@ -27,6 +31,10 @@ class _WorkflowVisualList extends StatefulWidget {
   });
 
   final WorkflowDefinition workflow;
+  final TargetLibrarySnapshot targetLibrary;
+  final ConnectionStatus connectionStatus;
+  final MobileRuntimeSummary mobileRuntime;
+  final StudioSettings settings;
   final Map<String, List<_WorkflowSourceDiagnostic>> diagnosticsByNodeId;
   final Map<String, _WorkflowNodeEvidenceSummary> nodeEvidenceByNodeId;
   final RuntimeExecutionFocus executionFocus;

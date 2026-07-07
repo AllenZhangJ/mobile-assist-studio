@@ -36,6 +36,13 @@ extension _WorkflowCanvasNodeLayers on _WorkflowVisualListState {
           workflow: widget.workflow,
           node: node,
           entry: node.id == widget.workflow.entryNodesId,
+          capabilityBadge: _workflowNodeCapabilityBadge(
+            node: node,
+            targetLibrary: widget.targetLibrary,
+            connectionStatus: widget.connectionStatus,
+            mobileRuntime: widget.mobileRuntime,
+            settings: widget.settings,
+          ),
           diagnostics:
               widget.diagnosticsByNodeId[node.id] ??
               const <_WorkflowSourceDiagnostic>[],

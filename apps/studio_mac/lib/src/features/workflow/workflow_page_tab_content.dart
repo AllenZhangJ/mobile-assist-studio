@@ -51,6 +51,10 @@ extension _WorkflowPageTabContent on _WorkflowPageState {
   }) {
     return _WorkflowVisualTab(
       workflow: workflow,
+      targetLibrary: widget.snapshot.targetLibrary,
+      connectionStatus: widget.snapshot.connectionStatus,
+      mobileRuntime: widget.snapshot.mobileRuntime,
+      settings: widget.snapshot.settings,
       diagnosticsByNodeId: diagnosticsByNodeId,
       nodeEvidenceByNodeId: _latestNodeEvidenceByNodeId,
       executionFocus: widget.snapshot.executionFocus,

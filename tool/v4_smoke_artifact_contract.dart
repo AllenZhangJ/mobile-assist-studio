@@ -73,8 +73,12 @@ Future<void> main() async {
           finalAcceptance.stderr.contains('npm run v4:android-smoke:full') &&
           finalAcceptance.stderr.contains(
             'npm run v4:smoke:full:password-prompt',
-          ),
-      'acceptance final 必须提示最终验收缺口和可执行门禁命令。',
+          ) &&
+          finalAcceptance.stderr.contains('现场补验清单') &&
+          finalAcceptance.stderr.contains('当前 iOS') &&
+          finalAcceptance.stderr.contains('当前 Android') &&
+          finalAcceptance.stderr.contains('先补齐单平台 smoke'),
+      'acceptance final 必须提示最终验收缺口、现场补验清单和可执行门禁命令。',
     );
     stdout.writeln('V4 smoke artifact contract passed');
   } finally {

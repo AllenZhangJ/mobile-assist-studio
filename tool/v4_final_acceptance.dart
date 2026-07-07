@@ -57,6 +57,12 @@ Future<void> main(List<String> args) async {
         stderr.writeln('- ${gap.stderrLine}');
       }
     }
+    if (report.fieldChecklist.isNotEmpty) {
+      stderr.writeln('现场补验清单：');
+      for (final item in report.fieldChecklist) {
+        stderr.writeln('- ${item.stderrLine}');
+      }
+    }
     exit(2);
   }
 }
@@ -603,7 +609,7 @@ final class _AcceptanceGateGap {
   String get stderrLine {
     final value = command;
     final suffix = value == null || value.isEmpty ? '' : '；建议命令：$value';
-    return '$title：$current；通过标准：$required$suffix';
+    return '$title：${_trimForStderr(current)}；通过标准：${_trimForStderr(required)}$suffix';
   }
 
   // 转为 JSON，保持短命令和脱敏短文案。
@@ -637,6 +643,12 @@ final class _AcceptanceChecklistItem {
     return '`$value`';
   }
 
+  String get stderrLine {
+    final value = command;
+    final commandPart = value == null || value.isEmpty ? '无需命令' : value;
+    return '$order. $title：$commandPart；通过标准：$proof';
+  }
+
   // 转为 JSON，命令保持短 npm 入口，不写本机路径或设备标识。
   Map<String, Object?> toJsonObject() {
     return <String, Object?>{
@@ -646,6 +658,11 @@ final class _AcceptanceChecklistItem {
       'proof': proof,
     };
   }
+}
+
+// 清理终端单行拼接前的收尾标点，避免出现“。；”这类噪声。
+String _trimForStderr(String value) {
+  return value.replaceFirst(RegExp(r'[。；;，,.\s]+$'), '');
 }
 
 // AcceptanceEvidenceSummary 汇总刚生成的 readiness 和 archive 脱敏摘要。

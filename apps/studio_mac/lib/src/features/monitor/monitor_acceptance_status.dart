@@ -32,6 +32,11 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             tone: summary.localRunTone,
           ),
           _V4AcceptanceFact(
+            label: '安卓留档',
+            value: summary.androidRunLabel,
+            tone: summary.androidRunTone,
+          ),
+          _V4AcceptanceFact(
             label: '问题记录',
             value: summary.issueLabel,
             tone: summary.issueTone,
@@ -255,6 +260,8 @@ final class _V4AcceptanceStatusSummary {
     required this.platformTone,
     required this.localRunLabel,
     required this.localRunTone,
+    required this.androidRunLabel,
+    required this.androidRunTone,
     required this.issueLabel,
     required this.issueTone,
     required this.nextStepLabel,
@@ -267,6 +274,8 @@ final class _V4AcceptanceStatusSummary {
   final StudioStatusTone platformTone;
   final String localRunLabel;
   final StudioStatusTone localRunTone;
+  final String androidRunLabel;
+  final StudioStatusTone androidRunTone;
   final String issueLabel;
   final StudioStatusTone issueTone;
   final String nextStepLabel;
@@ -281,6 +290,35 @@ final class _V4AcceptanceStatusSummary {
         history.failedRuns + history.pausedRuns + history.stoppedRuns;
     final hasLocalRuns = history.totalRuns > 0;
     final platform = snapshot.mobileRuntime.platform;
+    final acceptance = snapshot.v4AcceptanceSummary;
+    if (acceptance.hasReport) {
+      return _V4AcceptanceStatusSummary(
+        statusLabel: acceptance.complete ? '已完成' : '未完成',
+        tone: acceptance.complete
+            ? StudioStatusTone.ready
+            : acceptance.auditOk
+            ? StudioStatusTone.warning
+            : StudioStatusTone.error,
+        platformLabel: _v4PlatformLabel(platform),
+        platformTone: _v4PlatformTone(platform),
+        localRunLabel: 'iOS ${acceptance.iosRuns}',
+        localRunTone: acceptance.iosRuns > 0
+            ? StudioStatusTone.ready
+            : StudioStatusTone.warning,
+        androidRunLabel: '安卓 ${acceptance.androidRuns}',
+        androidRunTone: acceptance.androidRuns > 0
+            ? StudioStatusTone.ready
+            : StudioStatusTone.warning,
+        issueLabel: acceptance.failures.isEmpty
+            ? '无'
+            : '${acceptance.failures.length} 条',
+        issueTone: acceptance.failures.isEmpty
+            ? StudioStatusTone.ready
+            : StudioStatusTone.warning,
+        nextStepLabel: _v4AcceptanceNextStepLabel(acceptance),
+        routeHint: _v4AcceptanceRouteHint(acceptance),
+      );
+    }
     return _V4AcceptanceStatusSummary(
       statusLabel: hasLocalRuns ? '待终验' : '待留档',
       tone: issueRuns > 0
@@ -294,6 +332,8 @@ final class _V4AcceptanceStatusSummary {
       localRunTone: hasLocalRuns
           ? StudioStatusTone.ready
           : StudioStatusTone.offline,
+      androidRunLabel: '未知',
+      androidRunTone: StudioStatusTone.offline,
       issueLabel: issueRuns > 0 ? '$issueRuns 条' : '无',
       issueTone: issueRuns > 0
           ? StudioStatusTone.warning
@@ -302,6 +342,29 @@ final class _V4AcceptanceStatusSummary {
       routeHint: _v4RouteHint(platform),
     );
   }
+}
+
+// 根据终验报告给出短下一步，避免把长命令挤进指标卡。
+String _v4AcceptanceNextStepLabel(V4AcceptanceSummary acceptance) {
+  if (acceptance.complete) return '已完成';
+  if (!acceptance.hasAndroidRun) return '补安卓';
+  if (acceptance.fullSmokeReports == 0 ||
+      acceptance.latestFullSmokeLabel != '完整通过') {
+    return '跑全量';
+  }
+  return '跑终验';
+}
+
+// 根据终验报告给现场路线卡生成短提示。
+String _v4AcceptanceRouteHint(V4AcceptanceSummary acceptance) {
+  if (acceptance.complete) return '终验已完成。';
+  if (!acceptance.hasAndroidRun) {
+    final detail = acceptance.androidDetail;
+    if (detail.isNotEmpty && detail != '无安卓状态。') return detail;
+    return '接安卓，开调试，点允许。';
+  }
+  if (acceptance.latestFullSmokeLabel != '完整通过') return '再跑全量 smoke。';
+  return '补齐后跑最终验收。';
 }
 
 // 将移动平台转成用户可读短标签。

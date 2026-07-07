@@ -129,7 +129,10 @@ class _MonitorPageState extends State<_MonitorPage> {
                     _CommandButton(
                       label: '刷新',
                       icon: Icons.refresh,
-                      onPressed: () => widget.controller.refreshRunHistory(),
+                      onPressed: () async {
+                        await widget.controller.refreshRunHistory();
+                        await widget.controller.refreshV4AcceptanceSummary();
+                      },
                     ),
                   ],
                 ),

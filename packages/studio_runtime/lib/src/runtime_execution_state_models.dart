@@ -172,6 +172,7 @@ final class StudioRuntimeSnapshot {
     required this.latestScreenshotAt,
     required this.inspectorSnapshot,
     required this.dependencyReport,
+    required this.v4AcceptanceSummary,
     required this.mobileRuntime,
     required this.runHistory,
     required this.executionFocus,
@@ -209,6 +210,7 @@ final class StudioRuntimeSnapshot {
       latestScreenshotAt: null,
       inspectorSnapshot: null,
       dependencyReport: LocalDependencyReport.empty,
+      v4AcceptanceSummary: V4AcceptanceSummary.empty,
       mobileRuntime: MobileRuntimeSummary.initial,
       runHistory: RunHistorySummary.empty,
       executionFocus: RuntimeExecutionFocus.empty,
@@ -235,6 +237,7 @@ final class StudioRuntimeSnapshot {
   final DateTime? latestScreenshotAt;
   final InspectorSnapshot? inspectorSnapshot;
   final LocalDependencyReport dependencyReport;
+  final V4AcceptanceSummary v4AcceptanceSummary;
   final MobileRuntimeSummary mobileRuntime;
   final RunHistorySummary runHistory;
   final RuntimeExecutionFocus executionFocus;
@@ -259,6 +262,7 @@ final class StudioRuntimeSnapshot {
     Object? latestScreenshotAt = _unset,
     Object? inspectorSnapshot = _unset,
     LocalDependencyReport? dependencyReport,
+    V4AcceptanceSummary? v4AcceptanceSummary,
     MobileRuntimeSummary? mobileRuntime,
     RunHistorySummary? runHistory,
     RuntimeExecutionFocus? executionFocus,
@@ -292,6 +296,7 @@ final class StudioRuntimeSnapshot {
           ? this.inspectorSnapshot
           : inspectorSnapshot as InspectorSnapshot?,
       dependencyReport: dependencyReport ?? this.dependencyReport,
+      v4AcceptanceSummary: v4AcceptanceSummary ?? this.v4AcceptanceSummary,
       mobileRuntime: mobileRuntime ?? this.mobileRuntime,
       runHistory: runHistory ?? this.runHistory,
       executionFocus: executionFocus ?? this.executionFocus,

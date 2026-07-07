@@ -102,6 +102,8 @@ void main() {
     expect(find.text('当前平台'), findsOneWidget);
     expect(find.text('iOS'), findsOneWidget);
     expect(find.text('3 条'), findsOneWidget);
+    expect(find.text('安卓留档'), findsOneWidget);
+    expect(find.text('未知'), findsWidgets);
     expect(find.text('1 条'), findsOneWidget);
     expect(find.text('跑全量'), findsWidgets);
     expect(find.text('现场路线'), findsOneWidget);
@@ -143,6 +145,59 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(copiedCommand, 'npm run v4:acceptance-final');
+  });
+
+  testWidgets('monitor uses latest v4 acceptance report summary', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    final preview = StudioRuntimeSnapshot.initial().copyWith(
+      v4AcceptanceSummary: V4AcceptanceSummary(
+        hasReport: true,
+        auditOk: true,
+        complete: false,
+        statusLabel: '最终验收未完成',
+        checkedAt: DateTime.utc(2026, 1, 9),
+        gitRevision: '12345678',
+        androidStatus: '未就绪',
+        androidDetail: '可用 0，未授权 0，离线 0',
+        screenshots: 1,
+        iosRuns: 1,
+        androidRuns: 0,
+        fullSmokeReports: 7,
+        latestFullSmokeLabel: '前置检查阻断',
+        failures: const ['缺少 Android 平台 smoke run。'],
+        nextSteps: const ['Android：连接一台已开启 USB 调试的手机。'],
+      ),
+    );
+
+    await tester.pumpWidget(StudioMacApp(previewScreenshot: preview));
+
+    await tester.tap(find.byKey(const ValueKey('nav-记录')));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('V4 验收'),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('monitor-page-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      const Offset(0, -220),
+      maxIteration: 8,
+    );
+
+    expect(find.text('V4 验收'), findsOneWidget);
+    expect(find.text('未完成'), findsOneWidget);
+    expect(find.text('iOS 1'), findsOneWidget);
+    expect(find.text('安卓 0'), findsOneWidget);
+    expect(find.text('补安卓'), findsOneWidget);
+    expect(find.text('可用 0，未授权 0，离线 0'), findsOneWidget);
   });
 
   testWidgets('monitor renders local trend and status distribution', (

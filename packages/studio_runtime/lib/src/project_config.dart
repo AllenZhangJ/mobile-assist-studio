@@ -328,6 +328,11 @@ Directory _evidenceRootForConfig(StudioProjectConfig config) {
   return Directory('${projectDirectory.path}/recordings/studio_runtime');
 }
 
+Directory _v4AcceptanceDirectoryForConfig(StudioProjectConfig config) {
+  final projectDirectory = _projectDirectoryForConfig(config);
+  return Directory('${projectDirectory.path}/recordings/v4-smoke/acceptance');
+}
+
 File _workflowFileForConfig(StudioProjectConfig config) {
   final projectDirectory = _projectDirectoryForConfig(config);
   return File('${projectDirectory.path}/workflows/current.workflow.json');

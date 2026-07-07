@@ -48,6 +48,7 @@ class _StudioShellState extends State<StudioShell> {
         }
       });
       unawaited(_controller.refreshRunHistory());
+      unawaited(_controller.refreshV4AcceptanceSummary());
     }
   }
 

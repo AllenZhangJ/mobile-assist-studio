@@ -19,6 +19,7 @@ final class StudioRuntimeController {
     RunReportReader? runReportReader,
     RunReportExporter? runReportExporter,
     RunEvidenceAssetReader? runEvidenceAssetReader,
+    V4AcceptanceSummaryReader? v4AcceptanceSummaryReader,
     WorkflowStore? workflowStore,
     SubWorkflowStore? subWorkflowStore,
     TargetLibraryStore? targetLibraryStore,
@@ -67,6 +68,8 @@ final class StudioRuntimeController {
          runEvidenceAssetReader,
          evidenceStore,
        ),
+       _v4AcceptanceSummaryReader =
+           v4AcceptanceSummaryReader ?? const NoopV4AcceptanceSummaryReader(),
        _workflowStore = workflowStore ?? const NoopWorkflowStore(),
        _subWorkflowStore = subWorkflowStore ?? const NoopSubWorkflowStore(),
        _targetLibraryStore =
@@ -152,6 +155,9 @@ final class StudioRuntimeController {
       runReportReader: evidenceStore,
       runReportExporter: evidenceStore,
       runEvidenceAssetReader: evidenceStore,
+      v4AcceptanceSummaryReader: LocalV4AcceptanceSummaryReader(
+        directory: _v4AcceptanceDirectoryForConfig(config),
+      ),
       workflowStore: workflowStore,
       subWorkflowStore: subWorkflowStore,
       targetLibraryStore: targetLibraryStore,
@@ -185,6 +191,7 @@ final class StudioRuntimeController {
   final RunReportReader _runReportReader;
   final RunReportExporter _runReportExporter;
   final RunEvidenceAssetReader _runEvidenceAssetReader;
+  final V4AcceptanceSummaryReader _v4AcceptanceSummaryReader;
   final WorkflowStore _workflowStore;
   final SubWorkflowStore _subWorkflowStore;
   final TargetLibraryStore _targetLibraryStore;

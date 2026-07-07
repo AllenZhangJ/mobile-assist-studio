@@ -257,13 +257,15 @@ Future<_FullSmokeReportSummary?> _probeLatestFullSmokeReport(
   reports.sort((left, right) {
     return right.uri.pathSegments.last.compareTo(left.uri.pathSegments.last);
   });
-  final file = reports.first;
-  final decoded = await _readJsonObject(file);
-  if (decoded == null || decoded['kind'] != 'v4FullSmoke') return null;
-  return _FullSmokeReportSummary.fromJson(
-    reportName: _redactText(file.uri.pathSegments.last),
-    json: decoded,
-  );
+  for (final file in reports) {
+    final decoded = await _readJsonObject(file);
+    if (decoded == null || decoded['kind'] != 'v4FullSmoke') continue;
+    return _FullSmokeReportSummary.fromJson(
+      reportName: _redactText(file.uri.pathSegments.last),
+      json: decoded,
+    );
+  }
+  return null;
 }
 
 // 读取最近一次 Android smoke 前置诊断，不把诊断计作真实 smoke run。
@@ -283,15 +285,17 @@ Future<_AndroidSmokePreflightSummary?> _probeLatestAndroidPreflightReport(
   reports.sort((left, right) {
     return right.uri.pathSegments.last.compareTo(left.uri.pathSegments.last);
   });
-  final file = reports.first;
-  final decoded = await _readJsonObject(file);
-  if (decoded == null || decoded['kind'] != 'v4AndroidSmokePreflight') {
-    return null;
+  for (final file in reports) {
+    final decoded = await _readJsonObject(file);
+    if (decoded == null || decoded['kind'] != 'v4AndroidSmokePreflight') {
+      continue;
+    }
+    return _AndroidSmokePreflightSummary.fromJson(
+      reportName: _redactText(file.uri.pathSegments.last),
+      json: decoded,
+    );
   }
-  return _AndroidSmokePreflightSummary.fromJson(
-    reportName: _redactText(file.uri.pathSegments.last),
-    json: decoded,
-  );
+  return null;
 }
 
 // 从单个运行目录解析状态、动作、流程、截图和失败摘要。

@@ -105,6 +105,47 @@ Future<void> main() async {
       '当前提交完整 fixture 的 archive final 应返回 0，实际 ${completeArchiveFinal.exitCode}。',
     );
 
+    final corruptLatestDir = Directory(
+      '${tempDir.path}/complete-with-corrupt-latest-full-smoke',
+    );
+    await _seedCompleteSmokeFixture(
+      corruptLatestDir,
+      fullSmokeGit: currentGit,
+      platformGit: currentGit,
+    );
+    await _seedCorruptLatestFullSmokeReport(corruptLatestDir);
+    final corruptLatestReadiness = await _runReadiness(
+      corruptLatestDir,
+      requireComplete: true,
+    );
+    _expect(
+      corruptLatestReadiness.exitCode == 0,
+      '最新 full smoke JSON 损坏时 readiness 应回退到最近有效报告。',
+    );
+    final corruptLatestArchiveFinal = await _runArchiveFinal(corruptLatestDir);
+    _expect(
+      corruptLatestArchiveFinal.exitCode == 0,
+      '最新 full smoke JSON 损坏时 archive final 应回退到最近有效报告。',
+    );
+
+    final corruptLatestAcceptanceDir = Directory(
+      '${tempDir.path}/acceptance-with-corrupt-latest-generated-reports',
+    );
+    await _seedFullSmokeFixture(corruptLatestAcceptanceDir);
+    await _seedArchiveFixture(corruptLatestAcceptanceDir);
+    await _seedCorruptLatestGeneratedReports(corruptLatestAcceptanceDir);
+    final corruptLatestAcceptance = await _runFinalAcceptance(
+      corruptLatestAcceptanceDir,
+    );
+    _expect(
+      corruptLatestAcceptance.exitCode == 0,
+      '最新 readiness / archive JSON 损坏时 acceptance audit 应回退到最近有效报告。',
+    );
+    final corruptLatestAcceptanceArtifacts = await _loadAcceptanceArtifacts(
+      corruptLatestAcceptanceDir,
+    );
+    _assertAcceptanceJson(corruptLatestAcceptanceArtifacts.json);
+
     final singlePlatformFullDir = Directory(
       '${tempDir.path}/complete-single-platform-full-smoke',
     );
@@ -528,6 +569,25 @@ Future<void> _seedCompleteSmokeFixture(
     timestamp: timestamp,
     writeScreenshotFile: writePlatformScreenshots,
   );
+}
+
+// 写入一份文件名更新但内容损坏的 full smoke 报告，验证读取逻辑能回退。
+Future<void> _seedCorruptLatestFullSmokeReport(Directory outDir) async {
+  await File(
+    '${outDir.path}/FULL_SMOKE_2026-01-03T00-00-00-000000Z.json',
+  ).writeAsString('{bad-json\n');
+}
+
+// 写入未来时间戳但内容损坏的生成报告，验证 final acceptance 能回退读取。
+Future<void> _seedCorruptLatestGeneratedReports(Directory outDir) async {
+  await File(
+    '${outDir.path}/SMOKE_READINESS_2999-01-01T00-00-00-000000Z.json',
+  ).writeAsString('{bad-json\n');
+  final archiveDir = Directory('${outDir.path}/archives');
+  await archiveDir.create(recursive: true);
+  await File(
+    '${archiveDir.path}/SMOKE_ARCHIVE_2999-01-01T00-00-00-000000Z.json',
+  ).writeAsString('{bad-json\n');
 }
 
 // 写入单个平台完整 smoke run，覆盖截图、动作、workflow 和日志事件。

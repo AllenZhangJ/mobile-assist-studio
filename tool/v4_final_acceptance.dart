@@ -1296,13 +1296,16 @@ Future<Map<String, Object?>?> _loadLatestJson(
     (left, right) =>
         right.uri.pathSegments.last.compareTo(left.uri.pathSegments.last),
   );
-  try {
-    final decoded = jsonDecode(await files.first.readAsString());
-    if (decoded is! Map) return null;
-    return Map<String, Object?>.from(decoded);
-  } on Object {
-    return null;
+  for (final file in files) {
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map) continue;
+      return Map<String, Object?>.from(decoded);
+    } on Object {
+      continue;
+    }
   }
+  return null;
 }
 
 // 安全读取嵌套 Map。

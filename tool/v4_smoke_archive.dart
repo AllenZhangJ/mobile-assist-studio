@@ -233,15 +233,18 @@ Future<_ReportJsonSummary?> _latestJsonSummary({
           (left, right) => right.relativePath.compareTo(left.relativePath),
         );
   if (candidates.isEmpty) return null;
-  final file = File('${outDir.path}/${candidates.first.relativePath}');
-  if (!await file.exists()) return null;
-  try {
-    final decoded = jsonDecode(await file.readAsString());
-    if (decoded is! Map) return null;
-    return _ReportJsonSummary.fromJson(Map<String, Object?>.from(decoded));
-  } on Object {
-    return null;
+  for (final candidate in candidates) {
+    final file = File('${outDir.path}/${candidate.relativePath}');
+    if (!await file.exists()) continue;
+    try {
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is! Map) continue;
+      return _ReportJsonSummary.fromJson(Map<String, Object?>.from(decoded));
+    } on Object {
+      continue;
+    }
   }
+  return null;
 }
 
 // 读取最近平台 smoke run 的结构化摘要，只读取元数据和事件类型。

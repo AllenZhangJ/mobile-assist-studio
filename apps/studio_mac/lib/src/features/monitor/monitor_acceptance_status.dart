@@ -73,6 +73,16 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             ),
           ),
           _CommandButton(
+            controlKey: const ValueKey('monitor-copy-v4-ios-password-smoke'),
+            label: '复制iOS',
+            icon: Icons.phone_iphone_outlined,
+            onPressed: () => _copyPlainText(
+              context,
+              text: _v4IosPasswordSmokeCommand,
+              message: 'iOS 命令已复制',
+            ),
+          ),
+          _CommandButton(
             controlKey: const ValueKey('monitor-copy-v4-android-smoke'),
             label: '复制安卓',
             icon: Icons.android_outlined,
@@ -142,7 +152,7 @@ class _V4AcceptanceRouteCard extends StatelessWidget {
                   icon: Icons.copy_all_outlined,
                   onPressed: () => _copyPlainText(
                     context,
-                    text: _v4AcceptanceRouteCommands,
+                    text: summary.routeCommands,
                     message: '路线已复制',
                   ),
                 ),
@@ -163,11 +173,9 @@ class _V4AcceptanceRouteCard extends StatelessWidget {
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: const [
-                _V4AcceptanceRouteStep(label: '接安卓'),
-                _V4AcceptanceRouteStep(label: '跑安卓'),
-                _V4AcceptanceRouteStep(label: '跑全量'),
-                _V4AcceptanceRouteStep(label: '终验'),
+              children: [
+                for (final step in summary.routeSteps)
+                  _V4AcceptanceRouteStep(label: step),
               ],
             ),
           ],
@@ -273,6 +281,8 @@ final class _V4AcceptanceStatusSummary {
     required this.issueTone,
     required this.nextStepLabel,
     required this.routeHint,
+    required this.routeCommands,
+    required this.routeSteps,
   });
 
   final String statusLabel;
@@ -289,6 +299,8 @@ final class _V4AcceptanceStatusSummary {
   final StudioStatusTone issueTone;
   final String nextStepLabel;
   final String routeHint;
+  final String routeCommands;
+  final List<String> routeSteps;
 
   // 根据当前连接平台和本地历史生成保守验收状态。
   factory _V4AcceptanceStatusSummary.fromSnapshot(
@@ -328,6 +340,8 @@ final class _V4AcceptanceStatusSummary {
             : StudioStatusTone.warning,
         nextStepLabel: _v4AcceptanceNextStepLabel(acceptance),
         routeHint: _v4AcceptanceRouteHint(acceptance),
+        routeCommands: _v4AcceptanceRouteCommandsFor(acceptance),
+        routeSteps: _v4AcceptanceRouteStepsFor(acceptance),
       );
     }
     return _V4AcceptanceStatusSummary(
@@ -353,6 +367,8 @@ final class _V4AcceptanceStatusSummary {
           : StudioStatusTone.ready,
       nextStepLabel: _v4NextStepLabel(platform, hasLocalRuns),
       routeHint: _v4RouteHint(platform),
+      routeCommands: _v4AcceptanceRouteCommands,
+      routeSteps: const ['接安卓', '跑安卓', '跑全量', '终验'],
     );
   }
 }
@@ -369,6 +385,8 @@ StudioStatusTone _v4BatchProgressTone(V4AcceptanceSummary acceptance) {
 // 根据终验报告给出短下一步，避免把长命令挤进指标卡。
 String _v4AcceptanceNextStepLabel(V4AcceptanceSummary acceptance) {
   if (acceptance.complete) return '已完成';
+  if (_v4AcceptanceNeedsIosTunnel(acceptance)) return '补iOS';
+  if (_v4AcceptanceNeedsIosSmoke(acceptance)) return '跑iOS';
   if (!acceptance.hasAndroidRun) return '补安卓';
   if (acceptance.fullSmokeReports == 0 ||
       acceptance.latestFullSmokeLabel != '完整通过') {
@@ -380,6 +398,8 @@ String _v4AcceptanceNextStepLabel(V4AcceptanceSummary acceptance) {
 // 根据终验报告给现场路线卡生成短提示。
 String _v4AcceptanceRouteHint(V4AcceptanceSummary acceptance) {
   if (acceptance.complete) return '终验已完成。';
+  if (_v4AcceptanceNeedsIosTunnel(acceptance)) return '先补 iOS 隧道，再接安卓。';
+  if (_v4AcceptanceNeedsIosSmoke(acceptance)) return '先补 iOS 冒烟。';
   if (!acceptance.hasAndroidRun) {
     final detail = acceptance.androidDetail;
     if (detail.isNotEmpty && detail != '无安卓状态。') return detail;
@@ -387,6 +407,72 @@ String _v4AcceptanceRouteHint(V4AcceptanceSummary acceptance) {
   }
   if (acceptance.latestFullSmokeLabel != '完整通过') return '再跑全量 smoke。';
   return '补齐后跑最终验收。';
+}
+
+// 判断终验下一步是否要求先补 iOS 隧道。
+bool _v4AcceptanceNeedsIosTunnel(V4AcceptanceSummary acceptance) {
+  return acceptance.nextSteps.any(
+    (step) => step.contains(_v4IosPasswordSmokeCommand),
+  );
+}
+
+// 判断终验下一步是否要求补 iOS 单平台冒烟。
+bool _v4AcceptanceNeedsIosSmoke(V4AcceptanceSummary acceptance) {
+  return acceptance.nextSteps.any((step) => step.contains(_v4IosSmokeCommand));
+}
+
+// 由终验报告里的下一步命令生成现场路线，避免 UI 和报告互相漂移。
+String _v4AcceptanceRouteCommandsFor(V4AcceptanceSummary acceptance) {
+  final commands = <String>[];
+  void addCommand(String command) {
+    if (!commands.contains(command)) commands.add(command);
+  }
+
+  if (_v4AcceptanceNeedsIosTunnel(acceptance)) {
+    addCommand(_v4IosPasswordSmokeCommand);
+  } else if (_v4AcceptanceNeedsIosSmoke(acceptance)) {
+    addCommand(_v4IosSmokeCommand);
+  }
+  if (acceptance.nextSteps.any(
+        (step) => step.contains(_v4AndroidSmokeCommand),
+      ) ||
+      !acceptance.hasAndroidRun) {
+    addCommand(_v4AndroidSmokeCommand);
+  }
+  if (acceptance.nextSteps.any((step) => step.contains(_v4FullSmokeCommand)) ||
+      acceptance.latestFullSmokeLabel != '完整通过') {
+    addCommand(_v4FullSmokeCommand);
+  }
+  addCommand(_v4AcceptanceFinalCommand);
+  return commands.join('\n');
+}
+
+// 生成短步骤胶囊，保持中文简短且允许自动换行。
+List<String> _v4AcceptanceRouteStepsFor(V4AcceptanceSummary acceptance) {
+  final steps = <String>[];
+  void addStep(String label) {
+    if (!steps.contains(label)) steps.add(label);
+  }
+
+  if (_v4AcceptanceNeedsIosTunnel(acceptance)) {
+    addStep('连iOS');
+    addStep('跑iOS');
+  } else if (_v4AcceptanceNeedsIosSmoke(acceptance)) {
+    addStep('跑iOS');
+  }
+  if (!acceptance.hasAndroidRun ||
+      acceptance.nextSteps.any(
+        (step) => step.contains(_v4AndroidSmokeCommand),
+      )) {
+    addStep('接安卓');
+    addStep('跑安卓');
+  }
+  if (acceptance.latestFullSmokeLabel != '完整通过' ||
+      acceptance.nextSteps.any((step) => step.contains(_v4FullSmokeCommand))) {
+    addStep('跑全量');
+  }
+  addStep('终验');
+  return List<String>.unmodifiable(steps);
 }
 
 // 将移动平台转成用户可读短标签。

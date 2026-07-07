@@ -286,6 +286,9 @@ part 'shell/bottom_console.dart';
 
 const _iosTunnelCommand =
     'sudo node_modules/.bin/appium driver run xcuitest tunnel-creation';
+const String _v4IosSmokeCommand = 'npm run v4:ios-smoke:full';
+const String _v4IosPasswordSmokeCommand =
+    'npm run v4:ios-smoke:full:password-stdin';
 const String _v4FullSmokeCommand = 'npm run v4:smoke:full';
 const String _v4PasswordSmokeCommand = 'npm run v4:smoke:full:password-stdin';
 const String _v4AndroidSmokeCommand = 'npm run v4:android-smoke:full';

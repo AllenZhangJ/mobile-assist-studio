@@ -129,6 +129,12 @@ void main() {
     expect(copiedCommand, 'npm run v4:smoke:full:password-stdin');
 
     await tester.tap(
+      find.byKey(const ValueKey('monitor-copy-v4-ios-password-smoke')),
+    );
+    await tester.pumpAndSettle();
+    expect(copiedCommand, 'npm run v4:ios-smoke:full:password-stdin');
+
+    await tester.tap(
       find.byKey(const ValueKey('monitor-copy-v4-android-smoke')),
     );
     await tester.pumpAndSettle();
@@ -200,6 +206,95 @@ void main() {
     expect(find.text('安卓 0'), findsOneWidget);
     expect(find.text('补安卓'), findsOneWidget);
     expect(find.text('可用 0，未授权 0，离线 0'), findsOneWidget);
+  });
+
+  testWidgets('monitor routes v4 iOS tunnel recovery from acceptance report', (
+    tester,
+  ) async {
+    String? copiedCommand;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            final arguments = call.arguments as Map<Object?, Object?>;
+            copiedCommand = arguments['text'] as String?;
+            return null;
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    final preview = StudioRuntimeSnapshot.initial().copyWith(
+      v4AcceptanceSummary: V4AcceptanceSummary(
+        hasReport: true,
+        auditOk: true,
+        complete: false,
+        statusLabel: '最终验收未完成',
+        checkedAt: DateTime.utc(2026, 1, 9),
+        gitRevision: '12345678',
+        androidStatus: '未就绪',
+        androidDetail: '可用 0，未授权 0，离线 0',
+        screenshots: 1,
+        iosRuns: 1,
+        androidRuns: 0,
+        fullSmokeReports: 9,
+        latestFullSmokeLabel: '前置检查阻断',
+        failures: const ['最近 full smoke 尚未完整通过。'],
+        nextSteps: const [
+          'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-stdin` 启动隧道后补验。',
+          'Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。',
+          '双平台：iOS 和 Android 单平台 smoke 都通过后，运行 `npm run v4:smoke:full`。',
+          '终验：补齐留档后运行 `npm run v4:acceptance-final`。',
+        ],
+        batches: _v4AcceptanceBatchFixture(),
+      ),
+    );
+
+    await tester.pumpWidget(StudioMacApp(previewScreenshot: preview));
+
+    await tester.tap(find.byKey(const ValueKey('nav-记录')));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('V4 验收'),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('monitor-page-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      const Offset(0, -220),
+      maxIteration: 8,
+    );
+
+    expect(find.text('补iOS'), findsOneWidget);
+    expect(find.text('先补 iOS 隧道，再接安卓。'), findsOneWidget);
+    expect(find.text('连iOS'), findsOneWidget);
+    expect(find.text('跑iOS'), findsOneWidget);
+    expect(find.text('跑安卓'), findsOneWidget);
+    expect(find.text('跑全量'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('monitor-copy-v4-route')));
+    await tester.pumpAndSettle();
+    expect(
+      copiedCommand,
+      'npm run v4:ios-smoke:full:password-stdin\n'
+      'npm run v4:android-smoke:full\n'
+      'npm run v4:smoke:full\n'
+      'npm run v4:acceptance-final',
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey('monitor-copy-v4-ios-password-smoke')),
+    );
+    await tester.pumpAndSettle();
+    expect(copiedCommand, 'npm run v4:ios-smoke:full:password-stdin');
   });
 
   testWidgets('monitor renders local trend and status distribution', (

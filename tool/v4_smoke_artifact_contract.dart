@@ -751,25 +751,40 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   );
   final fieldChecklist = _listAt(json, 'fieldChecklist');
   _expect(fieldChecklist.length >= 4, 'acceptance 必须给出现场补验清单。');
+  final checklistMaps = fieldChecklist.map(_mapFrom).toList(growable: false);
   _expect(
-    fieldChecklist.any(
+    checklistMaps.any(
           (item) =>
-              _mapFrom(item)['command'] ==
-              'npm run v4:ios-smoke:full:password-prompt',
+              item['command'] == 'npm run v4:ios-smoke:full:password-prompt',
         ) &&
-        fieldChecklist.any(
-          (item) =>
-              _mapFrom(item)['command'] == 'npm run v4:android-smoke:full',
+        checklistMaps.any(
+          (item) => item['command'] == 'npm run v4:android-smoke:full',
         ) &&
-        fieldChecklist.any(
-          (item) =>
-              _mapFrom(item)['command'] ==
-              'npm run v4:smoke:full:password-prompt',
+        checklistMaps.any(
+          (item) => item['command'] == 'npm run v4:smoke:full:password-prompt',
         ) &&
-        fieldChecklist.any(
-          (item) => _mapFrom(item)['command'] == 'npm run v4:acceptance-final',
+        checklistMaps.any(
+          (item) => item['command'] == 'npm run v4:acceptance-final',
         ),
     'acceptance 现场补验清单必须包含 iOS、Android、密码版全量和终验命令。',
+  );
+  _expect(
+    checklistMaps.any(
+          (item) =>
+              item['command'] == 'npm run v4:ios-smoke:full:password-prompt' &&
+              '${item['proof']}'.contains('当前 iOS'),
+        ) &&
+        checklistMaps.any(
+          (item) =>
+              item['command'] == 'npm run v4:android-smoke:full' &&
+              '${item['proof']}'.contains('当前 Android'),
+        ) &&
+        checklistMaps.any(
+          (item) =>
+              item['command'] == 'npm run v4:smoke:full:password-prompt' &&
+              '${item['proof']}'.contains('单平台 smoke'),
+        ),
+    'acceptance 现场补验清单必须把当前平台状态写入 iOS / Android / full smoke 通过标准。',
   );
 
   final evidence = _mapAt(json, 'evidence');

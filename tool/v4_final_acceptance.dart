@@ -464,7 +464,11 @@ final class _AcceptanceReport {
 
   // 生成现场补验清单；它只重排安全命令，不执行真实设备动作。
   List<_AcceptanceChecklistItem> get fieldChecklist {
-    return _fieldChecklistForNextSteps(nextSteps, complete: complete);
+    return _fieldChecklistForNextSteps(
+      nextSteps,
+      complete: complete,
+      evidence: evidence,
+    );
   }
 
   // 生成结构化终验门禁缺口，便于 AI / 人工按证据补齐。
@@ -1145,6 +1149,7 @@ List<String> _nextStepsForFailures({
 List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
   List<String> nextSteps, {
   required bool complete,
+  required _AcceptanceEvidenceSummary evidence,
 }) {
   if (complete) {
     return const <_AcceptanceChecklistItem>[
@@ -1157,6 +1162,12 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
   }
 
   final joined = nextSteps.join('\n');
+  final localState = _jsonMapAt(
+    evidence.readiness ?? const <String, Object?>{},
+    'localState',
+  );
+  final iosDevice = _jsonMapAt(localState, 'iosDevice');
+  final androidDevice = _jsonMapAt(localState, 'androidDevice');
   final items = <_AcceptanceChecklistItem>[];
   var order = 1;
 
@@ -1176,13 +1187,13 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
     add(
       title: '补 iOS',
       command: 'npm run v4:ios-smoke:full:password-prompt',
-      proof: '终端隐藏输入 Mac 密码，手机保持解锁并允许系统提示，生成 iOS smoke 留档。',
+      proof: _iosChecklistProof(iosDevice, needsPasswordPrompt: true),
     );
   } else if (joined.contains('v4:ios-smoke:full')) {
     add(
       title: '补 iOS',
       command: 'npm run v4:ios-smoke:full',
-      proof: 'iPhone 已连接、已信任，生成 iOS smoke 留档。',
+      proof: _iosChecklistProof(iosDevice, needsPasswordPrompt: false),
     );
   }
 
@@ -1190,7 +1201,7 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
     add(
       title: '补 Android',
       command: 'npm run v4:android-smoke:full',
-      proof: '只连接一台已允许 USB 调试的 Android 手机，生成 Android smoke 留档。',
+      proof: _androidChecklistProof(androidDevice),
     );
   }
 
@@ -1198,13 +1209,13 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
     add(
       title: '跑全量',
       command: 'npm run v4:smoke:full:password-prompt',
-      proof: 'iOS 和 Android 单平台条件都就绪，双平台 full smoke 完整通过。',
+      proof: _fullSmokeChecklistProof(iosDevice, androidDevice),
     );
   } else if (joined.contains('v4:smoke:full')) {
     add(
       title: '跑全量',
       command: 'npm run v4:smoke:full',
-      proof: 'iOS 和 Android 单平台条件都就绪，双平台 full smoke 完整通过。',
+      proof: _fullSmokeChecklistProof(iosDevice, androidDevice),
     );
   }
 
@@ -1225,6 +1236,73 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
   }
 
   return items;
+}
+
+// 生成 iOS 补验通过标准；有现场状态时优先提示当前阻断点。
+String _iosChecklistProof(
+  Map<String, Object?> device, {
+  required bool needsPasswordPrompt,
+}) {
+  final state = _localChecklistState(device);
+  if (state == null) {
+    return needsPasswordPrompt
+        ? '隐藏输入 Mac 密码，手机解锁并点允许，生成 iOS smoke 留档。'
+        : 'iPhone 已连接、已信任，生成 iOS smoke 留档。';
+  }
+  if (state.available) {
+    return needsPasswordPrompt
+        ? '当前 iOS 可用（${state.label}）。手机保持解锁并点允许，生成 iOS smoke 留档。'
+        : '当前 iOS 可用（${state.label}）。生成 iOS smoke 留档。';
+  }
+  return needsPasswordPrompt
+      ? '当前 iOS 未就绪（${state.label}）。先插线、解锁并信任，再输入 Mac 密码补验。'
+      : '当前 iOS 未就绪（${state.label}）。先插线、解锁并信任，再补验。';
+}
+
+// 生成 Android 补验通过标准；只提示 USB 调试和授权，不展开 ADB 细节。
+String _androidChecklistProof(Map<String, Object?> device) {
+  final state = _localChecklistState(device);
+  if (state == null) {
+    return '只连接一台已允许 USB 调试的 Android 手机，生成 Android smoke 留档。';
+  }
+  if (state.available) {
+    return '当前 Android 可用（${state.label}）。生成 Android smoke 留档。';
+  }
+  return '当前 Android 未就绪（${state.label}）。先插线、开 USB 调试并点允许，再补验。';
+}
+
+// 生成双平台 full smoke 通过标准；设备未就绪时先引导补单平台留档。
+String _fullSmokeChecklistProof(
+  Map<String, Object?> iosDevice,
+  Map<String, Object?> androidDevice,
+) {
+  final iosState = _localChecklistState(iosDevice);
+  final androidState = _localChecklistState(androidDevice);
+  final missing = <String>[
+    if (iosState != null && !iosState.available) 'iOS',
+    if (androidState != null && !androidState.available) 'Android',
+  ];
+  if (missing.isNotEmpty) {
+    return '当前 ${missing.join('、')} 未就绪。先补齐单平台 smoke，再跑全量。';
+  }
+  return 'iOS 和 Android 单平台 smoke 都通过，双平台 full smoke 完整通过。';
+}
+
+// 把 readiness 本机状态收敛成清单可展示的短句，缺失时允许降级。
+_ChecklistLocalState? _localChecklistState(Map<String, Object?> device) {
+  if (device.isEmpty) return null;
+  return _ChecklistLocalState(
+    available: device['available'] == true,
+    label: _plainText(_localStateLabel(device)),
+  );
+}
+
+// 现场清单里的本机设备短状态。
+final class _ChecklistLocalState {
+  const _ChecklistLocalState({required this.available, required this.label});
+
+  final bool available;
+  final String label;
 }
 
 // 判断单平台 smoke 摘要是否存在但尚未完整通过。

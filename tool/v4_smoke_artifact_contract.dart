@@ -670,6 +670,22 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
         failures.any((failure) => failure.contains('归档终验')),
     'acceptance 必须保留两个最终门禁失败摘要。',
   );
+  final gateGaps = _listAt(json, 'gateGaps');
+  _expect(gateGaps.isNotEmpty, 'acceptance 必须生成结构化终验门禁缺口。');
+  _expect(
+    gateGaps.any(
+          (gap) =>
+              _mapFrom(gap)['title'] == 'Android smoke' &&
+              _mapFrom(gap)['command'] == 'npm run v4:android-smoke:full',
+        ) &&
+        gateGaps.any(
+          (gap) =>
+              _mapFrom(gap)['title'] == 'Full smoke' &&
+              _mapFrom(gap)['command'] ==
+                  'npm run v4:smoke:full:password-prompt',
+        ),
+    'acceptance gateGaps 必须包含 Android 和密码版 full smoke 缺口。',
+  );
   final nextSteps = _stringList(json['nextSteps']);
   _expect(
     nextSteps.any((step) => step.contains('v4:ios-smoke:full')) &&
@@ -764,6 +780,9 @@ void _assertAcceptanceMarkdown(String markdown) {
     '留档数量',
     '截图留档',
     'studio-ui-fixture.png',
+    '## 终验门禁',
+    'Android smoke',
+    'Full smoke',
     '## 现场补验清单',
     '通过标准',
     '## 下一步',

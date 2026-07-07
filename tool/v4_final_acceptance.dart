@@ -461,6 +461,11 @@ final class _AcceptanceReport {
     return _fieldChecklistForNextSteps(nextSteps, complete: complete);
   }
 
+  // 生成结构化终验门禁缺口，便于 AI / 人工按证据补齐。
+  List<_AcceptanceGateGap> get gateGaps {
+    return _gateGapsFromEvidence(evidence);
+  }
+
   String toJsonString() {
     const encoder = JsonEncoder.withIndent('  ');
     return '${encoder.convert(toJsonObject())}\n';
@@ -485,6 +490,9 @@ final class _AcceptanceReport {
         'failures': finalFailures,
       },
       'evidence': evidence.toJsonObject(),
+      'gateGaps': gateGaps
+          .map((gap) => gap.toJsonObject())
+          .toList(growable: false),
       'nextSteps': nextSteps,
       'fieldChecklist': fieldChecklist
           .map((item) => item.toJsonObject())
@@ -527,6 +535,21 @@ final class _AcceptanceReport {
     buffer.write(evidence.toMarkdown());
     buffer
       ..writeln()
+      ..writeln('## 终验门禁')
+      ..writeln()
+      ..writeln('| 项目 | 当前问题 | 通过标准 | 建议命令 |')
+      ..writeln('|---|---|---|---|');
+    if (gateGaps.isEmpty) {
+      buffer.writeln('| 全部门禁 | 无缺口 | 终验可通过 | - |');
+    } else {
+      for (final gap in gateGaps) {
+        buffer.writeln(
+          '| ${gap.title} | ${gap.current} | ${gap.required} | ${gap.commandMarkdown} |',
+        );
+      }
+    }
+    buffer
+      ..writeln()
       ..writeln('## 现场补验清单')
       ..writeln()
       ..writeln('| 顺序 | 操作 | 命令 | 通过标准 |')
@@ -544,6 +567,37 @@ final class _AcceptanceReport {
       buffer.writeln('- $step');
     }
     return buffer.toString();
+  }
+}
+
+// 终验门禁缺口，描述还差哪类证据才能完成。
+final class _AcceptanceGateGap {
+  const _AcceptanceGateGap({
+    required this.title,
+    required this.current,
+    required this.required,
+    this.command,
+  });
+
+  final String title;
+  final String current;
+  final String required;
+  final String? command;
+
+  String get commandMarkdown {
+    final value = command;
+    if (value == null || value.isEmpty) return '-';
+    return '`$value`';
+  }
+
+  // 转为 JSON，保持短命令和脱敏短文案。
+  Map<String, Object?> toJsonObject() {
+    return <String, Object?>{
+      'title': title,
+      'current': current,
+      'required': required,
+      'command': command,
+    };
   }
 }
 
@@ -721,6 +775,86 @@ String _latestFullSmokeLine(Map<String, Object?> summary) {
   final label = _plainText(summary['label']?.toString() ?? '未知');
   final timestamp = _plainText(summary['timestamp']?.toString() ?? '无时间');
   return '$label，时间 $timestamp';
+}
+
+// 从 archive warnings 生成终验门禁缺口，避免缺口只藏在子报告中。
+List<_AcceptanceGateGap> _gateGapsFromEvidence(
+  _AcceptanceEvidenceSummary evidence,
+) {
+  final archive = evidence.archive;
+  if (archive == null) return const <_AcceptanceGateGap>[];
+  final warnings = _jsonStringList(archive['warnings']);
+  if (warnings.isEmpty) return const <_AcceptanceGateGap>[];
+  final latestFullSmoke = _jsonMapAt(archive, 'latestFullSmoke');
+  final iosTunnelNeeded = _jsonStringList(
+    latestFullSmoke['blockers'],
+  ).any((blocker) => blocker.contains('iOS 隧道'));
+  return warnings
+      .map((warning) => _gateGapFromWarning(warning, iosTunnelNeeded))
+      .toList(growable: false);
+}
+
+// 将 archive 提醒映射成用户能执行的门禁项。
+_AcceptanceGateGap _gateGapFromWarning(String warning, bool iosTunnelNeeded) {
+  final text = _plainText(warning);
+  if (text.contains('readiness JSON')) {
+    return _AcceptanceGateGap(
+      title: 'Readiness',
+      current: text,
+      required: '生成 readiness JSON 留档',
+      command: 'npm run v4:smoke-readiness',
+    );
+  }
+  if (text.contains('full smoke JSON')) {
+    return _AcceptanceGateGap(
+      title: 'Full smoke',
+      current: text,
+      required: '生成双平台 full smoke JSON 留档',
+      command: iosTunnelNeeded
+          ? 'npm run v4:smoke:full:password-prompt'
+          : 'npm run v4:smoke:full',
+    );
+  }
+  if (text.contains('截图')) {
+    return _AcceptanceGateGap(
+      title: '截图',
+      current: text,
+      required: '至少保留一张 Mac App 或设备 smoke 截图',
+    );
+  }
+  if (text.contains('iOS 平台')) {
+    return _AcceptanceGateGap(
+      title: 'iOS smoke',
+      current: text,
+      required: 'iOS 真机 smoke run 留档存在',
+      command: iosTunnelNeeded
+          ? 'npm run v4:ios-smoke:full:password-prompt'
+          : 'npm run v4:ios-smoke:full',
+    );
+  }
+  if (text.contains('Android 平台')) {
+    return _AcceptanceGateGap(
+      title: 'Android smoke',
+      current: text,
+      required: 'Android 真机 smoke run 留档存在',
+      command: 'npm run v4:android-smoke:full',
+    );
+  }
+  if (text.contains('full smoke')) {
+    return _AcceptanceGateGap(
+      title: 'Full smoke',
+      current: text,
+      required: '最近双平台 full smoke 完整通过',
+      command: iosTunnelNeeded
+          ? 'npm run v4:smoke:full:password-prompt'
+          : 'npm run v4:smoke:full',
+    );
+  }
+  return _AcceptanceGateGap(
+    title: '其它门禁',
+    current: text,
+    required: '按 archive 提醒补齐对应证据',
+  );
 }
 
 // 读取最新 readiness 报告的关键摘要。

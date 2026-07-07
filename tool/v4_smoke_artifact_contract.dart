@@ -951,6 +951,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
         gateGaps.any(
           (gap) =>
               _mapFrom(gap)['title'] == 'Full smoke' &&
+              '${_mapFrom(gap)['required']}'.contains('当前提交') &&
               _mapFrom(gap)['command'] ==
                   'npm run v4:smoke:full:password-prompt',
         ),

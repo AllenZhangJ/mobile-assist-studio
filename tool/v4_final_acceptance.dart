@@ -1160,7 +1160,7 @@ _AcceptanceGateGap _gateGapFromWarning(String warning, bool iosTunnelNeeded) {
     return _AcceptanceGateGap(
       title: 'Full smoke',
       current: text,
-      required: '生成双平台 full smoke JSON 留档',
+      required: '生成当前提交双平台 full smoke JSON 留档',
       command: iosTunnelNeeded
           ? 'npm run v4:smoke:full:password-prompt'
           : 'npm run v4:smoke:full',
@@ -1195,7 +1195,7 @@ _AcceptanceGateGap _gateGapFromWarning(String warning, bool iosTunnelNeeded) {
     return _AcceptanceGateGap(
       title: 'Full smoke',
       current: text,
-      required: '最近双平台 full smoke 完整通过',
+      required: '当前提交双平台 full smoke 完整通过',
       command: iosTunnelNeeded
           ? 'npm run v4:smoke:full:password-prompt'
           : 'npm run v4:smoke:full',
@@ -1561,7 +1561,7 @@ String _fullSmokeChecklistProof(
   if (missing.isNotEmpty) {
     return '当前 ${missing.join('、')} 未就绪。先补齐单平台 smoke，再跑全量。';
   }
-  return 'iOS 和 Android 单平台 smoke 都通过，双平台 full smoke 完整通过。';
+  return 'iOS 和 Android 单平台 smoke 都通过，当前提交双平台 full smoke 完整通过。';
 }
 
 // 把 readiness 本机状态收敛成清单可展示的短句，缺失时允许降级。

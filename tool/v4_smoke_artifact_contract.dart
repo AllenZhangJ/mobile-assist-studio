@@ -285,6 +285,7 @@ Future<void> _assertPackageSmokeScripts() async {
   );
   await _assertFullSmokeDriverProbe();
   await _assertFullSmokePreflightStateContracts();
+  await _assertFinalAcceptanceNextStepSanitizer();
   _assertFullSmokeScript(
     scripts,
     name: 'v4:ios-smoke:full',
@@ -312,6 +313,19 @@ Future<void> _assertPackageSmokeScripts() async {
     name: 'v4:smoke:full:password-prompt',
     requiredSkipFlag: '',
     requiresPasswordPrompt: true,
+  );
+}
+
+// 断言 final acceptance 生成端会过滤 nextSteps 中的非白名单命令。
+Future<void> _assertFinalAcceptanceNextStepSanitizer() async {
+  final sourceFile = File('tool/v4_final_acceptance.dart');
+  _expect(await sourceFile.exists(), '必须存在 final acceptance 生成器。');
+  final source = await sourceFile.readAsString();
+  _expect(
+    source.contains('_safeAcceptanceInstructionText') &&
+        source.contains('命令已过滤') &&
+        source.contains('_allowedAcceptanceCommands.contains(command)'),
+    'final acceptance 生成端必须过滤 nextSteps 中的非白名单命令。',
   );
 }
 
@@ -1562,6 +1576,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
     'acceptance gateGaps 必须包含 iOS、Android 和密码版 full smoke 缺口。',
   );
   final nextSteps = _stringList(json['nextSteps']);
+  _assertAcceptanceNextStepCommandsAreWhitelisted(nextSteps);
   _expect(
     nextSteps.any((step) => step.contains('v4:ios-smoke:full')) &&
         nextSteps.any((step) => step.contains('USB iPhone')) &&
@@ -1669,6 +1684,31 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
 
   final steps = _listAt(json, 'steps');
   _expect(steps.length == 4, 'acceptance 必须包含 4 个固定步骤。');
+}
+
+// 断言最终验收 nextSteps 中的反引号命令也只能来自白名单。
+void _assertAcceptanceNextStepCommandsAreWhitelisted(List<String> steps) {
+  const allowed = <String>{
+    'npm run v4:ios-smoke:full',
+    'npm run v4:ios-smoke:full:password-prompt',
+    'npm run v4:android-smoke:full',
+    'npm run v4:smoke:full',
+    'npm run v4:smoke:full:password-prompt',
+    'npm run v4:smoke-readiness',
+    'npm run v4:smoke-archive',
+    'npm run v4:acceptance-audit',
+    'npm run v4:acceptance-final',
+  };
+  final pattern = RegExp(r'`([^`]+)`');
+  for (final step in steps) {
+    for (final match in pattern.allMatches(step)) {
+      final command = match.group(1)?.trim();
+      _expect(
+        command != null && allowed.contains(command),
+        'acceptance nextSteps 不得输出非白名单命令：$command',
+      );
+    }
+  }
 }
 
 // 断言最终验收 JSON 只输出项目内安全 smoke / 终验命令。

@@ -135,7 +135,7 @@ String? _stringAt(Map<String, Object?> json, String key) {
 // 安全读取用户可见文本，并复用连接详情脱敏规则。
 String? _safeAcceptanceTextAt(Map<String, Object?> json, String key) {
   final value = _stringAt(json, key);
-  return value == null ? null : _redactConnectionDetail(value);
+  return value == null ? null : _safeAcceptanceVisibleText(value);
 }
 
 // 安全读取可复制命令，只允许项目内 V4 smoke / 终验白名单。
@@ -143,6 +143,18 @@ String? _safeAcceptanceCommandAt(Map<String, Object?> json, String key) {
   final value = _stringAt(json, key);
   if (value == null) return null;
   return _allowedV4AcceptanceCommands.contains(value) ? value : null;
+}
+
+// 清洗终验报告里的用户可见文本，反引号命令只保留白名单。
+String _safeAcceptanceVisibleText(String value) {
+  final commandSafe = value.replaceAllMapped(RegExp(r'`([^`]+)`'), (match) {
+    final command = match.group(1)?.trim();
+    if (command != null && _allowedV4AcceptanceCommands.contains(command)) {
+      return '`$command`';
+    }
+    return '`[命令已过滤]`';
+  });
+  return _redactConnectionDetail(commandSafe);
 }
 
 // 安全读取 bool 字段。
@@ -179,7 +191,7 @@ List<String> _safeAcceptanceTextListAt(Map<String, Object?> json, String key) {
       .whereType<String>()
       .map((entry) => entry.trim())
       .where((entry) => entry.isNotEmpty)
-      .map(_redactConnectionDetail)
+      .map(_safeAcceptanceVisibleText)
       .take(6)
       .toList(growable: false);
 }
@@ -275,7 +287,7 @@ String? _shortGitRevision(String? value) {
 // Git 分支仅作为短版本线索展示，同样应用脱敏和长度限制。
 String? _safeGitBranch(String? value) {
   if (value == null || value.isEmpty) return null;
-  final safe = _redactConnectionDetail(value);
+  final safe = _safeAcceptanceVisibleText(value);
   if (safe.isEmpty) return null;
   return safe.length <= 48 ? safe : '${safe.substring(0, 48)}...';
 }

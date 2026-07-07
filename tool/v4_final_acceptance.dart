@@ -551,15 +551,15 @@ final class _AcceptanceReport {
 
   // 根据最终失败摘要生成可执行下一步，不读取本机隐私信息。
   List<String> get nextSteps {
-    if (finalFailures.isEmpty) {
-      return const <String>['保留本次报告，进入交付复核。'];
-    }
-    return _nextStepsForFailures(
-      failures: finalFailures,
-      auditOk: auditOk,
-      evidence: evidence,
-      currentGit: gitStatus.revision,
-    );
+    final raw = finalFailures.isEmpty
+        ? const <String>['保留本次报告，进入交付复核。']
+        : _nextStepsForFailures(
+            failures: finalFailures,
+            auditOk: auditOk,
+            evidence: evidence,
+            currentGit: gitStatus.revision,
+          );
+    return raw.map(_safeAcceptanceInstructionText).toList(growable: false);
   }
 
   // 生成现场补验清单；它只重排安全命令，不执行真实设备动作。
@@ -815,6 +815,14 @@ String? _safeAcceptanceCommand(String? value) {
   final command = value?.trim();
   if (command == null || command.isEmpty) return null;
   return _allowedAcceptanceCommands.contains(command) ? command : null;
+}
+
+// 清洗可见步骤里的反引号命令；只保留白名单命令。
+String _safeAcceptanceInstructionText(String value) {
+  return _redactText(value).replaceAllMapped(RegExp(r'`([^`]+)`'), (match) {
+    final command = _safeAcceptanceCommand(match.group(1));
+    return command == null ? '`命令已过滤`' : '`$command`';
+  });
 }
 
 // 终验门禁缺口，描述还差哪类证据才能完成。

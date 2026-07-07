@@ -188,11 +188,14 @@ void main() {
     expect(visibleText, contains('[本机路径]'));
     expect(visibleText, contains('[本机地址]'));
     expect(visibleText, contains('[标识]'));
+    expect(visibleText, contains('[命令已过滤]'));
     expect(summary.gateGaps.single.command, isNull);
     expect(summary.fieldChecklist.single.command, isNull);
     expect(visibleText, isNot(contains('/Users/example')));
     expect(visibleText, isNot(contains('00008110-000A01E03C3B801E')));
     expect(visibleText, isNot(contains('http://127.0.0.1:4723')));
+    expect(visibleText, isNot(contains('rm -rf')));
+    expect(visibleText, isNot(contains('osascript')));
   });
 }
 
@@ -340,7 +343,7 @@ String _acceptanceJsonWithSensitiveText() {
     }
   },
   "nextSteps": [
-    "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E"
+    "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E，并运行 `rm -rf /Users/example/project`"
   ],
   "gateGaps": [
     {

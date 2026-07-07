@@ -98,6 +98,33 @@ void main() {
     expect(summary.primaryNextStep, startsWith('代码：'));
   });
 
+  test('local v4 acceptance reader sanitizes field checklist order', () async {
+    final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
+    addTearDown(() async {
+      if (temp.existsSync()) await temp.delete(recursive: true);
+    });
+    await File(
+      '${temp.path}/FINAL_ACCEPTANCE_2026-01-02T00-00-00Z.json',
+    ).writeAsString(_acceptanceJsonWithUnsafeChecklist());
+
+    final summary = await LocalV4AcceptanceSummaryReader(
+      directory: temp,
+    ).readLatest();
+
+    expect(summary.hasReport, isTrue);
+    expect(summary.fieldChecklist.map((item) => item.title), <String>[
+      '清代码',
+      '补 Android',
+      '做终验',
+    ]);
+    expect(summary.fieldChecklist.map((item) => item.command), <String?>[
+      null,
+      'npm run v4:android-smoke:full',
+      'npm run v4:acceptance-final',
+    ]);
+    expect(summary.primaryNextStep, startsWith('代码：'));
+  });
+
   test('runtime controller refreshes v4 acceptance summary safely', () async {
     final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
     addTearDown(() async {
@@ -344,7 +371,7 @@ void main() {
     expect(visibleText, contains('[标识]'));
     expect(visibleText, contains('[命令已过滤]'));
     expect(summary.gateGaps.single.command, isNull);
-    expect(summary.fieldChecklist.single.command, isNull);
+    expect(summary.fieldChecklist, isEmpty);
     expect(visibleText, isNot(contains('/Users/example')));
     expect(visibleText, isNot(contains('00008110-000A01E03C3B801E')));
     expect(visibleText, isNot(contains('http://127.0.0.1:4723')));
@@ -598,6 +625,105 @@ String _acceptanceJsonWithCodeGate() {
       "order": 2,
       "title": "推远端",
       "proof": "当前提交已推送，ahead 0 且 behind 0。"
+    }
+  ]
+}
+''';
+}
+
+String _acceptanceJsonWithUnsafeChecklist() {
+  return '''
+{
+  "schemaVersion": 1,
+  "kind": "v4FinalAcceptance",
+  "timestamp": "2026-01-02T00:00:00.000000Z",
+  "git": "abcdef12",
+  "gitStatus": {
+    "revision": "abcdef12",
+    "branch": "main",
+    "dirty": true,
+    "worktree": "有未提交改动",
+    "upstream": "origin/main",
+    "ahead": 1,
+    "behind": 0,
+    "synced": false,
+    "remote": "未推送"
+  },
+  "completion": {
+    "auditOk": true,
+    "complete": false,
+    "label": "最终验收未完成",
+    "failures": ["代码工作区：有未提交改动。"]
+  },
+  "evidence": {
+    "readiness": {
+      "localState": {
+        "iosDevice": {
+          "status": "可用",
+          "detail": "可用 1，不可用 0"
+        },
+        "androidDevice": {
+          "status": "未就绪",
+          "detail": "可用 0，未授权 0，离线 0"
+        }
+      },
+      "batches": ${_batchRowsJson()}
+    },
+    "archive": {
+      "counts": {
+        "screenshots": 1,
+        "iosRuns": 1,
+        "androidRuns": 0,
+        "fullSmokeReports": 1
+      },
+      "latestFullSmoke": {
+        "label": "前置检查阻断"
+      }
+    }
+  },
+  "nextSteps": [
+    "代码：提交或撤销本地改动，保持工作区干净。"
+  ],
+  "gateGaps": [
+    {
+      "title": "代码工作区",
+      "current": "有未提交改动",
+      "required": "工作区干净，无未提交改动"
+    }
+  ],
+  "fieldChecklist": [
+    {
+      "order": 0,
+      "title": "做终验",
+      "proof": "缺少命令且顺序无效。"
+    },
+    {
+      "order": 1,
+      "title": "清代码",
+      "proof": "工作区干净，没有未提交改动。"
+    },
+    {
+      "order": 1,
+      "title": "跑全量",
+      "command": "npm run v4:smoke:full",
+      "proof": "重复顺序，必须跳过。"
+    },
+    {
+      "order": 2,
+      "title": "做终验",
+      "proof": "执行类步骤缺命令，必须跳过。"
+    },
+    {
+      "order": 3,
+      "title": "补 Android",
+      "command": "npm run v4:android-smoke:full",
+      "proof": "只连接一台已允许 USB 调试的 Android 手机。"
+    },
+    {
+      "order": 4,
+      "title": "做终验",
+      "command": "npm run v4:acceptance-final",
+      "proof": "终验返回 0。"
     }
   ]
 }

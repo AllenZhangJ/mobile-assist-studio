@@ -313,24 +313,44 @@ List<V4AcceptanceChecklistItem> _fieldChecklistAt(
   final value = json[key];
   if (value is! List) return const <V4AcceptanceChecklistItem>[];
   final items = <V4AcceptanceChecklistItem>[];
+  final seenOrders = <int>{};
   for (final item in value) {
     if (item is! Map) continue;
     final map = Map<String, Object?>.from(item);
+    final order = _nullableIntAt(map, 'order');
     final title = _safeAcceptanceTextAt(map, 'title');
     final proof = _safeAcceptanceTextAt(map, 'proof');
+    final command = _safeAcceptanceCommandAt(map, 'command');
+    if (order == null || order == 0 || seenOrders.contains(order)) continue;
     if (title == null || proof == null) continue;
+    if (!_checklistItemLooksSafe(title: title, command: command)) continue;
+    seenOrders.add(order);
     items.add(
       V4AcceptanceChecklistItem(
-        order: _intAt(map, 'order'),
+        order: order,
         title: title,
         proof: proof,
-        command: _safeAcceptanceCommandAt(map, 'command'),
+        command: command,
       ),
     );
     if (items.length >= 6) break;
   }
   items.sort((left, right) => left.order.compareTo(right.order));
   return List<V4AcceptanceChecklistItem>.unmodifiable(items);
+}
+
+// 判断现场清单项是否可展示；执行类步骤必须带白名单命令。
+bool _checklistItemLooksSafe({
+  required String title,
+  required String? command,
+}) {
+  final normalized = title.replaceAll(' ', '').replaceAll('Android', '安卓');
+  if (normalized.contains('清代码') ||
+      normalized.contains('推远端') ||
+      normalized.contains('保留报告')) {
+    return true;
+  }
+  return command != null;
 }
 
 // 安全读取 Batch 0-8 摘要列表，并对可见文本二次脱敏。

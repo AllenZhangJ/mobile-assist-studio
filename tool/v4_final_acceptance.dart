@@ -688,6 +688,29 @@ final class _AcceptanceEvidenceSummary {
         ..writeln('| Android 运行 | ${counts['androidRuns'] ?? 0} |')
         ..writeln('| Full smoke | ${counts['fullSmokeReports'] ?? 0} |')
         ..writeln();
+
+      final screenshotArtifacts = _jsonMapList(archive!['screenshotArtifacts']);
+      if (screenshotArtifacts.isNotEmpty) {
+        buffer
+          ..writeln('### 截图留档')
+          ..writeln();
+        for (final screenshot in screenshotArtifacts.take(10)) {
+          final path = _plainText(
+            screenshot['relativePath']?.toString() ?? '未知截图',
+          );
+          final bytes = screenshot['bytes']?.toString();
+          final suffix = bytes == null || bytes.isEmpty
+              ? ''
+              : ' (${bytes} bytes)';
+          buffer.writeln('- `$path`$suffix');
+        }
+        if (screenshotArtifacts.length > 10) {
+          buffer.writeln(
+            '- 其余 ${screenshotArtifacts.length - 10} 张见 archive JSON。',
+          );
+        }
+        buffer.writeln();
+      }
     }
     return buffer.toString();
   }
@@ -734,6 +757,12 @@ Future<Map<String, Object?>?> _loadLatestArchive(Directory archiveDir) async {
   );
   if (json == null) return null;
   final summary = _jsonMapAt(json, 'summary');
+  final artifacts = _jsonMapList(json['artifacts']);
+  final screenshots = artifacts
+      .where((entry) => entry['kind'] == 'screenshot')
+      .take(20)
+      .map(_redactJsonValue)
+      .toList(growable: false);
   return <String, Object?>{
     'counts': <String, Object?>{
       'screenshots': summary['screenshots'] ?? 0,
@@ -742,6 +771,7 @@ Future<Map<String, Object?>?> _loadLatestArchive(Directory archiveDir) async {
       'fullSmokeReports': summary['fullSmokeReports'] ?? 0,
     },
     'latestFullSmoke': _redactJsonValue(summary['latestFullSmoke']),
+    'screenshotArtifacts': screenshots,
     'warnings': _redactJsonValue(json['warnings']),
   };
 }

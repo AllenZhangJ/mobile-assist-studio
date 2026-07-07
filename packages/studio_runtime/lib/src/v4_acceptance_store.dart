@@ -237,12 +237,12 @@ String _safeAcceptanceVisibleText(String value) {
 
 // 过滤普通文本里的命令片段，避免坏报告绕开反引号污染 UI。
 String _filterPlainAcceptanceCommands(String value) {
-  var safe = value.replaceAllMapped(RegExp(r'npm run [A-Za-z0-9:._-]+'), (
-    match,
-  ) {
+  var safe = value.replaceAllMapped(_plainNpmRunCommandPattern, (match) {
     final command = match.group(0)?.trim();
-    if (command != null && _allowedV4AcceptanceCommands.contains(command)) {
-      return command;
+    final normalized = command == null ? null : _normalizePlainCommand(command);
+    if (normalized != null &&
+        _allowedV4AcceptanceCommands.contains(normalized)) {
+      return normalized;
     }
     return '[命令已过滤]';
   });
@@ -252,17 +252,30 @@ String _filterPlainAcceptanceCommands(String value) {
   return safe;
 }
 
-final _blockedPlainCommandPatterns = <String>[
-  r'\brm\s+-rf\b[^。；，,;]*',
-  r'\bosascript\s+-e\b[^。；，,;]*',
-  r'\bsudo\s+\S+[^。；，,;]*',
-  r'\bcurl\s+\S+[^。；，,;]*',
-  r'\bpython3?\s+\S+[^。；，,;]*',
-  r'\bnode\s+\S+[^。；，,;]*',
-  r'\bbash\s+\S+[^。；，,;]*',
-  r'\bzsh\s+\S+[^。；，,;]*',
-  r'\bsh\s+\S+[^。；，,;]*',
-].map(RegExp.new).toList(growable: false);
+// 将普通文本命令里的重复空白收敛，便于和项目白名单做精确比较。
+String _normalizePlainCommand(String command) {
+  return command.replaceAll(RegExp(r'\s+'), ' ');
+}
+
+final _plainNpmRunCommandPattern = RegExp(
+  r'\bnpm\s+run\s+[A-Za-z0-9:._-]+',
+  caseSensitive: false,
+);
+
+final _blockedPlainCommandPatterns =
+    <String>[
+          r'\brm\s+-rf\b[^。；，,;]*',
+          r'\bosascript\s+-e\b[^。；，,;]*',
+          r'\bsudo\s+\S+[^。；，,;]*',
+          r'\bcurl\s+\S+[^。；，,;]*',
+          r'\bpython3?\s+\S+[^。；，,;]*',
+          r'\bnode\s+\S+[^。；，,;]*',
+          r'\bbash\s+\S+[^。；，,;]*',
+          r'\bzsh\s+\S+[^。；，,;]*',
+          r'\bsh\s+\S+[^。；，,;]*',
+        ]
+        .map((pattern) => RegExp(pattern, caseSensitive: false))
+        .toList(growable: false);
 
 // 安全读取 bool 字段。
 bool? _boolAt(Map<String, Object?> json, String key) {

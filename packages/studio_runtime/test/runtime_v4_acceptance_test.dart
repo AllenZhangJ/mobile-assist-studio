@@ -356,6 +356,7 @@ void main() {
         batch.evidence,
       ],
     ].join(' ');
+    final lowerVisibleText = visibleText.toLowerCase();
 
     expect(visibleText, contains('[本机路径]'));
     expect(visibleText, contains('[本机地址]'));
@@ -366,9 +367,10 @@ void main() {
     expect(visibleText, isNot(contains('/Users/example')));
     expect(visibleText, isNot(contains('00008110-000A01E03C3B801E')));
     expect(visibleText, isNot(contains('http://127.0.0.1:4723')));
-    expect(visibleText, isNot(contains('rm -rf')));
-    expect(visibleText, isNot(contains('osascript')));
-    expect(visibleText, isNot(contains('legacy:danger')));
+    expect(lowerVisibleText, isNot(contains('rm -rf')));
+    expect(lowerVisibleText, isNot(contains('osascript')));
+    expect(lowerVisibleText, isNot(contains('legacy:danger')));
+    expect(lowerVisibleText, isNot(contains('sudo')));
   });
 }
 
@@ -516,12 +518,12 @@ String _acceptanceJsonWithSensitiveText() {
     }
   },
   "nextSteps": [
-    "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E，并运行 `rm -rf /Users/example/project`，不要运行 rm -rf /Users/example/project 或 npm run legacy:danger"
+    "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E，并运行 `rm -rf /Users/example/project`，不要运行 RM -RF /Users/example/project、NPM   RUN legacy:danger 或 SUDO whoami"
   ],
   "gateGaps": [
     {
       "title": "iOS smoke /Users/example",
-      "current": "设备 00008110-000A01E03C3B801E 在 http://127.0.0.1:4723/session 失败，可疑命令 osascript -e bad",
+      "current": "设备 00008110-000A01E03C3B801E 在 http://127.0.0.1:4723/session 失败，可疑命令 OSASCRIPT -e bad",
       "required": "不要泄露 /Users/example/project",
       "command": "rm -rf /Users/example/project"
     }

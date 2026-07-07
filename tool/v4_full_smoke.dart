@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 // V4 full smoke 编排 iOS 与 Android 完整真机冒烟，并始终生成汇总留档。
@@ -36,7 +37,7 @@ Future<void> main(List<String> args) async {
     _summaryMarkdown(timestamp: timestamp, results: results),
     flush: true,
   );
-  stdout.writeln('\nFull smoke report: ${report.path}');
+  stdout.writeln('\nFull smoke report: ${_redactText(report.path)}');
 
   final failed = results.where((result) => result.exitCode != 0).toList();
   if (failed.isNotEmpty) {
@@ -118,7 +119,7 @@ Future<_FullSmokeResult> _runStep(_FullSmokeStep step, Duration timeout) async {
   stdout.writeln(_redactText(step.commandLine));
 
   try {
-    final process = await Process.run(
+    final process = await Process.start(
       step.executable,
       step.arguments,
       workingDirectory: step.workingDirectory,
@@ -127,30 +128,51 @@ Future<_FullSmokeResult> _runStep(_FullSmokeStep step, Duration timeout) async {
         'DART_SUPPRESS_ANALYTICS': 'true',
         'FLUTTER_SUPPRESS_ANALYTICS': 'true',
       },
-    ).timeout(timeout);
+    );
+    final stdoutBuffer = StringBuffer();
+    final stderrBuffer = StringBuffer();
+    final stdoutDone = process.stdout
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .listen(stdoutBuffer.write)
+        .asFuture<void>();
+    final stderrDone = process.stderr
+        .transform(const Utf8Decoder(allowMalformed: true))
+        .listen(stderrBuffer.write)
+        .asFuture<void>();
+
+    var timedOut = false;
+    var exitCode = 0;
+    try {
+      exitCode = await process.exitCode.timeout(timeout);
+    } on TimeoutException {
+      timedOut = true;
+      exitCode = 124;
+      process.kill(ProcessSignal.sigterm);
+      try {
+        await process.exitCode.timeout(const Duration(seconds: 2));
+      } on TimeoutException {
+        process.kill(ProcessSignal.sigkill);
+        try {
+          await process.exitCode.timeout(const Duration(seconds: 2));
+        } on TimeoutException {
+          // SIGKILL 后仍未结算时不再阻塞 full smoke 汇总。
+        }
+      }
+    }
+    await _awaitOutputFlush(stdoutDone, stderrDone);
+
     final finishedAt = DateTime.now().toUtc();
     final result = _FullSmokeResult(
       step: step,
-      exitCode: process.exitCode,
-      stdoutText: _redactText('${process.stdout}'),
-      stderrText: _redactText('${process.stderr}'),
+      exitCode: exitCode,
+      stdoutText: _redactText(stdoutBuffer.toString()),
+      stderrText: _redactText(_stderrWithTimeoutNote(stderrBuffer, timedOut)),
       startedAt: startedAt,
       finishedAt: finishedAt,
+      timedOut: timedOut,
     );
     stdout.writeln('${step.name}：${result.statusLabel}');
     return result;
-  } on TimeoutException {
-    final finishedAt = DateTime.now().toUtc();
-    stdout.writeln('${step.name}：超时');
-    return _FullSmokeResult(
-      step: step,
-      exitCode: 124,
-      stdoutText: '',
-      stderrText: 'step timeout after ${timeout.inSeconds}s',
-      startedAt: startedAt,
-      finishedAt: finishedAt,
-      timedOut: true,
-    );
   } on ProcessException catch (error) {
     final finishedAt = DateTime.now().toUtc();
     stdout.writeln('${step.name}：启动失败');
@@ -163,6 +185,30 @@ Future<_FullSmokeResult> _runStep(_FullSmokeStep step, Duration timeout) async {
       finishedAt: finishedAt,
     );
   }
+}
+
+// 等待输出流关闭；进程已结束后仍给极短缓冲时间，避免报告丢尾部错误。
+Future<void> _awaitOutputFlush(
+  Future<void> stdoutDone,
+  Future<void> stderrDone,
+) async {
+  try {
+    await Future.wait([
+      stdoutDone,
+      stderrDone,
+    ]).timeout(const Duration(seconds: 2));
+  } on Object {
+    // 输出收尾失败不应覆盖主进程结果；报告会保留已收集内容。
+  }
+}
+
+// 超时时在 stderr 摘要里明确写入由编排器终止，便于现场复盘。
+String _stderrWithTimeoutNote(StringBuffer buffer, bool timedOut) {
+  final stderrText = buffer.toString();
+  if (!timedOut) return stderrText;
+  final note = 'step timeout; process terminated by V4 full smoke runner';
+  if (stderrText.trim().isEmpty) return note;
+  return '$note\n$stderrText';
 }
 
 // dry-run 只展示将要执行的命令，用于本地确认和 CI 语法检查。
@@ -234,6 +280,10 @@ String _shortBlock(String value, {int limit = 2200}) {
 String _redactText(String value) {
   return value
       .replaceAll(RegExp(r'/Users/[^/\s]+'), '<home>')
+      .replaceAll(RegExp(r'/private/tmp/[^\s`)]+'), '<tmp>')
+      .replaceAll(RegExp(r'/tmp/[^\s`)]+'), '<tmp>')
+      .replaceAll(RegExp(r'/var/folders/[^\s`)]+'), '<tmp>')
+      .replaceAll(RegExp(r'/private/var/folders/[^\s`)]+'), '<tmp>')
       .replaceAll(
         RegExp(
           r'[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}',

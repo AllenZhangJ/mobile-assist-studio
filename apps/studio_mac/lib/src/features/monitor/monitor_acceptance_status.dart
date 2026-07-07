@@ -47,6 +47,11 @@ class _V4AcceptanceStatusPanel extends StatelessWidget {
             tone: summary.worktreeTone,
           ),
           _V4AcceptanceFact(
+            label: '远端',
+            value: summary.remoteLabel,
+            tone: summary.remoteTone,
+          ),
+          _V4AcceptanceFact(
             label: '安卓留档',
             value: summary.androidRunLabel,
             tone: summary.androidRunTone,
@@ -289,6 +294,8 @@ final class _V4AcceptanceStatusSummary {
     required this.batchProgressTone,
     required this.worktreeLabel,
     required this.worktreeTone,
+    required this.remoteLabel,
+    required this.remoteTone,
     required this.androidRunLabel,
     required this.androidRunTone,
     required this.issueLabel,
@@ -311,6 +318,8 @@ final class _V4AcceptanceStatusSummary {
   final StudioStatusTone batchProgressTone;
   final String worktreeLabel;
   final StudioStatusTone worktreeTone;
+  final String remoteLabel;
+  final StudioStatusTone remoteTone;
   final String androidRunLabel;
   final StudioStatusTone androidRunTone;
   final String issueLabel;
@@ -356,6 +365,8 @@ final class _V4AcceptanceStatusSummary {
         batchProgressTone: _v4BatchProgressTone(acceptance),
         worktreeLabel: acceptance.gitWorktreeLabel,
         worktreeTone: _v4WorktreeTone(acceptance),
+        remoteLabel: acceptance.gitRemoteLabel,
+        remoteTone: _v4RemoteTone(acceptance),
         androidRunLabel: '安卓 ${acceptance.androidRuns}',
         androidRunTone: acceptance.androidRuns > 0
             ? StudioStatusTone.ready
@@ -393,6 +404,8 @@ final class _V4AcceptanceStatusSummary {
       batchProgressTone: StudioStatusTone.offline,
       worktreeLabel: '未知',
       worktreeTone: StudioStatusTone.offline,
+      remoteLabel: '未知',
+      remoteTone: StudioStatusTone.offline,
       androidRunLabel: '未知',
       androidRunTone: StudioStatusTone.offline,
       issueLabel: issueRuns > 0 ? '$issueRuns 条' : '无',
@@ -421,6 +434,15 @@ StudioStatusTone _v4WorktreeTone(V4AcceptanceSummary acceptance) {
   return switch (acceptance.gitDirty) {
     false => StudioStatusTone.ready,
     true => StudioStatusTone.warning,
+    null => StudioStatusTone.offline,
+  };
+}
+
+// 根据终验报告里的 Git 远端同步状态映射版本可追溯状态。
+StudioStatusTone _v4RemoteTone(V4AcceptanceSummary acceptance) {
+  return switch (acceptance.gitRemoteSynced) {
+    true => StudioStatusTone.ready,
+    false => StudioStatusTone.warning,
     null => StudioStatusTone.offline,
   };
 }

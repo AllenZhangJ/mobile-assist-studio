@@ -204,10 +204,16 @@ Future<void> _settleOutput(
 
 // 当前 Git 状态只保留短提交、分支和干净度，不保存文件列表。
 Future<_GitStatus> _currentGitStatus(Duration timeout) async {
+  final upstream = await _currentGitUpstream(timeout);
+  final remoteState = upstream == null
+      ? const _GitRemoteState.unknown()
+      : await _currentGitRemoteState(upstream, timeout);
   return _GitStatus(
     revision: await _currentGitCommit(timeout),
     branch: await _currentGitBranch(timeout),
     dirty: await _currentGitDirty(timeout),
+    upstream: upstream,
+    remoteState: remoteState,
   );
 }
 
@@ -253,6 +259,42 @@ Future<bool?> _currentGitDirty(Duration timeout) async {
   ], timeout);
   if (status == null) return null;
   return status.trim().isNotEmpty;
+}
+
+// 当前上游分支只作为同步证明，不写远端 URL。
+Future<String?> _currentGitUpstream(Duration timeout) async {
+  final upstream = await _runGitProbe(const <String>[
+    'rev-parse',
+    '--abbrev-ref',
+    '--symbolic-full-name',
+    '@{upstream}',
+  ], timeout);
+  final value = upstream?.trim();
+  if (value == null || value.isEmpty) return null;
+  return value;
+}
+
+// 读取 ahead / behind 计数，证明提交是否已同步到上游。
+Future<_GitRemoteState> _currentGitRemoteState(
+  String upstream,
+  Duration timeout,
+) async {
+  final counts = await _runGitProbe(<String>[
+    'rev-list',
+    '--left-right',
+    '--count',
+    '$upstream...HEAD',
+  ], timeout);
+  final parts = counts?.trim().split(RegExp(r'\s+'));
+  if (parts == null || parts.length < 2) {
+    return const _GitRemoteState.unknown();
+  }
+  final behind = int.tryParse(parts[0]);
+  final ahead = int.tryParse(parts[1]);
+  if (ahead == null || behind == null) {
+    return const _GitRemoteState.unknown();
+  }
+  return _GitRemoteState(ahead: ahead, behind: behind);
 }
 
 // 执行只读 Git 探针并脱敏输出。
@@ -574,6 +616,7 @@ final class _AcceptanceReport {
       ..writeln('- 提交：${gitStatus.revision}')
       ..writeln('- 分支：${gitStatus.branch}')
       ..writeln('- 工作区：${gitStatus.worktreeLabel}')
+      ..writeln('- 远端：${gitStatus.remoteLabel}')
       ..writeln('- 来源：`$outDir`')
       ..writeln('- 完成：${complete ? '通过' : '未完成'}')
       ..writeln('- 基础审计：${auditOk ? '通过' : '失败'}')
@@ -643,11 +686,15 @@ final class _GitStatus {
     required this.revision,
     required this.branch,
     required this.dirty,
+    required this.upstream,
+    required this.remoteState,
   });
 
   final String revision;
   final String branch;
   final bool? dirty;
+  final String? upstream;
+  final _GitRemoteState remoteState;
 
   String get worktreeLabel {
     return switch (dirty) {
@@ -657,6 +704,20 @@ final class _GitStatus {
     };
   }
 
+  String get remoteLabel {
+    final value = remoteState.synced;
+    if (value == true) return '已同步';
+    if (value == false) {
+      if (remoteState.ahead > 0 && remoteState.behind > 0) {
+        return '已分叉';
+      }
+      if (remoteState.ahead > 0) return '未推送';
+      if (remoteState.behind > 0) return '落后远端';
+      return '未同步';
+    }
+    return '未知';
+  }
+
   // 转为 JSON，保持旧顶层 git 字段之外的扩展指纹。
   Map<String, Object?> toJsonObject() {
     return <String, Object?>{
@@ -664,7 +725,27 @@ final class _GitStatus {
       'branch': branch,
       'dirty': dirty,
       'worktree': worktreeLabel,
+      'upstream': upstream,
+      'ahead': remoteState.ahead,
+      'behind': remoteState.behind,
+      'synced': remoteState.synced,
+      'remote': remoteLabel,
     };
+  }
+}
+
+// GitRemoteState 只记录 ahead / behind 数字，不保存远端 URL。
+final class _GitRemoteState {
+  const _GitRemoteState({required this.ahead, required this.behind});
+
+  const _GitRemoteState.unknown() : ahead = -1, behind = -1;
+
+  final int ahead;
+  final int behind;
+
+  bool? get synced {
+    if (ahead < 0 || behind < 0) return null;
+    return ahead == 0 && behind == 0;
   }
 }
 

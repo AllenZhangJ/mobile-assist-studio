@@ -77,6 +77,9 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
     ),
     gitBranch: _safeGitBranch(_stringAt(gitStatus, 'branch')),
     gitDirty: _boolAt(gitStatus, 'dirty'),
+    gitRemoteSynced: _boolAt(gitStatus, 'synced'),
+    gitAhead: _nullableIntAt(gitStatus, 'ahead'),
+    gitBehind: _nullableIntAt(gitStatus, 'behind'),
     iosStatus: _safeAcceptanceTextAt(iosDevice, 'status') ?? '未知',
     iosDetail: _safeAcceptanceTextAt(iosDevice, 'detail') ?? '无 iOS 状态。',
     androidStatus: _safeAcceptanceTextAt(androidDevice, 'status') ?? '未知',
@@ -154,6 +157,18 @@ int _intAt(Map<String, Object?> json, String key) {
   if (value is int) return value;
   if (value is num) return value.toInt();
   return 0;
+}
+
+// 安全读取可选整数，未知或负数保持 null。
+int? _nullableIntAt(Map<String, Object?> json, String key) {
+  final value = json[key];
+  final number = switch (value) {
+    int() => value,
+    num() => value.toInt(),
+    _ => null,
+  };
+  if (number == null || number < 0) return null;
+  return number;
 }
 
 // 安全读取字符串列表，并限制长度。

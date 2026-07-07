@@ -13,6 +13,9 @@ final class V4AcceptanceSummary {
     required this.gitRevision,
     this.gitBranch,
     this.gitDirty,
+    this.gitRemoteSynced,
+    this.gitAhead,
+    this.gitBehind,
     required this.iosStatus,
     required this.iosDetail,
     required this.androidStatus,
@@ -37,6 +40,9 @@ final class V4AcceptanceSummary {
   final String? gitRevision;
   final String? gitBranch;
   final bool? gitDirty;
+  final bool? gitRemoteSynced;
+  final int? gitAhead;
+  final int? gitBehind;
   final String iosStatus;
   final String iosDetail;
   final String androidStatus;
@@ -115,6 +121,25 @@ final class V4AcceptanceSummary {
       false => '干净',
       null => '未知',
     };
+  }
+
+  // 远端同步短文案，证明当前提交是否已推到上游。
+  String get gitRemoteLabel {
+    return switch (gitRemoteSynced) {
+      true => '已推',
+      false => _gitRemoteGapLabel,
+      null => '未知',
+    };
+  }
+
+  // 将 ahead / behind 组合压成短中文，避免主界面展示 Git 术语。
+  String get _gitRemoteGapLabel {
+    final ahead = gitAhead ?? 0;
+    final behind = gitBehind ?? 0;
+    if (ahead > 0 && behind > 0) return '分叉';
+    if (ahead > 0) return '未推';
+    if (behind > 0) return '落后';
+    return '未同步';
   }
 }
 

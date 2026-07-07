@@ -31,6 +31,10 @@ void main() {
       expect(summary.gitBranch, 'main');
       expect(summary.gitDirty, isFalse);
       expect(summary.gitWorktreeLabel, '干净');
+      expect(summary.gitRemoteSynced, isTrue);
+      expect(summary.gitAhead, 0);
+      expect(summary.gitBehind, 0);
+      expect(summary.gitRemoteLabel, '已推');
       expect(summary.iosStatus, '未就绪');
       expect(summary.iosDetail, '可用 0，不可用 1');
       expect(summary.androidStatus, '未就绪');
@@ -102,6 +106,7 @@ void main() {
     expect(summary.hasReport, isTrue);
     expect(summary.gitRevision, 'good');
     expect(summary.gitDirty, isFalse);
+    expect(summary.gitRemoteSynced, isTrue);
     expect(summary.androidRuns, 1);
   });
 
@@ -121,6 +126,7 @@ void main() {
       summary.statusLabel,
       summary.gitBranch ?? '',
       summary.gitWorktreeLabel,
+      summary.gitRemoteLabel,
       summary.iosStatus,
       summary.iosDetail,
       summary.androidStatus,
@@ -168,7 +174,12 @@ String _acceptanceJson({required String git, required int androidRuns}) {
     "revision": "$git",
     "branch": "main",
     "dirty": false,
-    "worktree": "干净"
+    "worktree": "干净",
+    "upstream": "origin/main",
+    "ahead": 0,
+    "behind": 0,
+    "synced": true,
+    "remote": "已同步"
   },
   "completion": {
     "auditOk": true,
@@ -254,7 +265,12 @@ String _acceptanceJsonWithSensitiveText() {
     "revision": "abcdef12",
     "branch": "/Users/example/project",
     "dirty": true,
-    "worktree": "有未提交改动"
+    "worktree": "有未提交改动",
+    "upstream": "/Users/example/remote",
+    "ahead": 2,
+    "behind": 1,
+    "synced": false,
+    "remote": "已分叉"
   },
   "completion": {
     "auditOk": true,

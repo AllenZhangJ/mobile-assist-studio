@@ -174,6 +174,9 @@ void main() {
         gitRevision: '12345678',
         gitBranch: 'main',
         gitDirty: false,
+        gitRemoteSynced: true,
+        gitAhead: 0,
+        gitBehind: 0,
         iosStatus: '未就绪',
         iosDetail: '可用 0，不可用 1',
         androidStatus: '未就绪',
@@ -214,6 +217,8 @@ void main() {
     expect(find.text('8/9'), findsOneWidget);
     expect(find.text('代码'), findsOneWidget);
     expect(find.text('干净'), findsOneWidget);
+    expect(find.text('远端'), findsOneWidget);
+    expect(find.text('已推'), findsOneWidget);
     expect(find.text('安卓 0'), findsOneWidget);
     expect(find.text('补安卓'), findsOneWidget);
     expect(find.text('可用 0，未授权 0，离线 0'), findsOneWidget);
@@ -251,6 +256,9 @@ void main() {
         gitRevision: '12345678',
         gitBranch: 'main',
         gitDirty: false,
+        gitRemoteSynced: true,
+        gitAhead: 0,
+        gitBehind: 0,
         iosStatus: '未就绪',
         iosDetail: '可用 0，不可用 1',
         androidStatus: '未就绪',

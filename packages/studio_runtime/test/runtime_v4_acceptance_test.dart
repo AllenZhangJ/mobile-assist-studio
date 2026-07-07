@@ -98,7 +98,7 @@ void main() {
     expect(summary.primaryNextStep, startsWith('代码：'));
   });
 
-  test('local v4 acceptance reader sanitizes field checklist order', () async {
+  test('local v4 acceptance reader rejects gapped field checklist', () async {
     final temp = await Directory.systemTemp.createTemp('v4_acceptance_test_');
     addTearDown(() async {
       if (temp.existsSync()) await temp.delete(recursive: true);
@@ -112,16 +112,7 @@ void main() {
     ).readLatest();
 
     expect(summary.hasReport, isTrue);
-    expect(summary.fieldChecklist.map((item) => item.title), <String>[
-      '清代码',
-      '补 Android',
-      '做终验',
-    ]);
-    expect(summary.fieldChecklist.map((item) => item.command), <String?>[
-      null,
-      'npm run v4:android-smoke:full',
-      'npm run v4:acceptance-final',
-    ]);
+    expect(summary.fieldChecklist, isEmpty);
     expect(summary.primaryNextStep, startsWith('代码：'));
   });
 
@@ -449,19 +440,19 @@ String _acceptanceJson({required String git, required int androidRuns}) {
   ],
   "fieldChecklist": [
     {
-      "order": 2,
+      "order": 1,
       "title": "补 Android",
       "command": "npm run v4:android-smoke:full",
       "proof": "只连接一台已允许 USB 调试的 Android 手机。"
     },
     {
-      "order": 3,
+      "order": 2,
       "title": "跑全量",
       "command": "npm run v4:smoke:full:password-prompt",
       "proof": "双平台 full smoke 完整通过。"
     },
     {
-      "order": 4,
+      "order": 3,
       "title": "做终验",
       "command": "npm run v4:acceptance-final",
       "proof": "终验返回 0。"

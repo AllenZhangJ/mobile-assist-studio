@@ -336,7 +336,18 @@ List<V4AcceptanceChecklistItem> _fieldChecklistAt(
     if (items.length >= 6) break;
   }
   items.sort((left, right) => left.order.compareTo(right.order));
+  if (!_fieldChecklistOrdersAreContinuous(items)) {
+    return const <V4AcceptanceChecklistItem>[];
+  }
   return List<V4AcceptanceChecklistItem>.unmodifiable(items);
+}
+
+// 确保现场路线从 1 开始连续，避免跳过坏项后展示不完整补验路径。
+bool _fieldChecklistOrdersAreContinuous(List<V4AcceptanceChecklistItem> items) {
+  for (var index = 0; index < items.length; index += 1) {
+    if (items[index].order != index + 1) return false;
+  }
+  return true;
 }
 
 // 判断现场清单项是否可展示；执行类步骤必须带白名单命令。

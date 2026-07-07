@@ -212,6 +212,40 @@ void main() {
   }
 }
 ''');
+      final invalidBatchRows = _batchRowsJson().replaceFirst(
+        'Batch 2 双平台 smoke',
+        'Batch 2 旧 smoke',
+      );
+      await File(
+        '${temp.path}/FINAL_ACCEPTANCE_2026-01-05T00-00-00Z.json',
+      ).writeAsString('''
+{
+  "schemaVersion": 1,
+  "kind": "v4FinalAcceptance",
+  "timestamp": "2026-01-05T00:00:00.000000Z",
+  "completion": {
+    "auditOk": true,
+    "complete": false
+  },
+  "evidence": {
+    "readiness": {
+      "localState": {
+        "iosDevice": {"status": "未就绪", "detail": "可用 0"},
+        "androidDevice": {"status": "未就绪", "detail": "可用 0"}
+      },
+      "batches": $invalidBatchRows
+    },
+    "archive": {
+      "counts": {
+        "screenshots": 0,
+        "iosRuns": 0,
+        "androidRuns": 0,
+        "fullSmokeReports": 7.5
+      }
+    }
+  }
+}
+''');
 
       final summary = await LocalV4AcceptanceSummaryReader(
         directory: temp,

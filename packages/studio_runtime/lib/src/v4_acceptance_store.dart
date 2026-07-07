@@ -92,8 +92,31 @@ bool _archiveCountsLookValid(Map<String, Object?> counts) {
 // 判断 Batch 0-8 摘要是否存在，避免旧报告或半报告误导批次进度。
 bool _batchRowsLookValid(Map<String, Object?> readiness) {
   final value = readiness['batches'];
-  return value is List && value.length >= 9;
+  if (value is! List || value.length < _expectedV4BatchNames.length) {
+    return false;
+  }
+  for (var index = 0; index < _expectedV4BatchNames.length; index += 1) {
+    final item = value[index];
+    if (item is! Map) return false;
+    final map = Map<String, Object?>.from(item);
+    if (_stringAt(map, 'name') != _expectedV4BatchNames[index]) return false;
+    if (_stringAt(map, 'status') == null) return false;
+    if (_stringAt(map, 'evidence') == null) return false;
+  }
+  return true;
 }
+
+const _expectedV4BatchNames = <String>[
+  'Batch 0 真源治理',
+  'Batch 1 Runtime 基座',
+  'Batch 2 双平台 smoke',
+  'Batch 3 Inspector',
+  'Batch 4 Target / Recorder',
+  'Batch 5 Vision Core',
+  'Batch 6 Workflow Canvas',
+  'Batch 7 Evidence / Report',
+  'Batch 8 AI / MCP Core',
+];
 
 // 把终验 JSON 转为脱敏摘要。
 V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
@@ -217,11 +240,14 @@ int _intAt(Map<String, Object?> json, String key) {
 // 安全读取可选整数，未知或负数保持 null。
 int? _nullableIntAt(Map<String, Object?> json, String key) {
   final value = json[key];
-  final number = switch (value) {
-    int() => value,
-    num() => value.toInt(),
-    _ => null,
-  };
+  final int? number;
+  if (value is int) {
+    number = value;
+  } else if (value is num && value.isFinite && value % 1 == 0) {
+    number = value.toInt();
+  } else {
+    number = null;
+  }
   if (number == null || number < 0) return null;
   return number;
 }

@@ -76,6 +76,8 @@ void main() {
 <hierarchy>
   <node class="android.widget.FrameLayout" bounds="[0,0][390,844]">
     <node class="android.widget.Button" text="开始" clickable="true" bounds="[20,40][120,88]" />
+    <node class="android.widget.TextView" text="/Users/example/private" bounds="[20,100][180,140]" />
+    <node class="android.widget.TextView" text="11112222-3333444455556666" bounds="[20,160][220,200]" />
   </node>
 </hierarchy>
 ''',
@@ -104,9 +106,50 @@ void main() {
     final locators = locatorResult.output['locators'] as List<Object?>;
     expect(targetResult.output['draftOnly'], isTrue);
     expect(locatorResult.output['draftOnly'], isTrue);
+    expect(targetResult.output['requiresUserReview'], isTrue);
+    expect(locatorResult.output['requiresUserReview'], isTrue);
+    expect(targetResult.output['available'], isTrue);
+    expect(locatorResult.output['available'], isTrue);
     expect(targets.toString(), contains('label=开始'));
     expect(locators.toString(), contains('label=开始'));
+    expect(
+      '${targetResult.output} ${locatorResult.output}',
+      contains('[path]'),
+    );
+    expect(
+      '${targetResult.output} ${locatorResult.output}',
+      contains('[device]'),
+    );
+    expect(
+      '${targetResult.output} ${locatorResult.output}',
+      isNot(contains('/Users/example')),
+    );
+    expect(
+      '${targetResult.output} ${locatorResult.output}',
+      isNot(contains('11112222-3333444455556666')),
+    );
     expect(controller.snapshot.targetLibrary.count, 0);
+  });
+
+  test('ai suggestions explain missing inspector state', () async {
+    final controller = StudioRuntimeController();
+
+    final targetResult = await controller.invokeAiTool(
+      const AiToolInvocationRequest(toolId: 'suggestTarget'),
+    );
+    final locatorResult = await controller.invokeAiTool(
+      const AiToolInvocationRequest(toolId: 'suggestLocator'),
+    );
+    await controller.dispose();
+
+    expect(targetResult.status, AiToolInvocationStatus.completed);
+    expect(locatorResult.status, AiToolInvocationStatus.completed);
+    expect(targetResult.output['available'], isFalse);
+    expect(locatorResult.output['available'], isFalse);
+    expect(targetResult.output['reason'], contains('先检查'));
+    expect(locatorResult.output['reason'], contains('先检查'));
+    expect(targetResult.output['targets'], isEmpty);
+    expect(locatorResult.output['locators'], isEmpty);
   });
 
   test(

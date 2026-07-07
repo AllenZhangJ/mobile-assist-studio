@@ -302,16 +302,31 @@ Map<String, Object?> _aiFailureExplanation(RunLocalReport report) {
 // _aiTargetSuggestions 根据当前元素树生成目标草稿，不写入 Target Store。
 Map<String, Object?> _aiTargetSuggestions(StudioRuntimeSnapshot snapshot) {
   final root = snapshot.inspectorSnapshot?.rootElement;
+  final capabilities = _aiEffectiveCapabilities(snapshot);
   final candidates = root == null
       ? const <Map<String, Object?>>[]
       : _flattenInspectorElements(root)
-            .where(_elementCanBecomeTarget)
+            .where(
+              (element) => _elementCanBecomeTarget(
+                element,
+                selectorTargetSupported: capabilities.selectorTarget,
+              ),
+            )
             .take(5)
-            .map(_targetSuggestionFromElement)
+            .map(
+              (element) => _targetSuggestionFromElement(
+                element,
+                selectorTargetSupported: capabilities.selectorTarget,
+              ),
+            )
             .toList(growable: false);
   return <String, Object?>{
     'draftOnly': true,
+    'requiresUserReview': true,
+    'available': candidates.isNotEmpty,
+    'reason': _aiSuggestionReason(root, candidates.length),
     'count': candidates.length,
+    'source': 'inspector',
     'targets': candidates,
   };
 }
@@ -319,16 +334,25 @@ Map<String, Object?> _aiTargetSuggestions(StudioRuntimeSnapshot snapshot) {
 // _aiLocatorSuggestions 根据当前元素树生成受控 selector 短语法。
 Map<String, Object?> _aiLocatorSuggestions(StudioRuntimeSnapshot snapshot) {
   final root = snapshot.inspectorSnapshot?.rootElement;
-  final locators = root == null
+  final capabilities = _aiEffectiveCapabilities(snapshot);
+  final locators = root == null || !capabilities.selectorTarget
       ? const <Map<String, Object?>>[]
       : _flattenInspectorElements(root)
-            .where(_elementCanBecomeTarget)
+            .where((element) => _selectorForElement(element) != null)
             .take(5)
             .map(_locatorSuggestionFromElement)
             .toList(growable: false);
   return <String, Object?>{
     'draftOnly': true,
+    'requiresUserReview': true,
+    'available': locators.isNotEmpty,
+    'reason': root == null
+        ? _aiSuggestionReason(root, locators.length)
+        : !capabilities.selectorTarget
+        ? '当前平台暂不支持元素定位。'
+        : _aiSuggestionReason(root, locators.length),
     'count': locators.length,
+    'source': 'inspector',
     'locators': locators,
   };
 }
@@ -357,21 +381,30 @@ List<InspectorElementSummary> _flattenInspectorElements(
 }
 
 // _elementCanBecomeTarget 判断元素是否有可生成定位的信息。
-bool _elementCanBecomeTarget(InspectorElementSummary element) {
-  return (element.label != null && element.label!.trim().isNotEmpty) ||
-      (element.value != null && element.value!.trim().isNotEmpty) ||
-      element.bounds != null;
+bool _elementCanBecomeTarget(
+  InspectorElementSummary element, {
+  required bool selectorTargetSupported,
+}) {
+  if (element.bounds != null) return true;
+  return selectorTargetSupported && _selectorForElement(element) != null;
 }
 
 // _targetSuggestionFromElement 生成目标草稿。
 Map<String, Object?> _targetSuggestionFromElement(
-  InspectorElementSummary element,
-) {
-  final label = element.label ?? element.value ?? element.type;
-  final selector = _selectorForElement(element);
+  InspectorElementSummary element, {
+  required bool selectorTargetSupported,
+}) {
+  final label =
+      _safeAiElementText(element.label) ??
+      _safeAiElementText(element.value) ??
+      _safeAiElementText(element.type) ??
+      '元素';
+  final selector = selectorTargetSupported
+      ? _selectorForElement(element)
+      : null;
   return <String, Object?>{
     'targetId': _safeAiId('target_$label'),
-    'label': _sanitizeReportText(label),
+    'label': label,
     'kind': selector == null ? 'region' : 'selector',
     'payload': selector == null
         ? _regionPayload(element.bounds)
@@ -384,8 +417,12 @@ Map<String, Object?> _locatorSuggestionFromElement(
   InspectorElementSummary element,
 ) {
   return <String, Object?>{
-    'elementId': element.id,
-    'label': element.label ?? element.value ?? element.type,
+    'elementId': _sanitizeReportText(element.id),
+    'label':
+        _safeAiElementText(element.label) ??
+        _safeAiElementText(element.value) ??
+        _safeAiElementText(element.type) ??
+        '元素',
     'selector': _selectorForElement(element),
     'fallback': element.bounds == null ? null : _regionPayload(element.bounds),
   };
@@ -393,13 +430,38 @@ Map<String, Object?> _locatorSuggestionFromElement(
 
 // _selectorForElement 使用项目允许的短语法，不生成 XPath / CSS / 脚本。
 String? _selectorForElement(InspectorElementSummary element) {
-  final label = element.label?.trim();
+  final label = _safeAiElementText(element.label);
   if (label != null && label.isNotEmpty) return 'label=$label';
-  final value = element.value?.trim();
+  final value = _safeAiElementText(element.value);
   if (value != null && value.isNotEmpty) return 'value=$value';
-  final type = element.type.trim();
-  if (type.isNotEmpty) return 'type=$type';
+  final type = _safeAiElementText(element.type);
+  if (type != null && type.isNotEmpty) return 'type=$type';
   return null;
+}
+
+// _aiEffectiveCapabilities 取 Inspector 能力，缺失时降级为当前 Runtime 能力。
+MobileDriverCapabilityReport _aiEffectiveCapabilities(
+  StudioRuntimeSnapshot snapshot,
+) {
+  return snapshot.inspectorSnapshot?.capabilities ??
+      snapshot.mobileRuntime.capabilities;
+}
+
+// _aiSuggestionReason 输出用户能理解的生成状态，不暴露底层 Appium 细节。
+String _aiSuggestionReason(InspectorElementSummary? root, int count) {
+  if (root == null) return '请先检查当前界面，再生成建议。';
+  if (count == 0) return '当前界面没有可用元素。';
+  return '已基于当前检查结果生成草稿。';
+}
+
+// _safeAiElementText 在 Runtime 输出层先脱敏，再生成目标和定位草稿。
+String? _safeAiElementText(String? value) {
+  if (value == null) return null;
+  final sanitized = _sanitizeReportText(
+    value.replaceAll(RegExp(r'\s+'), ' ').trim(),
+  );
+  if (sanitized.isEmpty) return null;
+  return sanitized.length > 32 ? '${sanitized.substring(0, 32)}...' : sanitized;
 }
 
 // _regionPayload 把元素边界转成区域目标草稿。

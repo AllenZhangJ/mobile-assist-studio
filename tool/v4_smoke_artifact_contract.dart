@@ -41,6 +41,31 @@ Future<void> main() async {
           finalArchive.stderr.contains('full smoke'),
       'archive final 必须一次性提示平台 run 和 full smoke 缺口。',
     );
+
+    final acceptance = await _runFinalAcceptance(tempDir);
+    _expect(
+      acceptance.exitCode == 0,
+      'acceptance audit 在 fixture 下应成功留档，实际 ${acceptance.exitCode}。',
+    );
+    final acceptanceArtifacts = await _loadAcceptanceArtifacts(tempDir);
+    _assertAcceptanceJson(acceptanceArtifacts.json);
+    _assertAcceptanceMarkdown(acceptanceArtifacts.markdown);
+    _assertNoSensitiveText(acceptanceArtifacts.allText);
+
+    final finalAcceptance = await _runFinalAcceptance(
+      tempDir,
+      requireComplete: true,
+    );
+    _expect(
+      finalAcceptance.exitCode == 2,
+      'acceptance final 在 fixture 未完整时必须返回 2，实际 ${finalAcceptance.exitCode}。',
+    );
+    _expect(
+      finalAcceptance.stderr.contains('最终验收尚未通过') &&
+          finalAcceptance.stderr.contains('完成审计') &&
+          finalAcceptance.stderr.contains('归档终验'),
+      'acceptance final 必须提示最终验收缺口。',
+    );
     stdout.writeln('V4 smoke artifact contract passed');
   } finally {
     await tempDir.delete(recursive: true);
@@ -132,6 +157,27 @@ Future<_ProcessResult> _runArchiveFinal(Directory outDir) async {
     '--require-complete',
     '--require-screenshot',
     '--require-platform-runs',
+  ]);
+}
+
+// 调用最终验收工具，验证统一审计报告和严格门禁。
+Future<_ProcessResult> _runFinalAcceptance(
+  Directory outDir, {
+  bool requireComplete = false,
+}) async {
+  return _runDartTool(<String>[
+    'tool/v4_final_acceptance.dart',
+    '--out-dir',
+    outDir.path,
+    '--archive-dir',
+    '${outDir.path}/archives',
+    '--report-dir',
+    '${outDir.path}/acceptance',
+    '--probe-timeout',
+    '1',
+    '--step-timeout',
+    '20',
+    if (requireComplete) '--require-complete',
   ]);
 }
 
@@ -239,6 +285,37 @@ Future<_ArchiveArtifacts> _loadArchiveArtifacts(Directory outDir) async {
   final decoded = jsonDecode(jsonText);
   _expect(decoded is Map, 'archive JSON 必须是对象。');
   return _ArchiveArtifacts(
+    json: Map<String, Object?>.from(decoded as Map),
+    markdown: markdown,
+    allText: '$jsonText\n$markdown',
+  );
+}
+
+// 读取 final acceptance 生成的最新 JSON 和 Markdown。
+Future<_AcceptanceArtifacts> _loadAcceptanceArtifacts(Directory outDir) async {
+  final acceptanceDir = Directory('${outDir.path}/acceptance');
+  final jsonFiles = await _matchingFiles(
+    acceptanceDir,
+    RegExp(r'^FINAL_ACCEPTANCE_.*\.json$'),
+  );
+  final markdownFiles = await _matchingFiles(
+    acceptanceDir,
+    RegExp(r'^FINAL_ACCEPTANCE_.*\.md$'),
+  );
+  _expect(
+    jsonFiles.length == 1,
+    'acceptance JSON 数量应为 1，实际 ${jsonFiles.length}',
+  );
+  _expect(
+    markdownFiles.length == 1,
+    'acceptance Markdown 数量应为 1，实际 ${markdownFiles.length}',
+  );
+
+  final jsonText = await jsonFiles.single.readAsString();
+  final markdown = await markdownFiles.single.readAsString();
+  final decoded = jsonDecode(jsonText);
+  _expect(decoded is Map, 'acceptance JSON 必须是对象。');
+  return _AcceptanceArtifacts(
     json: Map<String, Object?>.from(decoded as Map),
     markdown: markdown,
     allText: '$jsonText\n$markdown',
@@ -384,6 +461,41 @@ void _assertArchiveMarkdown(String markdown) {
   }
 }
 
+// 断言 final acceptance JSON 覆盖统一验收步骤和失败摘要。
+void _assertAcceptanceJson(Map<String, Object?> json) {
+  _expect(json['schemaVersion'] == 1, 'acceptance schemaVersion 必须为 1。');
+  _expect(json['kind'] == 'v4FinalAcceptance', 'acceptance kind 必须正确。');
+
+  final completion = _mapAt(json, 'completion');
+  _expect(completion['auditOk'] == true, 'acceptance auditOk 必须为 true。');
+  _expect(
+    completion['complete'] == false,
+    'fixture 下 acceptance complete 必须为 false。',
+  );
+  final failures = _stringList(completion['failures']);
+  _expect(
+    failures.any((failure) => failure.contains('完成审计')) &&
+        failures.any((failure) => failure.contains('归档终验')),
+    'acceptance 必须保留两个最终门禁失败摘要。',
+  );
+
+  final steps = _listAt(json, 'steps');
+  _expect(steps.length == 4, 'acceptance 必须包含 4 个固定步骤。');
+}
+
+// 断言 final acceptance Markdown 包含人工复盘区域。
+void _assertAcceptanceMarkdown(String markdown) {
+  for (final text in <String>[
+    '# V4 Final Acceptance',
+    '## 步骤',
+    '## 结论',
+    '完成审计',
+    '归档终验',
+  ]) {
+    _expect(markdown.contains(text), 'Acceptance Markdown 必须包含：$text');
+  }
+}
+
 // 扫描生成文本，防止合同 fixture 或 readiness 输出泄露真实本机信息。
 void _assertNoSensitiveText(String text) {
   final patterns = <RegExp>[
@@ -476,6 +588,19 @@ final class _ReadinessArtifacts {
 // archive 生成物集合。
 final class _ArchiveArtifacts {
   const _ArchiveArtifacts({
+    required this.json,
+    required this.markdown,
+    required this.allText,
+  });
+
+  final Map<String, Object?> json;
+  final String markdown;
+  final String allText;
+}
+
+// final acceptance 生成物集合。
+final class _AcceptanceArtifacts {
+  const _AcceptanceArtifacts({
     required this.json,
     required this.markdown,
     required this.allText,

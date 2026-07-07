@@ -154,6 +154,14 @@ Future<void> main() async {
       platformGit: currentGit,
       writePlatformScreenshots: false,
     );
+    final detachedScreenshotReadiness = await _runReadiness(
+      detachedScreenshotDir,
+      requireComplete: true,
+    );
+    _expect(
+      detachedScreenshotReadiness.exitCode == 2,
+      '只有全局截图、平台 run 缺少同 run 截图文件时 readiness final 必须拒绝通过。',
+    );
     final detachedScreenshotArchiveFinal = await _runArchiveFinal(
       detachedScreenshotDir,
     );
@@ -865,11 +873,18 @@ void _assertCompleteReadinessJson(Map<String, Object?> json) {
     '完整 fixture 必须全部属于当前提交。',
   );
   final artifacts = _mapAt(json, 'artifacts');
+  final latestIos = _mapAt(artifacts, 'latestIos');
+  final latestAndroid = _mapAt(artifacts, 'latestAndroid');
   _expect(
-    _mapAt(artifacts, 'latestIos')['git'] == git &&
-        _mapAt(artifacts, 'latestAndroid')['git'] == git &&
+    latestIos['git'] == git &&
+        latestAndroid['git'] == git &&
         _mapAt(artifacts, 'latestFullSmoke')['git'] == git,
     '完整 fixture 的三类 smoke 证据必须绑定同一当前提交。',
+  );
+  _expect(
+    latestIos['screenshotFileCount'] == 1 &&
+        latestAndroid['screenshotFileCount'] == 1,
+    '完整 fixture 的平台 smoke 必须保留同 run 截图文件计数。',
   );
   final batches = _listAt(json, 'batches').map(_mapFrom).toList();
   _expect(

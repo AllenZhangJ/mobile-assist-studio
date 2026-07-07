@@ -302,6 +302,7 @@ Future<_SmokeRunSummary> _readSmokeRunSummary(Directory dir) async {
       .where((type) => type.isNotEmpty)
       .toSet();
   final actionNames = _smokeActionNames(events);
+  final screenshotFileCount = await _countSmokeRunScreenshots(dir);
   final failure = events
       .where((event) => event['type'] == 'smokeFailure')
       .map((event) => event['message']?.toString() ?? '')
@@ -318,12 +319,30 @@ Future<_SmokeRunSummary> _readSmokeRunSummary(Directory dir) async {
     finishedAt: _parseDate(finished?['finishedAt']),
     actionsAllowed: _eventBool(events, 'smokeStart', 'actionsAllowed'),
     hasScreenshot: eventTypes.contains('smokeScreenshot'),
+    screenshotFileCount: screenshotFileCount,
     actionsExecuted: actionNames.isNotEmpty,
     actionNames: actionNames,
     workflowExecuted: eventTypes.contains('smokeWorkflowStart'),
     logsCollected: eventTypes.contains('smokeLogs'),
     failureSummary: failure == null ? null : _shortText(_redactText(failure)),
   );
+}
+
+// 统计同一 smoke run 下的截图文件，避免全局旧截图误算为平台留证。
+Future<int> _countSmokeRunScreenshots(Directory runDir) async {
+  final dir = Directory('${runDir.path}/screenshots');
+  if (!await dir.exists()) return 0;
+  var count = 0;
+  await for (final entity in dir.list(recursive: true, followLinks: false)) {
+    if (entity is! File) continue;
+    final name = entity.uri.pathSegments.last;
+    if (!RegExp(r'\.(png|jpg|jpeg)$', caseSensitive: false).hasMatch(name)) {
+      continue;
+    }
+    final stat = await entity.stat();
+    if (stat.size > 0) count += 1;
+  }
+  return count;
 }
 
 // 从 metadata / finished / smokeStart 事件中提取短提交号，兼容旧 run 缺字段。
@@ -946,6 +965,7 @@ final class _SmokeRunSummary {
     required this.finishedAt,
     required this.actionsAllowed,
     required this.hasScreenshot,
+    required this.screenshotFileCount,
     required this.actionsExecuted,
     required this.actionNames,
     required this.workflowExecuted,
@@ -961,6 +981,7 @@ final class _SmokeRunSummary {
   final DateTime? finishedAt;
   final bool? actionsAllowed;
   final bool hasScreenshot;
+  final int screenshotFileCount;
   final bool actionsExecuted;
   final Set<String> actionNames;
   final bool workflowExecuted;
@@ -968,6 +989,8 @@ final class _SmokeRunSummary {
   final String? failureSummary;
 
   bool get passed => status == 'success';
+
+  bool get hasScreenshotFile => screenshotFileCount > 0;
 
   bool get tapExecuted => actionNames.contains('tap');
 
@@ -979,6 +1002,7 @@ final class _SmokeRunSummary {
       passed &&
       actionsAllowed == true &&
       hasScreenshot &&
+      hasScreenshotFile &&
       workflowExecuted &&
       tapExecuted &&
       swipeExecuted &&
@@ -1007,7 +1031,11 @@ final class _SmokeRunSummary {
       actionsAllowed == true ? '允许动作' : '动作未授权',
       actionSummary,
       workflowExecuted ? '含流程' : '无流程',
-      hasScreenshot ? '有截图' : '无截图',
+      hasScreenshot
+          ? hasScreenshotFile
+                ? '有截图'
+                : '截图缺文件'
+          : '无截图',
       logsCollected ? '有日志' : '无日志',
     ];
     if (finishedAt case final finished?) {
@@ -1032,6 +1060,7 @@ final class _SmokeRunSummary {
       'finishedAt': finishedAt?.toUtc().toIso8601String(),
       'actionsAllowed': actionsAllowed,
       'hasScreenshot': hasScreenshot,
+      'screenshotFileCount': screenshotFileCount,
       'actionsExecuted': actionsExecuted,
       'actions': actionNames.toList()..sort(),
       'workflowExecuted': workflowExecuted,

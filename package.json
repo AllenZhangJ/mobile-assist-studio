@@ -15,6 +15,7 @@
     "v4:verify": "fvm dart run tool/v4_verify.dart",
     "v4:ios-smoke": "cd packages/studio_runtime && fvm dart run tool/v4_ios_smoke.dart --out-dir ../../recordings/v4-smoke/ios",
     "v4:android-smoke": "cd packages/studio_runtime && fvm dart run tool/v4_android_smoke.dart --out-dir ../../recordings/v4-smoke/android",
+    "v4:smoke-readiness": "fvm dart run tool/v4_smoke_readiness.dart",
     "smoke:v2-boundary": "fvm dart run tool/v2_boundary_check.dart",
     "smoke:v4-boundary": "fvm dart run tool/v4_boundary_check.dart",
     "smoke:macos-build": "fvm dart run tool/macos_build_smoke.dart",

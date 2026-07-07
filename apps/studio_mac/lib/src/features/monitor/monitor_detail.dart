@@ -7,12 +7,14 @@ class _RunDetailDrawer extends StatelessWidget {
     required this.detail,
     required this.report,
     required this.controller,
+    required this.focusNodeId,
   });
 
   final RunHistoryEntry entry;
   final RunDetail? detail;
   final RunLocalReport? report;
   final StudioRuntimeController controller;
+  final String? focusNodeId;
 
   // 渲染运行详情抽屉壳，并组合摘要、报告、分析、证据和节点路径分片。
   @override
@@ -140,6 +142,7 @@ class _RunDetailDrawer extends StatelessWidget {
                                 evidenceRefs: detail!.screenshotEvidenceRefs,
                                 controller: controller,
                                 revealByDefault: revealScreenshotsByDefault,
+                                focusNodeId: focusNodeId,
                               ),
                               const SizedBox(height: 14),
                               _RunRelatedEventsPanel(events: detail!.events),
@@ -150,6 +153,7 @@ class _RunDetailDrawer extends StatelessWidget {
                                 controller: controller,
                                 revealEvidenceByDefault:
                                     revealScreenshotsByDefault,
+                                focusNodeId: focusNodeId,
                               ),
                             ],
                           ),

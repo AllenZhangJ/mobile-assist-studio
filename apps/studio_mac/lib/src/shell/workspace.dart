@@ -8,6 +8,9 @@ class _Workspace extends StatelessWidget {
     required this.controller,
     required this.selectedIndex,
     required this.onNavigate,
+    required this.monitorFocusRequest,
+    required this.onOpenMonitorFocus,
+    required this.onMonitorFocusConsumed,
   });
 
   final String title;
@@ -15,6 +18,9 @@ class _Workspace extends StatelessWidget {
   final StudioRuntimeController controller;
   final int selectedIndex;
   final ValueChanged<int> onNavigate;
+  final _MonitorFocusRequest? monitorFocusRequest;
+  final void Function(String runId, String? nodeId) onOpenMonitorFocus;
+  final ValueChanged<int> onMonitorFocusConsumed;
 
   // 构建统一工作区面板，页面内容交给 PageContent 分派。
   @override
@@ -34,6 +40,9 @@ class _Workspace extends StatelessWidget {
           snapshot: snapshot,
           controller: controller,
           onNavigate: onNavigate,
+          monitorFocusRequest: monitorFocusRequest,
+          onOpenMonitorFocus: onOpenMonitorFocus,
+          onMonitorFocusConsumed: onMonitorFocusConsumed,
         ),
       ),
     );
@@ -47,12 +56,18 @@ class _PageContent extends StatelessWidget {
     required this.snapshot,
     required this.controller,
     required this.onNavigate,
+    required this.monitorFocusRequest,
+    required this.onOpenMonitorFocus,
+    required this.onMonitorFocusConsumed,
   });
 
   final int index;
   final StudioRuntimeSnapshot snapshot;
   final StudioRuntimeController controller;
   final ValueChanged<int> onNavigate;
+  final _MonitorFocusRequest? monitorFocusRequest;
+  final void Function(String runId, String? nodeId) onOpenMonitorFocus;
+  final ValueChanged<int> onMonitorFocusConsumed;
 
   // 根据一级导航索引切换 L1-L6 页面。
   @override
@@ -73,9 +88,15 @@ class _PageContent extends StatelessWidget {
         snapshot: snapshot,
         controller: controller,
         onNavigate: onNavigate,
+        onOpenMonitorFocus: onOpenMonitorFocus,
       ),
       4 => _ExecutePage(snapshot: snapshot, controller: controller),
-      _ => _MonitorPage(snapshot: snapshot, controller: controller),
+      _ => _MonitorPage(
+        snapshot: snapshot,
+        controller: controller,
+        focusRequest: monitorFocusRequest,
+        onFocusConsumed: onMonitorFocusConsumed,
+      ),
     };
   }
 }

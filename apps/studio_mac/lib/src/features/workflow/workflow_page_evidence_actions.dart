@@ -58,6 +58,11 @@ extension _WorkflowPageEvidenceActions on _WorkflowPageState {
 
   // 跳转到记录页，详情仍由 Monitor 统一承载。
   void _openLatestRunEvidenceInMonitor() {
-    widget.onNavigate(5);
+    final latestRun = _latestWorkflowRunEntry;
+    if (latestRun == null) {
+      widget.onNavigate(5);
+      return;
+    }
+    widget.onOpenMonitorFocus(latestRun.runId, _selectedNodeId);
   }
 }

@@ -6,11 +6,13 @@ class _WorkflowPage extends StatefulWidget {
     required this.snapshot,
     required this.controller,
     required this.onNavigate,
+    required this.onOpenMonitorFocus,
   });
 
   final StudioRuntimeSnapshot snapshot;
   final StudioRuntimeController controller;
   final ValueChanged<int> onNavigate;
+  final void Function(String runId, String? nodeId) onOpenMonitorFocus;
 
   @override
   State<_WorkflowPage> createState() => _WorkflowPageState();

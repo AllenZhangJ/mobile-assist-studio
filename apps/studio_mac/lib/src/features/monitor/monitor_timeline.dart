@@ -7,12 +7,14 @@ class _RunNodeTraceTimeline extends StatefulWidget {
     required this.traces,
     required this.controller,
     required this.revealEvidenceByDefault,
+    required this.focusNodeId,
   });
 
   final String runId;
   final List<RunNodeTrace> traces;
   final StudioRuntimeController controller;
   final bool revealEvidenceByDefault;
+  final String? focusNodeId;
 
   // 创建节点时间轴内部筛选状态。
   @override
@@ -52,6 +54,7 @@ class _RunNodeTraceTimelineState extends State<_RunNodeTraceTimeline> {
                 trace: trace,
                 controller: widget.controller,
                 revealEvidenceByDefault: widget.revealEvidenceByDefault,
+                focused: widget.focusNodeId == trace.nodeId,
               );
             },
           ),

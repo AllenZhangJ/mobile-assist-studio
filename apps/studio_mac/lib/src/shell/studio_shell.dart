@@ -22,6 +22,8 @@ class _StudioShellState extends State<StudioShell> {
   late StudioRuntimeSnapshot _snapshot;
   StreamSubscription<StudioRuntimeSnapshot>? _snapshotSubscription;
   int _selectedIndex = 0;
+  int _monitorFocusSerial = 0;
+  _MonitorFocusRequest? _monitorFocusRequest;
   bool _commandCenterOpen = false;
 
   static const _items = <_NavItem>[
@@ -159,6 +161,24 @@ class _StudioShellState extends State<StudioShell> {
     setState(() => _selectedIndex = index);
   }
 
+  // 带运行和节点焦点打开记录页，让跨页深链只携带轻量标识。
+  void _openMonitorRunFocus(String runId, String? nodeId) {
+    setState(() {
+      _selectedIndex = 5;
+      _monitorFocusRequest = _MonitorFocusRequest(
+        serial: ++_monitorFocusSerial,
+        runId: runId,
+        nodeId: nodeId,
+      );
+    });
+  }
+
+  // Monitor 消费焦点后清空一次性请求，避免热重建重复打开抽屉。
+  void _clearMonitorFocusRequest(int serial) {
+    if (_monitorFocusRequest?.serial != serial) return;
+    setState(() => _monitorFocusRequest = null);
+  }
+
   // 渲染工作站主布局：顶部状态、侧栏、工作区和底部控制台。
   @override
   Widget build(BuildContext context) {
@@ -188,6 +208,9 @@ class _StudioShellState extends State<StudioShell> {
                       controller: _controller,
                       selectedIndex: _selectedIndex,
                       onNavigate: _selectNavIndex,
+                      monitorFocusRequest: _monitorFocusRequest,
+                      onOpenMonitorFocus: _openMonitorRunFocus,
+                      onMonitorFocusConsumed: _clearMonitorFocusRequest,
                     ),
                   ),
                 ],
@@ -292,6 +315,19 @@ class _StudioShellState extends State<StudioShell> {
       ),
     );
   }
+}
+
+// 记录页一次性焦点请求，只保存运行和节点短标识，不携带路径或截图内容。
+class _MonitorFocusRequest {
+  const _MonitorFocusRequest({
+    required this.serial,
+    required this.runId,
+    required this.nodeId,
+  });
+
+  final int serial;
+  final String runId;
+  final String? nodeId;
 }
 
 // 项目配置缺失时的本机检查兜底。

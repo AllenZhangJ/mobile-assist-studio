@@ -150,6 +150,9 @@ void main() {
     );
     final controller = StudioRuntimeController(
       runDetailReader: FakeRunDetailReader({'run-latest': detail}),
+      runEvidenceAssetReader: const FakeRunEvidenceAssetReader({
+        'run-latest/screens/tap_b.png': onePixelPngBase64,
+      }),
     );
 
     await tester.pumpWidget(
@@ -195,6 +198,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const ValueKey('monitor-page-scroll')), findsOneWidget);
+    expect(find.byKey(const ValueKey('run-detail-drawer')), findsOneWidget);
+    expect(find.byKey(const ValueKey('run-trace-focused')), findsOneWidget);
+    expect(find.byKey(const ValueKey('run-evidence-replay')), findsOneWidget);
+    await pumpUntilFound(
+      tester,
+      find.byKey(const ValueKey('evidence-filmstrip-image-tap_b-0')),
+    );
+    expect(
+      find.byKey(const ValueKey('evidence-filmstrip-image-tap_b-0')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('screenshot-evidence-image-tap_b-0')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('workflow node navigator searches and focuses nodes', (

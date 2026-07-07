@@ -68,6 +68,7 @@ Future<void> _showRunDetailDrawer(
   required RunDetail? detail,
   required RunLocalReport? report,
   required StudioRuntimeController controller,
+  String? focusNodeId,
 }) {
   return showGeneralDialog<void>(
     context: context,
@@ -80,6 +81,7 @@ Future<void> _showRunDetailDrawer(
       detail: detail,
       report: report,
       controller: controller,
+      focusNodeId: focusNodeId,
     ),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curved = CurvedAnimation(

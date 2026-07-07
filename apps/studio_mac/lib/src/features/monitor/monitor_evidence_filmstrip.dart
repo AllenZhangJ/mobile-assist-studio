@@ -7,12 +7,14 @@ class _RunEvidenceFilmstripPanel extends StatefulWidget {
     required this.evidenceRefs,
     required this.controller,
     required this.revealByDefault,
+    required this.focusNodeId,
   });
 
   final String runId;
   final List<RunScreenshotEvidenceRef> evidenceRefs;
   final StudioRuntimeController controller;
   final bool revealByDefault;
+  final String? focusNodeId;
 
   // 创建截图证据回放状态，只在用户 reveal 后读取截图。
   @override
@@ -29,15 +31,28 @@ class _RunEvidenceFilmstripPanelState
   @override
   void initState() {
     super.initState();
+    final focusedIndex = _focusedEvidenceIndex;
+    if (focusedIndex != null) {
+      _showEvidence(focusedIndex);
+      return;
+    }
     if (widget.revealByDefault && widget.evidenceRefs.isNotEmpty) {
       _showEvidence(0);
     }
   }
 
-  // 数据源变化时校正当前索引，避免回放指向已不存在的截图。
+  // 数据源或焦点变化时校正当前索引，避免回放指向已不存在的截图。
   @override
   void didUpdateWidget(covariant _RunEvidenceFilmstripPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNodeId != widget.focusNodeId ||
+        oldWidget.runId != widget.runId) {
+      final focusedIndex = _focusedEvidenceIndex;
+      if (focusedIndex != null) {
+        _showEvidence(focusedIndex);
+        return;
+      }
+    }
     final revealedIndex = _revealedIndex;
     if (revealedIndex == null) return;
     if (revealedIndex >= widget.evidenceRefs.length) {
@@ -56,6 +71,16 @@ class _RunEvidenceFilmstripPanelState
     if (previousPath != nextPath || oldWidget.runId != widget.runId) {
       _showEvidence(revealedIndex);
     }
+  }
+
+  // 找到焦点节点的第一张截图；没有焦点或无匹配时不强行 reveal。
+  int? get _focusedEvidenceIndex {
+    final focusNodeId = widget.focusNodeId;
+    if (focusNodeId == null || focusNodeId.trim().isEmpty) return null;
+    for (var index = 0; index < widget.evidenceRefs.length; index++) {
+      if (widget.evidenceRefs[index].nodeId == focusNodeId) return index;
+    }
+    return null;
   }
 
   // 打开指定截图并按需读取本地证据。

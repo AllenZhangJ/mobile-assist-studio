@@ -2,10 +2,17 @@ part of '../../studio_mac_workspace.dart';
 
 // 监控页入口，负责筛选运行记录并组合指标、趋势和历史列表。
 class _MonitorPage extends StatefulWidget {
-  const _MonitorPage({required this.snapshot, required this.controller});
+  const _MonitorPage({
+    required this.snapshot,
+    required this.controller,
+    required this.focusRequest,
+    required this.onFocusConsumed,
+  });
 
   final StudioRuntimeSnapshot snapshot;
   final StudioRuntimeController controller;
+  final _MonitorFocusRequest? focusRequest;
+  final ValueChanged<int> onFocusConsumed;
 
   // 创建监控页状态对象，页面内筛选和搜索状态都归属 State。
   @override
@@ -21,7 +28,29 @@ class _MonitorPageState extends State<_MonitorPage> {
   String? _relatedRunLabel;
   RunNodeDurationTrend? _durationTrendDrilldown;
   String _query = '';
+  int? _handledFocusSerial;
   final TextEditingController _searchController = TextEditingController();
+
+  // 页面挂载后再处理跨页深链，确保 Navigator 和列表都已就绪。
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_consumeMonitorFocusRequest());
+    });
+  }
+
+  // 监听新的焦点请求，避免相同请求因父级重建被重复打开。
+  @override
+  void didUpdateWidget(covariant _MonitorPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusRequest?.serial == widget.focusRequest?.serial) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_consumeMonitorFocusRequest());
+    });
+  }
 
   // 释放搜索输入控制器，避免测试和页面切换后遗留监听。
   @override

@@ -82,8 +82,22 @@ V4AcceptanceSummary _acceptanceSummaryFromJson(Map<String, Object?> json) {
     failures: _safeAcceptanceTextListAt(completion, 'failures'),
     nextSteps: _safeAcceptanceTextListAt(json, 'nextSteps'),
     batches: _batchSummariesAt(readiness, 'batches'),
+    gateGaps: _gateGapSummariesAt(json, 'gateGaps'),
+    fieldChecklist: _fieldChecklistAt(json, 'fieldChecklist'),
   );
 }
+
+const _allowedV4AcceptanceCommands = <String>{
+  'npm run v4:ios-smoke:full',
+  'npm run v4:ios-smoke:full:password-prompt',
+  'npm run v4:android-smoke:full',
+  'npm run v4:smoke:full',
+  'npm run v4:smoke:full:password-prompt',
+  'npm run v4:smoke-readiness',
+  'npm run v4:smoke-archive',
+  'npm run v4:acceptance-audit',
+  'npm run v4:acceptance-final',
+};
 
 // 获取文件名，避免 UI 或模型保存完整路径。
 String _fileName(File file) {
@@ -113,6 +127,13 @@ String? _safeAcceptanceTextAt(Map<String, Object?> json, String key) {
   return value == null ? null : _redactConnectionDetail(value);
 }
 
+// 安全读取可复制命令，只允许项目内 V4 smoke / 终验白名单。
+String? _safeAcceptanceCommandAt(Map<String, Object?> json, String key) {
+  final value = _stringAt(json, key);
+  if (value == null) return null;
+  return _allowedV4AcceptanceCommands.contains(value) ? value : null;
+}
+
 // 安全读取 bool 字段。
 bool? _boolAt(Map<String, Object?> json, String key) {
   final value = json[key];
@@ -138,6 +159,62 @@ List<String> _safeAcceptanceTextListAt(Map<String, Object?> json, String key) {
       .map(_redactConnectionDetail)
       .take(6)
       .toList(growable: false);
+}
+
+// 读取结构化终验门禁，坏字段跳过并限制条数。
+List<V4AcceptanceGateGap> _gateGapSummariesAt(
+  Map<String, Object?> json,
+  String key,
+) {
+  final value = json[key];
+  if (value is! List) return const <V4AcceptanceGateGap>[];
+  final gaps = <V4AcceptanceGateGap>[];
+  for (final item in value) {
+    if (item is! Map) continue;
+    final map = Map<String, Object?>.from(item);
+    final title = _safeAcceptanceTextAt(map, 'title');
+    final current = _safeAcceptanceTextAt(map, 'current');
+    final requiredText = _safeAcceptanceTextAt(map, 'required');
+    if (title == null || current == null || requiredText == null) continue;
+    gaps.add(
+      V4AcceptanceGateGap(
+        title: title,
+        current: current,
+        requiredText: requiredText,
+        command: _safeAcceptanceCommandAt(map, 'command'),
+      ),
+    );
+    if (gaps.length >= 6) break;
+  }
+  return List<V4AcceptanceGateGap>.unmodifiable(gaps);
+}
+
+// 读取现场补验清单，命令走白名单，文字走脱敏。
+List<V4AcceptanceChecklistItem> _fieldChecklistAt(
+  Map<String, Object?> json,
+  String key,
+) {
+  final value = json[key];
+  if (value is! List) return const <V4AcceptanceChecklistItem>[];
+  final items = <V4AcceptanceChecklistItem>[];
+  for (final item in value) {
+    if (item is! Map) continue;
+    final map = Map<String, Object?>.from(item);
+    final title = _safeAcceptanceTextAt(map, 'title');
+    final proof = _safeAcceptanceTextAt(map, 'proof');
+    if (title == null || proof == null) continue;
+    items.add(
+      V4AcceptanceChecklistItem(
+        order: _intAt(map, 'order'),
+        title: title,
+        proof: proof,
+        command: _safeAcceptanceCommandAt(map, 'command'),
+      ),
+    );
+    if (items.length >= 6) break;
+  }
+  items.sort((left, right) => left.order.compareTo(right.order));
+  return List<V4AcceptanceChecklistItem>.unmodifiable(items);
 }
 
 // 安全读取 Batch 0-8 摘要列表，并对可见文本二次脱敏。

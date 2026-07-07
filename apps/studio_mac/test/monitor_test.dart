@@ -246,13 +246,48 @@ void main() {
         fullSmokeReports: 9,
         latestFullSmokeLabel: '前置检查阻断',
         failures: const ['最近 full smoke 尚未完整通过。'],
-        nextSteps: const [
-          'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-prompt` 输入 Mac 密码后补验。',
-          'Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。',
-          '双平台：iOS 和 Android 单平台 smoke 都通过后，运行 `npm run v4:smoke:full`。',
-          '终验：补齐留档后运行 `npm run v4:acceptance-final`。',
-        ],
+        nextSteps: const ['按现场补验清单继续。'],
         batches: _v4AcceptanceBatchFixture(),
+        gateGaps: const <V4AcceptanceGateGap>[
+          V4AcceptanceGateGap(
+            title: 'iOS smoke',
+            current: 'iOS 最近未完整通过。',
+            requiredText: 'iOS 真机 smoke run 完整通过',
+            command: 'npm run v4:ios-smoke:full:password-prompt',
+          ),
+          V4AcceptanceGateGap(
+            title: 'Android smoke',
+            current: '缺少 Android 平台 smoke run。',
+            requiredText: 'Android 真机 smoke run 留档存在',
+            command: 'npm run v4:android-smoke:full',
+          ),
+        ],
+        fieldChecklist: const <V4AcceptanceChecklistItem>[
+          V4AcceptanceChecklistItem(
+            order: 1,
+            title: '补 iOS',
+            command: 'npm run v4:ios-smoke:full:password-prompt',
+            proof: '生成 iOS smoke 留档。',
+          ),
+          V4AcceptanceChecklistItem(
+            order: 2,
+            title: '补 Android',
+            command: 'npm run v4:android-smoke:full',
+            proof: '生成 Android smoke 留档。',
+          ),
+          V4AcceptanceChecklistItem(
+            order: 3,
+            title: '跑全量',
+            command: 'npm run v4:smoke:full:password-prompt',
+            proof: '双平台 full smoke 完整通过。',
+          ),
+          V4AcceptanceChecklistItem(
+            order: 4,
+            title: '做终验',
+            command: 'npm run v4:acceptance-final',
+            proof: '终验返回 0。',
+          ),
+        ],
       ),
     );
 
@@ -273,12 +308,11 @@ void main() {
       maxIteration: 8,
     );
 
-    expect(find.text('补iOS'), findsOneWidget);
-    expect(find.text('先补 iOS 隧道，再接安卓。'), findsOneWidget);
-    expect(find.text('连iOS'), findsOneWidget);
-    expect(find.text('跑iOS'), findsOneWidget);
-    expect(find.text('跑安卓'), findsOneWidget);
+    expect(find.text('补iOS'), findsWidgets);
+    expect(find.text('按清单先补 iOS。'), findsOneWidget);
+    expect(find.text('补安卓'), findsWidgets);
     expect(find.text('跑全量'), findsOneWidget);
+    expect(find.text('终验'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('monitor-copy-v4-route')));
     await tester.pumpAndSettle();
@@ -286,7 +320,7 @@ void main() {
       copiedCommand,
       'npm run v4:ios-smoke:full:password-prompt\n'
       'npm run v4:android-smoke:full\n'
-      'npm run v4:smoke:full\n'
+      'npm run v4:smoke:full:password-prompt\n'
       'npm run v4:acceptance-final',
     );
 

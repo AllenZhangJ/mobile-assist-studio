@@ -41,6 +41,18 @@ void main() {
       expect(summary.completedBatchCount, 8);
       expect(summary.batchProgressLabel, '8/9');
       expect(summary.firstPendingBatch?.name, 'Batch 2 双平台 smoke');
+      expect(summary.gateGaps, hasLength(2));
+      expect(summary.gateGaps.first.title, 'Android smoke');
+      expect(summary.gateGaps.first.command, 'npm run v4:android-smoke:full');
+      expect(summary.fieldChecklist, hasLength(3));
+      expect(
+        summary.fieldChecklist.map((item) => item.command),
+        containsAll(<String?>[
+          'npm run v4:android-smoke:full',
+          'npm run v4:smoke:full:password-prompt',
+          'npm run v4:acceptance-final',
+        ]),
+      );
     },
   );
 
@@ -106,6 +118,17 @@ void main() {
       summary.latestFullSmokeLabel,
       ...summary.failures,
       ...summary.nextSteps,
+      for (final gap in summary.gateGaps) ...[
+        gap.title,
+        gap.current,
+        gap.requiredText,
+        if (gap.command != null) gap.command!,
+      ],
+      for (final item in summary.fieldChecklist) ...[
+        item.title,
+        item.proof,
+        if (item.command != null) item.command!,
+      ],
       for (final batch in summary.batches) ...[
         batch.name,
         batch.status,
@@ -116,6 +139,8 @@ void main() {
     expect(visibleText, contains('[本机路径]'));
     expect(visibleText, contains('[本机地址]'));
     expect(visibleText, contains('[标识]'));
+    expect(summary.gateGaps.single.command, isNull);
+    expect(summary.fieldChecklist.single.command, isNull);
     expect(visibleText, isNot(contains('/Users/example')));
     expect(visibleText, isNot(contains('00008110-000A01E03C3B801E')));
     expect(visibleText, isNot(contains('http://127.0.0.1:4723')));
@@ -159,6 +184,40 @@ String _acceptanceJson({required String git, required int androidRuns}) {
   },
   "nextSteps": [
     "Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。"
+  ],
+  "gateGaps": [
+    {
+      "title": "Android smoke",
+      "current": "缺少 Android 平台 smoke run。",
+      "required": "Android 真机 smoke run 留档存在",
+      "command": "npm run v4:android-smoke:full"
+    },
+    {
+      "title": "Full smoke",
+      "current": "最近 full smoke 尚未完整通过。",
+      "required": "最近双平台 full smoke 完整通过",
+      "command": "npm run v4:smoke:full:password-prompt"
+    }
+  ],
+  "fieldChecklist": [
+    {
+      "order": 2,
+      "title": "补 Android",
+      "command": "npm run v4:android-smoke:full",
+      "proof": "只连接一台已允许 USB 调试的 Android 手机。"
+    },
+    {
+      "order": 3,
+      "title": "跑全量",
+      "command": "npm run v4:smoke:full:password-prompt",
+      "proof": "双平台 full smoke 完整通过。"
+    },
+    {
+      "order": 4,
+      "title": "做终验",
+      "command": "npm run v4:acceptance-final",
+      "proof": "终验返回 0。"
+    }
   ]
 }
 ''';
@@ -203,6 +262,22 @@ String _acceptanceJsonWithSensitiveText() {
   },
   "nextSteps": [
     "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E"
+  ],
+  "gateGaps": [
+    {
+      "title": "iOS smoke /Users/example",
+      "current": "设备 00008110-000A01E03C3B801E 在 http://127.0.0.1:4723/session 失败",
+      "required": "不要泄露 /Users/example/project",
+      "command": "rm -rf /Users/example/project"
+    }
+  ],
+  "fieldChecklist": [
+    {
+      "order": 1,
+      "title": "补 iOS",
+      "command": "osascript -e bad",
+      "proof": "打开 /Users/example/project 后处理 00008110-000A01E03C3B801E"
+    }
   ]
 }
 ''';

@@ -332,10 +332,12 @@ final class _V4AcceptanceStatusSummary {
         androidRunTone: acceptance.androidRuns > 0
             ? StudioStatusTone.ready
             : StudioStatusTone.warning,
-        issueLabel: acceptance.failures.isEmpty
+        issueLabel: acceptance.gateGaps.isNotEmpty
+            ? '${acceptance.gateGaps.length} 条'
+            : acceptance.failures.isEmpty
             ? '无'
             : '${acceptance.failures.length} 条',
-        issueTone: acceptance.failures.isEmpty
+        issueTone: acceptance.gateGaps.isEmpty && acceptance.failures.isEmpty
             ? StudioStatusTone.ready
             : StudioStatusTone.warning,
         nextStepLabel: _v4AcceptanceNextStepLabel(acceptance),
@@ -385,6 +387,9 @@ StudioStatusTone _v4BatchProgressTone(V4AcceptanceSummary acceptance) {
 // 根据终验报告给出短下一步，避免把长命令挤进指标卡。
 String _v4AcceptanceNextStepLabel(V4AcceptanceSummary acceptance) {
   if (acceptance.complete) return '已完成';
+  if (acceptance.fieldChecklist.isNotEmpty) {
+    return _v4ChecklistStepLabel(acceptance.fieldChecklist.first.title);
+  }
   if (_v4AcceptanceNeedsIosTunnel(acceptance)) return '补iOS';
   if (_v4AcceptanceNeedsIosSmoke(acceptance)) return '跑iOS';
   if (!acceptance.hasAndroidRun) return '补安卓';
@@ -398,6 +403,9 @@ String _v4AcceptanceNextStepLabel(V4AcceptanceSummary acceptance) {
 // 根据终验报告给现场路线卡生成短提示。
 String _v4AcceptanceRouteHint(V4AcceptanceSummary acceptance) {
   if (acceptance.complete) return '终验已完成。';
+  if (acceptance.fieldChecklist.isNotEmpty) {
+    return _v4ChecklistRouteHint(acceptance.fieldChecklist.first.title);
+  }
   if (_v4AcceptanceNeedsIosTunnel(acceptance)) return '先补 iOS 隧道，再接安卓。';
   if (_v4AcceptanceNeedsIosSmoke(acceptance)) return '先补 iOS 冒烟。';
   if (!acceptance.hasAndroidRun) {
@@ -430,6 +438,12 @@ String _v4AcceptanceRouteCommandsFor(V4AcceptanceSummary acceptance) {
     if (!commands.contains(command)) commands.add(command);
   }
 
+  for (final item in acceptance.fieldChecklist) {
+    final command = item.command;
+    if (command != null) addCommand(command);
+  }
+  if (commands.isNotEmpty) return commands.join('\n');
+
   if (_v4AcceptanceNeedsIosTunnel(acceptance)) {
     addCommand(_v4IosPromptSmokeCommand);
   } else if (_v4AcceptanceNeedsIosSmoke(acceptance)) {
@@ -456,6 +470,11 @@ List<String> _v4AcceptanceRouteStepsFor(V4AcceptanceSummary acceptance) {
     if (!steps.contains(label)) steps.add(label);
   }
 
+  for (final item in acceptance.fieldChecklist) {
+    addStep(_v4ChecklistStepLabel(item.title));
+  }
+  if (steps.isNotEmpty) return List<String>.unmodifiable(steps);
+
   if (_v4AcceptanceNeedsIosTunnel(acceptance)) {
     addStep('连iOS');
     addStep('跑iOS');
@@ -475,6 +494,29 @@ List<String> _v4AcceptanceRouteStepsFor(V4AcceptanceSummary acceptance) {
   }
   addStep('终验');
   return List<String>.unmodifiable(steps);
+}
+
+// 将终验清单标题压缩成路线胶囊短文案。
+String _v4ChecklistStepLabel(String title) {
+  final normalized = title.replaceAll(' ', '').replaceAll('Android', '安卓');
+  if (normalized.contains('iOS')) return '补iOS';
+  if (normalized.contains('安卓')) return '补安卓';
+  if (normalized.contains('全量')) return '跑全量';
+  if (normalized.contains('终验')) return '终验';
+  if (normalized.length <= 4) return normalized;
+  return normalized.substring(0, 4);
+}
+
+// 将终验清单首项转成用户能扫读的一句话。
+String _v4ChecklistRouteHint(String title) {
+  final label = _v4ChecklistStepLabel(title);
+  return switch (label) {
+    '补iOS' => '按清单先补 iOS。',
+    '补安卓' => '按清单先补安卓。',
+    '跑全量' => '按清单跑全量。',
+    '终验' => '按清单做终验。',
+    _ => '按终验清单继续。',
+  };
 }
 
 // 将移动平台转成用户可读短标签。

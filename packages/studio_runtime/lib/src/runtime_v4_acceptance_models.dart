@@ -21,6 +21,8 @@ final class V4AcceptanceSummary {
     required this.failures,
     required this.nextSteps,
     required this.batches,
+    this.gateGaps = const <V4AcceptanceGateGap>[],
+    this.fieldChecklist = const <V4AcceptanceChecklistItem>[],
   });
 
   final bool hasReport;
@@ -39,6 +41,8 @@ final class V4AcceptanceSummary {
   final List<String> failures;
   final List<String> nextSteps;
   final List<V4AcceptanceBatchSummary> batches;
+  final List<V4AcceptanceGateGap> gateGaps;
+  final List<V4AcceptanceChecklistItem> fieldChecklist;
 
   // 无报告时的安全初始状态。
   static const empty = V4AcceptanceSummary(
@@ -58,6 +62,8 @@ final class V4AcceptanceSummary {
     failures: <String>[],
     nextSteps: <String>[],
     batches: <V4AcceptanceBatchSummary>[],
+    gateGaps: <V4AcceptanceGateGap>[],
+    fieldChecklist: <V4AcceptanceChecklistItem>[],
   );
 
   // 终验最短下一步，缺失报告时给出可操作入口。
@@ -91,6 +97,40 @@ final class V4AcceptanceSummary {
     }
     return null;
   }
+}
+
+// V4AcceptanceGateGap 是终验门禁的一条结构化缺口。
+// UI 只展示脱敏摘要，不读取子报告或本机路径。
+final class V4AcceptanceGateGap {
+  // 创建终验门禁缺口摘要。
+  const V4AcceptanceGateGap({
+    required this.title,
+    required this.current,
+    required this.requiredText,
+    this.command,
+  });
+
+  final String title;
+  final String current;
+  final String requiredText;
+  final String? command;
+}
+
+// V4AcceptanceChecklistItem 是现场补验清单的一条安全步骤。
+// command 只保留白名单命令，坏报告不能注入任意 shell 文本。
+final class V4AcceptanceChecklistItem {
+  // 创建现场补验清单项。
+  const V4AcceptanceChecklistItem({
+    required this.order,
+    required this.title,
+    required this.proof,
+    this.command,
+  });
+
+  final int order;
+  final String title;
+  final String proof;
+  final String? command;
 }
 
 // V4AcceptanceBatchSummary 是 Batch 0-8 的单行脱敏验收摘要。

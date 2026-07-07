@@ -570,6 +570,15 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
     localState['androidDevice'] is Map,
     'acceptance evidence 必须嵌入 Android 本机状态。',
   );
+  final readinessArtifacts = _mapAt(readiness, 'artifacts');
+  _expect(
+    readinessArtifacts['androidPreflightReports'] == 1,
+    'acceptance evidence 必须嵌入 Android 前置诊断数量。',
+  );
+  _expect(
+    _mapAt(readinessArtifacts, 'latestAndroidPreflight')['label'] == '有阻断',
+    'acceptance evidence 必须嵌入最近 Android 前置诊断。',
+  );
   final archive = _mapAt(evidence, 'archive');
   final counts = _mapAt(archive, 'counts');
   _expect(counts['screenshots'] == 1, 'acceptance evidence 必须嵌入截图数量。');
@@ -587,6 +596,7 @@ void _assertAcceptanceMarkdown(String markdown) {
     '## 结论',
     '## 现场摘要',
     'Android 手机',
+    'Android 前置诊断',
     '留档数量',
     '## 下一步',
     '完成审计',

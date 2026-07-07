@@ -578,6 +578,21 @@ final class _AcceptanceEvidenceSummary {
         );
       }
       buffer.writeln();
+      final artifacts = _jsonMapAt(readiness!, 'artifacts');
+      final androidPreflight = _jsonMapAt(artifacts, 'latestAndroidPreflight');
+      if (androidPreflight.isNotEmpty) {
+        buffer
+          ..writeln('### Android 前置诊断')
+          ..writeln()
+          ..writeln(
+            '- 最近：${_plainText(androidPreflight['summary']?.toString() ?? '无摘要')}',
+          );
+        final blockers = _jsonStringList(androidPreflight['blockers']);
+        if (blockers.isNotEmpty) {
+          buffer.writeln('- 阻断：${blockers.join('、')}');
+        }
+        buffer.writeln();
+      }
     }
     if (archive != null) {
       final counts = _jsonMapAt(archive!, 'counts');
@@ -606,6 +621,13 @@ Future<Map<String, Object?>?> _loadLatestReadiness(Directory outDir) async {
   return <String, Object?>{
     'completion': _redactJsonValue(_jsonMapAt(json, 'completion')),
     'localState': _redactJsonValue(_jsonMapAt(json, 'localState')),
+    'artifacts': <String, Object?>{
+      'androidPreflightReports':
+          _jsonMapAt(json, 'artifacts')['androidPreflightReports'] ?? 0,
+      'latestAndroidPreflight': _redactJsonValue(
+        _jsonMapAt(json, 'artifacts')['latestAndroidPreflight'],
+      ),
+    },
     'nextSteps': _redactJsonValue(json['nextSteps']),
   };
 }
@@ -662,6 +684,20 @@ Map<String, Object?> _jsonMapAt(Map<String, Object?> json, String key) {
   if (value is Map<String, Object?>) return value;
   if (value is Map) return Map<String, Object?>.from(value);
   return const <String, Object?>{};
+}
+
+// 读取 JSON 字符串列表，坏值直接过滤并脱敏。
+List<String> _jsonStringList(Object? value) {
+  if (value is! Iterable) return const <String>[];
+  return value
+      .map((item) => _plainText(item?.toString() ?? ''))
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
+// 生成适合 Markdown 单行展示的脱敏文本。
+String _plainText(String value) {
+  return _redactText(value).replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
 // 生成本机状态短摘要，避免 Markdown 报告铺满底层字段。

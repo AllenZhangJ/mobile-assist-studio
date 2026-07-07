@@ -1,6 +1,7 @@
 name: workflow_dsl
 description: Project DSL models and validation for iOS Assist Studio workflows.
 version: 1.0.0
+publish_to: none
 
 environment:
   sdk: ^3.9.2

@@ -1379,6 +1379,11 @@ List<String> _nextStepsForFailures({
     evidence.readiness ?? const <String, Object?>{},
     'artifacts',
   );
+  final localState = _jsonMapAt(
+    evidence.readiness ?? const <String, Object?>{},
+    'localState',
+  );
+  final iosUsbMux = _jsonMapAt(localState, 'iosUsbMux');
   final latestFullSmoke = _jsonMapAt(
     evidence.archive ?? const <String, Object?>{},
     'latestFullSmoke',
@@ -1417,13 +1422,12 @@ List<String> _nextStepsForFailures({
     steps.add('远端：推送当前提交，并确认本地与上游同步。');
   }
   if (needsIosSmoke) {
-    if (latestFullSmokeNeedsIosTunnel) {
-      steps.add(
-        'iOS：先用 Mac App 点连接设备，或运行 `npm run v4:ios-smoke:full:password-prompt` 输入 Mac 密码后补验。',
-      );
-    } else {
-      steps.add('iOS：连接并信任一台 iPhone，运行 `npm run v4:ios-smoke:full`。');
-    }
+    steps.add(
+      _iosNextStepForFailures(
+        iosUsbMux: iosUsbMux,
+        needsPasswordPrompt: latestFullSmokeNeedsIosTunnel,
+      ),
+    );
   }
   if (needsAndroidSmoke) {
     steps.add('Android：连接一台已开启 USB 调试的手机，运行 `npm run v4:android-smoke:full`。');
@@ -1440,6 +1444,24 @@ List<String> _nextStepsForFailures({
   }
   steps.add('终验：补齐留档后运行 `npm run v4:acceptance-final`。');
   return steps.toSet().toList(growable: false);
+}
+
+// 生成最终报告里的 iOS 下一步，优先解释 USB 缺失这一类现场阻断。
+String _iosNextStepForFailures({
+  required Map<String, Object?> iosUsbMux,
+  required bool needsPasswordPrompt,
+}) {
+  final usbState = _localChecklistState(iosUsbMux);
+  final command = needsPasswordPrompt
+      ? 'npm run v4:ios-smoke:full:password-prompt'
+      : 'npm run v4:ios-smoke:full';
+  if (usbState != null && !usbState.available) {
+    return 'iOS：当前未发现 USB iPhone（${usbState.label}）。先插线、解锁并信任，再运行 `$command`。';
+  }
+  if (needsPasswordPrompt) {
+    return 'iOS：先用 Mac App 点连接设备，或运行 `$command` 输入 Mac 密码后补验。';
+  }
+  return 'iOS：连接并信任一台 iPhone，运行 `$command`。';
 }
 
 // 根据下一步生成现场执行顺序，避免用户在多条命令间来回试错。

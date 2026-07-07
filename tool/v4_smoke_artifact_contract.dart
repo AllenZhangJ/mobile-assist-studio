@@ -1162,6 +1162,7 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   final nextSteps = _stringList(json['nextSteps']);
   _expect(
     nextSteps.any((step) => step.contains('v4:ios-smoke:full')) &&
+        nextSteps.any((step) => step.contains('USB iPhone')) &&
         nextSteps.any(
           (step) => step.contains('v4:ios-smoke:full:password-prompt'),
         ) &&

@@ -29,6 +29,105 @@ void main() {
     expect(find.text('刷新'), findsOneWidget);
   });
 
+  testWidgets('monitor exposes v4 acceptance command shortcuts', (
+    tester,
+  ) async {
+    String? copiedCommand;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'Clipboard.setData') {
+            final arguments = call.arguments as Map<Object?, Object?>;
+            copiedCommand = arguments['text'] as String?;
+            return null;
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+    await tester.binding.setSurfaceSize(const Size(1400, 900));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+
+    final preview = StudioRuntimeSnapshot.initial().copyWith(
+      mobileRuntime: MobileRuntimeSummary(
+        platform: MobilePlatform.ios,
+        resourceState: MobileResourceState.idle,
+        capabilities: MobileDriverCapabilityReport.none.copyWith(
+          platform: MobilePlatform.ios,
+        ),
+      ),
+      runHistory: RunHistorySummary(
+        totalRuns: 3,
+        completedRuns: 2,
+        failedRuns: 1,
+        pausedRuns: 0,
+        stoppedRuns: 0,
+        dailyRuns: const [],
+        recentRuns: [
+          RunHistoryEntry(
+            runId: 'run-v4-local-ok',
+            workflowName: '验收流程',
+            status: 'completed',
+            loops: 1,
+            completedLoops: 1,
+            startedAt: DateTime.utc(2026, 1, 9),
+            finishedAt: DateTime.utc(2026, 1, 9, 0, 0, 3),
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpWidget(StudioMacApp(previewScreenshot: preview));
+
+    await tester.tap(find.byKey(const ValueKey('nav-记录')));
+    await tester.pumpAndSettle();
+
+    await tester.dragUntilVisible(
+      find.text('V4 验收'),
+      find
+          .descendant(
+            of: find.byKey(const ValueKey('monitor-page-scroll')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+      const Offset(0, -220),
+      maxIteration: 8,
+    );
+
+    expect(find.text('V4 验收'), findsOneWidget);
+    expect(find.text('待终验'), findsOneWidget);
+    expect(find.text('当前平台'), findsOneWidget);
+    expect(find.text('iOS'), findsOneWidget);
+    expect(find.text('3 条'), findsOneWidget);
+    expect(find.text('1 条'), findsOneWidget);
+    expect(find.text('跑全量'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('monitor-copy-v4-full-smoke')));
+    await tester.pumpAndSettle();
+    expect(copiedCommand, 'npm run v4:smoke:full');
+
+    await tester.tap(
+      find.byKey(const ValueKey('monitor-copy-v4-password-smoke')),
+    );
+    await tester.pumpAndSettle();
+    expect(copiedCommand, 'npm run v4:smoke:full:password-stdin');
+
+    await tester.tap(
+      find.byKey(const ValueKey('monitor-copy-v4-android-smoke')),
+    );
+    await tester.pumpAndSettle();
+    expect(copiedCommand, 'npm run v4:android-smoke:full');
+
+    await tester.tap(
+      find.byKey(const ValueKey('monitor-copy-v4-acceptance-audit')),
+    );
+    await tester.pumpAndSettle();
+    expect(copiedCommand, 'npm run v4:acceptance-audit');
+  });
+
   testWidgets('monitor renders local trend and status distribution', (
     tester,
   ) async {

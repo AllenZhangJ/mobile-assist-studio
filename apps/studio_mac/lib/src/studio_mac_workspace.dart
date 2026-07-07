@@ -210,6 +210,7 @@ part 'features/execute/execute_summary_latest_run.dart';
 part 'features/execute/execute_summary_timeline.dart';
 part 'features/monitor/monitor_page.dart';
 part 'features/monitor/monitor_page_actions.dart';
+part 'features/monitor/monitor_acceptance_status.dart';
 part 'features/monitor/monitor_overview.dart';
 part 'features/monitor/monitor_trend_helpers.dart';
 part 'features/monitor/monitor_trend.dart';

@@ -101,6 +101,8 @@ class _MonitorPageState extends State<_MonitorPage> {
             onShowRuns: _showNodeDurationTrendRuns,
           ),
           const SizedBox(height: 14),
+          _V4AcceptanceStatusPanel(snapshot: widget.snapshot),
+          const SizedBox(height: 14),
           _Surface(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

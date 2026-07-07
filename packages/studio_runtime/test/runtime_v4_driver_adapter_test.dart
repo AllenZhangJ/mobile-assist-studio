@@ -55,29 +55,4 @@ void main() {
     expect(actions.calls, contains('button:回主页'));
     expect(actions.calls, contains('release'));
   });
-
-  test(
-    'Android driver skeleton does not claim executable capabilities',
-    () async {
-      const driver = AndroidAppiumMobileDriverSkeleton();
-
-      final capabilities = await driver.capabilityReport();
-      final heartbeat = await driver.heartbeat();
-
-      expect(driver.platform, MobilePlatform.android);
-      expect(capabilities.supportsCoreActions, isFalse);
-      expect(heartbeat.ready, isFalse);
-      expect(heartbeat.message, 'Android 无能力占位 adapter 已加载。');
-      expect(
-        () => driver.connect(),
-        throwsA(
-          isA<UnsupportedError>().having(
-            (error) => error.message,
-            'message',
-            'Android 无能力占位 adapter 不能创建真机会话。',
-          ),
-        ),
-      );
-    },
-  );
 }

@@ -16,22 +16,6 @@ const _iosAppiumCapabilities = MobileDriverCapabilityReport(
   remotePreview: false,
 );
 
-const _androidSkeletonCapabilities = MobileDriverCapabilityReport(
-  platform: MobilePlatform.android,
-  screenshot: false,
-  tap: false,
-  swipe: false,
-  input: false,
-  pageSource: false,
-  selectorTarget: false,
-  imageTarget: false,
-  ocrTarget: false,
-  appLifecycle: false,
-  logs: false,
-  performance: false,
-  remotePreview: false,
-);
-
 const _androidAppiumCapabilities = MobileDriverCapabilityReport(
   platform: MobilePlatform.android,
   screenshot: true,
@@ -196,94 +180,6 @@ final class IosAppiumMobileDriver implements MobileDeviceDriver {
     }
     return session.id;
   }
-}
-
-// AndroidAppiumMobileDriverSkeleton 是无能力占位 adapter。
-// 真实 Android 真机路径由 AndroidAppiumMobileDriver 承载。
-final class AndroidAppiumMobileDriverSkeleton implements MobileDeviceDriver {
-  const AndroidAppiumMobileDriverSkeleton();
-
-  @override
-  MobilePlatform get platform => MobilePlatform.android;
-
-  @override
-  Future<MobileDriverCapabilityReport> capabilityReport() async {
-    return _androidSkeletonCapabilities;
-  }
-
-  @override
-  Future<MobileDeviceSummary?> discoverCurrentDevice() async {
-    return null;
-  }
-
-  @override
-  Future<MobileDriverSession> connect() {
-    throw UnsupportedError('Android 无能力占位 adapter 不能创建真机会话。');
-  }
-
-  @override
-  Future<void> disconnect() async {}
-
-  @override
-  Future<MobileDriverHeartbeat> heartbeat() async {
-    return const MobileDriverHeartbeat(
-      ready: false,
-      message: 'Android 无能力占位 adapter 已加载。',
-      capabilities: _androidSkeletonCapabilities,
-    );
-  }
-
-  @override
-  Future<MobileScreenshot> captureScreenshot() {
-    throw UnsupportedError('Android 无能力占位 adapter 不能截图。');
-  }
-
-  @override
-  Future<String?> getPageSource() async {
-    return null;
-  }
-
-  @override
-  Future<void> tap(ViewportPoint point, {Duration? duration}) {
-    throw UnsupportedError('Android 无能力占位 adapter 不能点按。');
-  }
-
-  @override
-  Future<void> swipe(
-    ViewportPoint from,
-    ViewportPoint to, {
-    Duration? duration,
-  }) {
-    throw UnsupportedError('Android 无能力占位 adapter 不能滑动。');
-  }
-
-  @override
-  Future<void> inputText(String text) {
-    throw UnsupportedError('Android 无能力占位 adapter 不能输入。');
-  }
-
-  @override
-  Future<void> launchApp(String appId) {
-    throw UnsupportedError('Android 无能力占位 adapter 不能启动 App。');
-  }
-
-  @override
-  Future<void> stopApp(String appId) {
-    throw UnsupportedError('Android 无能力占位 adapter 不能停止 App。');
-  }
-
-  @override
-  Future<void> pressHome() {
-    throw UnsupportedError('Android 无能力占位 adapter 不能回主页。');
-  }
-
-  @override
-  Future<List<String>> collectLogs() async {
-    return const <String>[];
-  }
-
-  @override
-  Future<void> releaseActions() async {}
 }
 
 // AndroidAppiumMobileDriver 通过 ADB 发现当前 Android 手机，并用 UiAutomator2 建立会话。

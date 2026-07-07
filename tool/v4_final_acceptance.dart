@@ -923,6 +923,7 @@ final class _AcceptanceEvidenceSummary {
         'Appium': 'appium',
         'iOS 隧道': 'iosTunnel',
         'iOS 手机': 'iosDevice',
+        'iOS USB': 'iosUsbMux',
         'Android 手机': 'androidDevice',
       }.entries) {
         buffer.writeln(
@@ -1067,6 +1068,9 @@ List<_AcceptanceGateGap> _gateGapsFromEvidence(
           platformLabel: 'iOS',
           latest: latestIos,
           localDevice: _jsonMapAt(localState, 'iosDevice'),
+          localExtraStates: <Map<String, Object?>>[
+            _jsonMapAt(localState, 'iosUsbMux'),
+          ],
           currentGit: currentGit,
           command: iosTunnelNeeded
               ? 'npm run v4:ios-smoke:full:password-prompt'
@@ -1109,12 +1113,16 @@ _AcceptanceGateGap _platformSmokeGateGap({
   required String platformLabel,
   required Map<String, Object?> latest,
   required Map<String, Object?> localDevice,
+  List<Map<String, Object?>> localExtraStates = const <Map<String, Object?>>[],
   required String currentGit,
   required String command,
 }) {
   final currentParts = <String>[
     if (localDevice.isNotEmpty)
       '$platformLabel 当前状态：${_localStateLabel(localDevice)}',
+    for (final state in localExtraStates)
+      if (state.isNotEmpty)
+        '${_localStateName(state)}：${_localStateLabel(state)}',
     _platformSmokeIssueText(platformLabel, latest, currentGit: currentGit),
   ];
   return _AcceptanceGateGap(
@@ -1456,6 +1464,7 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
     'localState',
   );
   final iosDevice = _jsonMapAt(localState, 'iosDevice');
+  final iosUsbMux = _jsonMapAt(localState, 'iosUsbMux');
   final androidDevice = _jsonMapAt(localState, 'androidDevice');
   final items = <_AcceptanceChecklistItem>[];
   var order = 1;
@@ -1484,13 +1493,21 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
     add(
       title: '补 iOS',
       command: 'npm run v4:ios-smoke:full:password-prompt',
-      proof: _iosChecklistProof(iosDevice, needsPasswordPrompt: true),
+      proof: _iosChecklistProof(
+        iosDevice,
+        iosUsbMux: iosUsbMux,
+        needsPasswordPrompt: true,
+      ),
     );
   } else if (joined.contains('v4:ios-smoke:full')) {
     add(
       title: '补 iOS',
       command: 'npm run v4:ios-smoke:full',
-      proof: _iosChecklistProof(iosDevice, needsPasswordPrompt: false),
+      proof: _iosChecklistProof(
+        iosDevice,
+        iosUsbMux: iosUsbMux,
+        needsPasswordPrompt: false,
+      ),
     );
   }
 
@@ -1538,8 +1555,13 @@ List<_AcceptanceChecklistItem> _fieldChecklistForNextSteps(
 // 生成 iOS 补验通过标准；有现场状态时优先提示当前阻断点。
 String _iosChecklistProof(
   Map<String, Object?> device, {
+  required Map<String, Object?> iosUsbMux,
   required bool needsPasswordPrompt,
 }) {
+  final usbState = _localChecklistState(iosUsbMux);
+  if (usbState != null && !usbState.available) {
+    return '当前未发现 USB iPhone（${usbState.label}）。先插线、解锁并信任，再补 iOS。';
+  }
   final state = _localChecklistState(device);
   if (state == null) {
     return needsPasswordPrompt
@@ -1554,6 +1576,12 @@ String _iosChecklistProof(
   return needsPasswordPrompt
       ? '当前 iOS 未就绪（${state.label}）。先插线、解锁并信任，再输入 Mac 密码补验。'
       : '当前 iOS 未就绪（${state.label}）。先插线、解锁并信任，再补验。';
+}
+
+// 给额外本机状态补一个短名称，避免终验门禁只出现裸状态值。
+String _localStateName(Map<String, Object?> state) {
+  if (state.containsKey('usbDevices')) return 'iOS USB';
+  return '本机状态';
 }
 
 // 生成 Android 补验通过标准；只提示 USB 调试和授权，不展开 ADB 细节。

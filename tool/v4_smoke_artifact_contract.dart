@@ -894,10 +894,17 @@ void _assertReadinessJson(Map<String, Object?> json) {
     'appium',
     'iosTunnel',
     'iosDevice',
+    'iosUsbMux',
     'androidDevice',
   ]) {
     _expect(localState[key] is Map, 'localState.$key 必须存在。');
   }
+  final iosUsbMux = _mapAt(localState, 'iosUsbMux');
+  _expect(
+    iosUsbMux.containsKey('toolAvailable') &&
+        iosUsbMux.containsKey('usbDevices'),
+    'localState.iosUsbMux 必须保留工具状态和 USB 数量。',
+  );
 
   final batches = _listAt(json, 'batches');
   _expect(batches.length == 9, 'batches 必须包含 Batch 0-8。');
@@ -1189,7 +1196,8 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
     checklistMaps.any(
           (item) =>
               item['command'] == 'npm run v4:ios-smoke:full:password-prompt' &&
-              '${item['proof']}'.contains('当前 iOS'),
+              ('${item['proof']}'.contains('当前 iOS') ||
+                  '${item['proof']}'.contains('USB iPhone')),
         ) &&
         checklistMaps.any(
           (item) =>
@@ -1210,6 +1218,10 @@ void _assertAcceptanceJson(Map<String, Object?> json) {
   _expect(
     localState['androidDevice'] is Map,
     'acceptance evidence 必须嵌入 Android 本机状态。',
+  );
+  _expect(
+    localState['iosUsbMux'] is Map,
+    'acceptance evidence 必须嵌入 iOS USB 本机状态。',
   );
   final batches = _listAt(readiness, 'batches');
   _expect(batches.length == 9, 'acceptance evidence 必须嵌入 Batch 0-8。');
@@ -1267,6 +1279,7 @@ void _assertAcceptanceMarkdown(String markdown) {
     'Batch 0 真源治理',
     'Batch 8 AI / MCP Core',
     'Android 手机',
+    'iOS USB',
     'Android smoke 前置诊断',
     '最近完整冒烟',
     '留档数量',

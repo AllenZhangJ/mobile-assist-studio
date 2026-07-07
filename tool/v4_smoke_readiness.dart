@@ -54,6 +54,7 @@ Future<_SmokeReadinessReport> _collectReadiness(
     timeout: options.timeout,
   );
   final ios = await _probeIosDevices(options.timeout);
+  final iosUsbMux = await _probeIosUsbMux(options.timeout);
   final android = await _probeAndroidDevices(options.timeout);
   final artifacts = await _probeArtifacts(options.outDir);
 
@@ -63,6 +64,7 @@ Future<_SmokeReadinessReport> _collectReadiness(
     appium: appium,
     tunnel: tunnel,
     ios: ios,
+    iosUsbMux: iosUsbMux,
     android: android,
     artifacts: artifacts,
   );
@@ -130,6 +132,57 @@ Future<_IosProbe> _probeIosDevices(Duration timeout) async {
     connected: connected,
     unavailable: unavailable < 0 ? 0 : unavailable,
   );
+}
+
+// 可选探测 usbmux USB 视角，避免 CoreDevice 历史记录误导现场判断。
+Future<_IosUsbMuxProbe> _probeIosUsbMux(Duration timeout) async {
+  final result = await _runProcess('pymobiledevice3', const [
+    'usbmux',
+    'list',
+  ], timeout: timeout);
+  if (result.exitCode == 0) {
+    final count = _countUsbmuxDevices(result.stdout);
+    return _IosUsbMuxProbe(
+      available: count > 0,
+      toolAvailable: true,
+      usbDevices: count,
+    );
+  }
+
+  final issue = '${result.stderr}\n${result.stdout}'.toLowerCase();
+  final toolMissing =
+      issue.contains('no such file') ||
+      issue.contains('not found') ||
+      issue.contains('cannot run program');
+  final permissionDenied =
+      issue.contains('operation not permitted') || issue.contains('permission');
+  return _IosUsbMuxProbe(
+    available: false,
+    toolAvailable: !toolMissing,
+    permissionDenied: permissionDenied,
+    detail: toolMissing
+        ? '工具不可用'
+        : permissionDenied
+        ? '权限受限'
+        : '探测失败',
+  );
+}
+
+// 从 pymobiledevice3 输出中只提取数量，不保留任何设备号或表格行。
+int _countUsbmuxDevices(String stdoutText) {
+  final trimmed = stdoutText.trim();
+  if (trimmed.isEmpty || trimmed == '[]') return 0;
+  try {
+    final decoded = jsonDecode(trimmed);
+    if (decoded is List) return decoded.length;
+  } on Object {
+    // 非 JSON 表格输出继续走文本计数。
+  }
+  return trimmed
+      .split('\n')
+      .map((line) => line.trim())
+      .where((line) => line.contains('USB') || line.contains('Network'))
+      .length;
 }
 
 // 探测当前 Android 设备数量，只保留状态统计，不写 serial。
@@ -729,6 +782,35 @@ final class _IosProbe {
   }
 }
 
+// iOS usbmux 设备探测结果，只保留数量和工具状态。
+final class _IosUsbMuxProbe {
+  const _IosUsbMuxProbe({
+    required this.available,
+    required this.toolAvailable,
+    this.usbDevices = 0,
+    this.permissionDenied = false,
+    this.detail,
+  });
+
+  final bool available;
+  final bool toolAvailable;
+  final int usbDevices;
+  final bool permissionDenied;
+  final String? detail;
+
+  // 转成机器可读状态，不写设备标识。
+  Map<String, Object?> toJsonObject({required String detail}) {
+    return <String, Object?>{
+      'available': available,
+      'status': available ? '可用' : '未就绪',
+      'detail': detail,
+      'toolAvailable': toolAvailable,
+      'permissionDenied': permissionDenied,
+      'usbDevices': usbDevices,
+    };
+  }
+}
+
 // Android 设备探测结果。
 final class _AndroidProbe {
   const _AndroidProbe({
@@ -1124,6 +1206,7 @@ final class _SmokeReadinessReport {
     required this.appium,
     required this.tunnel,
     required this.ios,
+    required this.iosUsbMux,
     required this.android,
     required this.artifacts,
   });
@@ -1133,16 +1216,26 @@ final class _SmokeReadinessReport {
   final _HttpProbe appium;
   final _HttpProbe tunnel;
   final _IosProbe ios;
+  final _IosUsbMuxProbe iosUsbMux;
   final _AndroidProbe android;
   final _ArtifactProbe artifacts;
 
   bool get iosFullSmokeReady =>
-      appium.reachable && appium.ready == true && ios.available && _hasTunnel;
+      appium.reachable &&
+      appium.ready == true &&
+      ios.available &&
+      _iosUsbMuxAllowsSmoke &&
+      _hasTunnel;
 
   bool get androidFullSmokeReady =>
       appium.reachable && appium.ready == true && android.available;
 
   bool get _hasTunnel => tunnel.reachable && (tunnel.count ?? 0) > 0;
+
+  bool get _iosUsbMuxAllowsSmoke {
+    if (!iosUsbMux.toolAvailable || iosUsbMux.permissionDenied) return true;
+    return iosUsbMux.available;
+  }
 
   bool get _latestIosFullPassed => artifacts.latestIos?.fullPassed ?? false;
 
@@ -1211,6 +1304,7 @@ final class _SmokeReadinessReport {
         'appium': appium.toJsonObject(detail: _appiumDetail()),
         'iosTunnel': tunnel.toJsonObject(detail: _tunnelDetail()),
         'iosDevice': ios.toJsonObject(detail: _iosDetail()),
+        'iosUsbMux': iosUsbMux.toJsonObject(detail: _iosUsbMuxDetail()),
         'androidDevice': android.toJsonObject(detail: _androidDetail()),
       },
       'batches': _batchRows.map((row) => row.toJsonObject()).toList(),
@@ -1248,6 +1342,9 @@ final class _SmokeReadinessReport {
       ..writeln('| iOS 隧道 | ${tunnel.statusLabel} | ${_tunnelDetail()} |')
       ..writeln(
         '| iOS 手机 | ${ios.available ? '可用' : '未就绪'} | ${_iosDetail()} |',
+      )
+      ..writeln(
+        '| iOS USB | ${iosUsbMux.available ? '可用' : '未就绪'} | ${_iosUsbMuxDetail()} |',
       )
       ..writeln(
         '| Android 手机 | ${android.available ? '可用' : '未就绪'} | ${_androidDetail()} |',
@@ -1302,6 +1399,11 @@ final class _SmokeReadinessReport {
   String _iosDetail() {
     if (ios.detail != null) return ios.detail!;
     return '可用 ${ios.connected}，不可用 ${ios.unavailable}';
+  }
+
+  String _iosUsbMuxDetail() {
+    if (iosUsbMux.detail != null) return iosUsbMux.detail!;
+    return 'USB ${iosUsbMux.usbDevices}';
   }
 
   String _androidDetail() {
@@ -1368,10 +1470,19 @@ final class _SmokeReadinessReport {
       ];
     }
     return <String>[
-      if (!iosFullSmokeReady) 'iOS：先打开 Mac App 点“连接设备”，输入 Mac 密码，并在手机点允许。',
+      if (!iosFullSmokeReady) _iosNextStep(),
       if (!androidFullSmokeReady)
         'Android：连接一台已开启 USB 调试的手机，再运行 Android smoke。',
     ];
+  }
+
+  String _iosNextStep() {
+    if (iosUsbMux.toolAvailable &&
+        !iosUsbMux.permissionDenied &&
+        !iosUsbMux.available) {
+      return 'iOS：未发现 USB iPhone。先插线、解锁并信任，再打开 Mac App 点“连接设备”。';
+    }
+    return 'iOS：先打开 Mac App 点“连接设备”，输入 Mac 密码，并在手机点允许。';
   }
 }
 

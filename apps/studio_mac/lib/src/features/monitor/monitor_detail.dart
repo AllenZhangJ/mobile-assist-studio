@@ -118,6 +118,12 @@ class _RunDetailDrawer extends StatelessWidget {
                                 visualEvidenceEvents:
                                     detail!.visualEvidenceEvents,
                               ),
+                              const SizedBox(height: 14),
+                              _RunAiExplanationPanel(
+                                runId: resolvedEntry.runId,
+                                report: report,
+                                controller: controller,
+                              ),
                               if (detail!.visualEvidenceEvents.isNotEmpty) ...[
                                 const SizedBox(height: 14),
                                 _RunVisualEvidenceChainPanel(

@@ -238,6 +238,7 @@ part 'features/monitor/monitor_detail_summary.dart';
 part 'features/monitor/monitor_detail_analysis.dart';
 part 'features/monitor/monitor_detail_recommendation.dart';
 part 'features/monitor/monitor_detail_recommendation_model.dart';
+part 'features/monitor/monitor_detail_ai_explanation.dart';
 part 'features/monitor/monitor_detail_copy.dart';
 part 'features/monitor/monitor_detail_report.dart';
 part 'features/monitor/monitor_evidence.dart';

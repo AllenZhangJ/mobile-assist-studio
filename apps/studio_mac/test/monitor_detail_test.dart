@@ -273,6 +273,22 @@ void main() {
     expect(find.textContaining('条件 判断不够确定'), findsOneWidget);
     expect(find.text('看证据'), findsOneWidget);
     expect(find.textContaining('已有 1 张截图'), findsOneWidget);
+    expect(find.byKey(const ValueKey('run-ai-explanation')), findsOneWidget);
+    expect(find.text('智能解释'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('run-ai-explain-failure')),
+      160,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const ValueKey('run-ai-explain-failure')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('视觉判断没有稳定命中。'), findsOneWidget);
+    expect(find.textContaining('原因：条件置信度过低。'), findsOneWidget);
+    expect(controller.snapshot.aiAuditLog.last.toolId, 'explainRunFailure');
+    expect(find.textContaining('/Users'), findsNothing);
+    expect(find.textContaining('127.0.0.1'), findsNothing);
+    expect(find.textContaining('session'), findsNothing);
     expect(find.byKey(const ValueKey('run-execution-metrics')), findsOneWidget);
     expect(find.text('路径摘要'), findsOneWidget);
     expect(find.text('步数'), findsOneWidget);

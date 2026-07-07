@@ -201,6 +201,7 @@ void main() {
       final exported = '${failure.toJson()} ${template.toJson()}';
       expect(failure.status, AiToolInvocationStatus.completed);
       expect(template.status, AiToolInvocationStatus.completed);
+      expect(failure.output['summary'], '视觉判断没有稳定命中。');
       expect(failure.output['nextSteps'].toString(), contains('视觉证据'));
       expect(template.output['suggestions'].toString(), contains('重新截取'));
       expect(exported, isNot(contains('/Users/example')));

@@ -284,7 +284,11 @@ Map<String, Object?> _aiFailureExplanation(RunLocalReport report) {
   final category = report.issue.category;
   final reason = report.issue.reason ?? '暂无明确失败原因。';
   return <String, Object?>{
-    'summary': _failureSummary(category),
+    'summary': _failureSummary(
+      category,
+      reason: reason,
+      hasWeakVisual: report.visualChecks.any(_visualCheckNeedsFix),
+    ),
     'category': category,
     'node': report.issue.nodeLabel ?? report.issue.nodeId,
     'reason': reason,
@@ -499,16 +503,37 @@ Map<String, Object?> _templateFixFromCheck(RunReportVisualCheck check) {
 }
 
 // _failureSummary 按失败分类生成简短解释。
-String _failureSummary(String category) {
+String _failureSummary(
+  String category, {
+  required String reason,
+  required bool hasWeakVisual,
+}) {
+  final normalized = '$category $reason'.toLowerCase();
+  if (hasWeakVisual ||
+      normalized.contains('confidence') ||
+      normalized.contains('置信')) {
+    return '视觉判断没有稳定命中。';
+  }
   switch (category) {
     case 'visual':
+    case 'Low Confidence':
       return '视觉判断没有稳定命中。';
     case 'timeout':
+    case 'Timeout':
       return '执行等待超时。';
     case 'device':
+    case 'Driver Error':
+    case 'Session Error':
       return '设备或会话状态异常。';
     case 'workflow':
+    case 'Validation':
       return '流程结构或参数需要检查。';
+    case 'Paused':
+      return '流程已暂停，等待人工确认。';
+    case 'Stopped':
+      return '流程已安全停止。';
+    case 'None':
+      return '本次运行没有记录明显问题。';
     default:
       return '运行未按预期完成。';
   }

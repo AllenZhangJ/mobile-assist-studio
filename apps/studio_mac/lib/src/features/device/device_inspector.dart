@@ -56,12 +56,162 @@ class _DeviceInspectorPanel extends StatelessWidget {
             const SizedBox(height: 12),
             _InspectorCapabilityWrap(capabilities: inspector.capabilities),
             const SizedBox(height: 12),
+            _InspectorAiSuggestionPanel(
+              snapshot: snapshot,
+              controller: controller,
+            ),
+            const SizedBox(height: 12),
             _InspectorElementTree(root: inspector.rootElement),
             const SizedBox(height: 12),
             _InspectorSourcePreview(preview: inspector.sourcePreview),
           ],
         ],
       ),
+    );
+  }
+}
+
+// Inspector 智能建议入口，只展示 Runtime 返回的草稿，不写目标库。
+class _InspectorAiSuggestionPanel extends StatefulWidget {
+  const _InspectorAiSuggestionPanel({
+    required this.snapshot,
+    required this.controller,
+  });
+
+  final StudioRuntimeSnapshot snapshot;
+  final StudioRuntimeController controller;
+
+  // 创建本地结果状态，避免把 AI 草稿写入页面外的状态源。
+  @override
+  State<_InspectorAiSuggestionPanel> createState() =>
+      _InspectorAiSuggestionPanelState();
+}
+
+// Inspector 智能建议状态，负责调用受控 Runtime AI 工具。
+class _InspectorAiSuggestionPanelState
+    extends State<_InspectorAiSuggestionPanel> {
+  AiToolInvocationResult? _result;
+  bool _busy = false;
+
+  // 渲染建议入口和最近一次结果。
+  @override
+  Widget build(BuildContext context) {
+    final canSuggest =
+        widget.snapshot.inspectorSnapshot != null &&
+        widget.snapshot.runStatus == RunStatus.idle &&
+        widget.snapshot.mobileRuntime.resourceState !=
+            MobileResourceState.diagnosing &&
+        !_busy;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: StudioColors.panel.withValues(alpha: 0.72),
+        border: Border.all(color: StudioColors.border),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '智能建议',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+              ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  _CommandButton(
+                    controlKey: const ValueKey(
+                      'device-inspector-suggest-target',
+                    ),
+                    label: '目标',
+                    icon: Icons.lightbulb_outline,
+                    onPressed: canSuggest
+                        ? () => _invokeSuggestion('suggestTarget')
+                        : null,
+                  ),
+                  _CommandButton(
+                    controlKey: const ValueKey(
+                      'device-inspector-suggest-locator',
+                    ),
+                    label: '定位',
+                    icon: Icons.center_focus_strong_outlined,
+                    onPressed: canSuggest
+                        ? () => _invokeSuggestion('suggestLocator')
+                        : null,
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _result == null
+                ? '基于当前检查结果生成草稿，不保存、不点击。'
+                : _aiSuggestionSummary(_result!),
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: StudioColors.muted, height: 1.45),
+          ),
+          if (_result != null) ...[
+            const SizedBox(height: 8),
+            _InspectorAiSuggestionList(result: _result!),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 调用 Runtime 受控 AI 工具，并只把结果留在当前面板。
+  Future<void> _invokeSuggestion(String toolId) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final result = await widget.controller.invokeAiTool(
+        AiToolInvocationRequest(toolId: toolId),
+      );
+      if (!mounted) return;
+      setState(() => _result = result);
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+}
+
+// Inspector 智能建议列表，展示少量脱敏草稿。
+class _InspectorAiSuggestionList extends StatelessWidget {
+  const _InspectorAiSuggestionList({required this.result});
+
+  final AiToolInvocationResult result;
+
+  // 渲染前三条建议，避免主界面堆叠过多技术细节。
+  @override
+  Widget build(BuildContext context) {
+    final items = _aiSuggestionItems(result).take(3).toList(growable: false);
+    if (items.isEmpty) {
+      return const Text('暂无可用建议。', style: TextStyle(color: StudioColors.muted));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final item in items)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              item,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -303,6 +453,52 @@ String _inspectorSummary(
     return '读取截图和界面结构，帮助判断当前页面。';
   }
   return inspector.sourceSummary ?? '界面结构已读取。';
+}
+
+// 生成 AI 建议摘要。
+String _aiSuggestionSummary(AiToolInvocationResult result) {
+  final output = result.output;
+  final reason = output['reason'];
+  final count = output['count'];
+  if (reason is String && reason.trim().isNotEmpty) {
+    return '$reason${count is int ? ' 共 $count 条。' : ''}';
+  }
+  return result.message;
+}
+
+// 从 AI 工具结果中提取可展示建议。
+List<String> _aiSuggestionItems(AiToolInvocationResult result) {
+  final key = result.toolId == 'suggestLocator' ? 'locators' : 'targets';
+  final rawItems = result.output[key];
+  if (rawItems is! List<Object?>) return const <String>[];
+  return rawItems
+      .whereType<Map<String, Object?>>()
+      .map(
+        (item) => result.toolId == 'suggestLocator'
+            ? _aiLocatorItem(item)
+            : _aiTargetItem(item),
+      )
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
+// 生成目标建议短文案。
+String _aiTargetItem(Map<String, Object?> item) {
+  final label = item['label'];
+  final kind = item['kind'];
+  if (label is! String || label.trim().isEmpty) return '';
+  return '${label.trim()} · ${kind == 'region' ? '区域' : '选择'}';
+}
+
+// 生成定位建议短文案。
+String _aiLocatorItem(Map<String, Object?> item) {
+  final label = item['label'];
+  final selector = item['selector'];
+  if (label is! String || label.trim().isEmpty) return '';
+  if (selector is String && selector.trim().isNotEmpty) {
+    return '${label.trim()} · ${selector.trim()}';
+  }
+  return label.trim();
 }
 
 // 生成元素行标题。

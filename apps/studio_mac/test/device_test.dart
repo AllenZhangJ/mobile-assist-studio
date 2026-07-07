@@ -136,7 +136,7 @@ void main() {
   });
 
   testWidgets('device inspector reads source through runtime', (tester) async {
-    await useDesktopSurface(tester, size: const Size(1400, 1800));
+    await useDesktopSurface(tester, size: const Size(1400, 2200));
     final actions = FakePreviewDeviceActionExecutor(
       screenshotBase64: onePixelPngBase64,
       viewportSize: const ViewportSize(width: 390, height: 844),
@@ -176,6 +176,39 @@ void main() {
     expect(find.textContaining('Button'), findsWidgets);
     expect(find.textContaining('inspect-session'), findsNothing);
     expect(find.textContaining('resource-id'), findsNothing);
+
+    final targetButton = find.byKey(
+      const ValueKey('device-inspector-suggest-target'),
+    );
+    await tester.dragUntilVisible(
+      targetButton,
+      find.byKey(const ValueKey('device-side-scroll')),
+      const Offset(0, -180),
+      maxIteration: 8,
+    );
+    await tester.ensureVisible(targetButton);
+    await tester.pumpAndSettle();
+    await tester.tap(targetButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('智能建议'), findsOneWidget);
+    expect(find.textContaining('已基于当前检查结果生成草稿'), findsOneWidget);
+    expect(find.textContaining('开始 · 选择'), findsOneWidget);
+    expect(controller.snapshot.targetLibrary.count, 0);
+    expect(controller.snapshot.aiAuditLog.single.toolId, 'suggestTarget');
+
+    await tester.tap(
+      find.byKey(const ValueKey('device-inspector-suggest-locator')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('开始 · label=开始'), findsOneWidget);
+    expect(controller.snapshot.targetLibrary.count, 0);
+    expect(controller.snapshot.aiAuditLog.last.toolId, 'suggestLocator');
+    expect(
+      actions.calls,
+      containsAllInOrder(['screenshot', 'source:inspect-session']),
+    );
   });
 
   testWidgets('device readiness guide summarizes connected local stack', (

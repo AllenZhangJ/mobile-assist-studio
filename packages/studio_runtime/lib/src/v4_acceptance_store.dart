@@ -223,17 +223,46 @@ String? _safeAcceptanceCommandAt(Map<String, Object?> json, String key) {
   return _allowedV4AcceptanceCommands.contains(value) ? value : null;
 }
 
-// 清洗终验报告里的用户可见文本，反引号命令只保留白名单。
+// 清洗终验报告里的用户可见文本，命令文本只保留白名单。
 String _safeAcceptanceVisibleText(String value) {
-  final commandSafe = value.replaceAllMapped(RegExp(r'`([^`]+)`'), (match) {
+  final backtickSafe = value.replaceAllMapped(RegExp(r'`([^`]+)`'), (match) {
     final command = match.group(1)?.trim();
     if (command != null && _allowedV4AcceptanceCommands.contains(command)) {
       return '`$command`';
     }
     return '`[命令已过滤]`';
   });
-  return _redactConnectionDetail(commandSafe);
+  return _redactConnectionDetail(_filterPlainAcceptanceCommands(backtickSafe));
 }
+
+// 过滤普通文本里的命令片段，避免坏报告绕开反引号污染 UI。
+String _filterPlainAcceptanceCommands(String value) {
+  var safe = value.replaceAllMapped(RegExp(r'npm run [A-Za-z0-9:._-]+'), (
+    match,
+  ) {
+    final command = match.group(0)?.trim();
+    if (command != null && _allowedV4AcceptanceCommands.contains(command)) {
+      return command;
+    }
+    return '[命令已过滤]';
+  });
+  for (final pattern in _blockedPlainCommandPatterns) {
+    safe = safe.replaceAll(pattern, '[命令已过滤]');
+  }
+  return safe;
+}
+
+final _blockedPlainCommandPatterns = <String>[
+  r'\brm\s+-rf\b[^。；，,;]*',
+  r'\bosascript\s+-e\b[^。；，,;]*',
+  r'\bsudo\s+\S+[^。；，,;]*',
+  r'\bcurl\s+\S+[^。；，,;]*',
+  r'\bpython3?\s+\S+[^。；，,;]*',
+  r'\bnode\s+\S+[^。；，,;]*',
+  r'\bbash\s+\S+[^。；，,;]*',
+  r'\bzsh\s+\S+[^。；，,;]*',
+  r'\bsh\s+\S+[^。；，,;]*',
+].map(RegExp.new).toList(growable: false);
 
 // 安全读取 bool 字段。
 bool? _boolAt(Map<String, Object?> json, String key) {

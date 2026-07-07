@@ -1466,23 +1466,38 @@ final class _SmokeReadinessReport {
   List<String> _nextSteps() {
     if (iosFullSmokeReady && androidFullSmokeReady) {
       return const <String>[
-        '可继续运行 `npm run v4:ios-smoke` 和 `npm run v4:android-smoke`。',
+        '可运行 `npm run v4:ios-smoke:full:password-prompt`、`npm run v4:android-smoke:full`，再运行 `npm run v4:smoke:full:password-prompt`。',
       ];
     }
     return <String>[
       if (!iosFullSmokeReady) _iosNextStep(),
-      if (!androidFullSmokeReady)
-        'Android：连接一台已开启 USB 调试的手机，再运行 Android smoke。',
+      if (!androidFullSmokeReady) _androidNextStep(),
     ];
   }
 
   String _iosNextStep() {
+    const command = 'npm run v4:ios-smoke:full:password-prompt';
     if (iosUsbMux.toolAvailable &&
         !iosUsbMux.permissionDenied &&
         !iosUsbMux.available) {
-      return 'iOS：未发现 USB iPhone。先插线、解锁并信任，再打开 Mac App 点“连接设备”。';
+      return 'iOS：未发现 USB iPhone（${_iosUsbMuxDetail()}）。先插线、解锁并信任，再运行 `$command`。';
     }
-    return 'iOS：先打开 Mac App 点“连接设备”，输入 Mac 密码，并在手机点允许。';
+    return 'iOS：运行 `$command`，按提示输入 Mac 密码，并在手机点允许。';
+  }
+
+  String _androidNextStep() {
+    const command = 'npm run v4:android-smoke:full';
+    final detail = _androidDetail();
+    if (android.available) {
+      return 'Android：当前手机可用（$detail），运行 `$command`。';
+    }
+    if (android.unauthorized > 0) {
+      return 'Android：手机未授权（$detail）。在手机上允许 USB 调试后运行 `$command`。';
+    }
+    if (android.offline > 0) {
+      return 'Android：手机离线（$detail）。重插数据线并保持亮屏后运行 `$command`。';
+    }
+    return 'Android：未发现 Android 手机（$detail）。开启 USB 调试，插线并点允许，再运行 `$command`。';
   }
 }
 

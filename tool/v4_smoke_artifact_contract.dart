@@ -973,6 +973,15 @@ void _assertReadinessJson(Map<String, Object?> json) {
 
   final nextSteps = _listAt(json, 'nextSteps');
   _expect(nextSteps.isNotEmpty, 'nextSteps 必须给出下一步。');
+  final nextStepText = nextSteps.map((step) => '$step').join('\n');
+  _expect(
+    nextStepText.contains('v4:ios-smoke:full:password-prompt') &&
+        nextStepText.contains('USB iPhone') &&
+        nextStepText.contains('v4:android-smoke:full') &&
+        nextStepText.contains('未发现 Android 手机') &&
+        nextStepText.contains('开启 USB 调试'),
+    'readiness nextSteps 必须给出 iOS 密码版命令和 Android 状态驱动命令。',
+  );
 }
 
 // 断言完整 fixture 的 readiness 严格门禁能成功闭环。

@@ -171,8 +171,8 @@ Future<_AcceptanceStepResult> _runStep(
       timedOut: timedOut,
       startedAt: startedAt,
       finishedAt: DateTime.now().toUtc(),
-      stdoutText: _redactText(stdoutBuffer.toString()),
-      stderrText: _redactText(stderrBuffer.toString()),
+      stdoutText: _safeAcceptanceInstructionText(stdoutBuffer.toString()),
+      stderrText: _safeAcceptanceInstructionText(stderrBuffer.toString()),
     );
   } on ProcessException catch (error) {
     return _AcceptanceStepResult(
@@ -182,7 +182,7 @@ Future<_AcceptanceStepResult> _runStep(
       startedAt: startedAt,
       finishedAt: DateTime.now().toUtc(),
       stdoutText: '',
-      stderrText: _redactText(error.message),
+      stderrText: _safeAcceptanceInstructionText(error.message),
     );
   }
 }
@@ -310,7 +310,7 @@ Future<String?> _runGitProbe(List<String> arguments, Duration timeout) async {
 
 // 裁剪长输出，保留首尾上下文。
 String _shortBlock(String value, {int limit = 1800}) {
-  final trimmed = value.trim();
+  final trimmed = _safeAcceptanceInstructionText(value).trim();
   if (trimmed.length <= limit) return trimmed;
   final head = trimmed.substring(0, limit ~/ 2);
   final tail = trimmed.substring(trimmed.length - (limit ~/ 2));
@@ -341,7 +341,7 @@ String _redactText(String value) {
 
 // 脱敏任意 JSON 值，保留结构以便最终报告嵌入上游报告摘要。
 Object? _redactJsonValue(Object? value) {
-  if (value is String) return _redactText(value);
+  if (value is String) return _safeAcceptanceInstructionText(value);
   if (value is num || value is bool || value == null) return value;
   if (value is List) {
     return value.map(_redactJsonValue).toList(growable: false);
@@ -352,7 +352,7 @@ Object? _redactJsonValue(Object? value) {
         entry.key.toString(): _redactJsonValue(entry.value),
     };
   }
-  return _redactText(value.toString());
+  return _safeAcceptanceInstructionText(value.toString());
 }
 
 // 验收参数。
@@ -546,7 +546,7 @@ final class _AcceptanceReport {
         .map((result) => result.failureLabel)
         .toList();
     failures.addAll(gitStatus.failures);
-    return failures;
+    return failures.map(_safeAcceptanceInstructionText).toList(growable: false);
   }
 
   // 根据最终失败摘要生成可执行下一步，不读取本机隐私信息。
@@ -661,7 +661,7 @@ final class _AcceptanceReport {
     } else {
       for (final gap in gateGaps) {
         buffer.writeln(
-          '| ${gap.title} | ${gap.current} | ${gap.required} | ${gap.commandMarkdown} |',
+          '| ${gap.safeTitle} | ${gap.safeCurrent} | ${gap.safeRequired} | ${gap.commandMarkdown} |',
         );
       }
     }
@@ -673,7 +673,7 @@ final class _AcceptanceReport {
       ..writeln('|---:|---|---|---|');
     for (final item in fieldChecklist) {
       buffer.writeln(
-        '| ${item.order} | ${item.title} | ${item.commandMarkdown} | ${item.proof} |',
+        '| ${item.order} | ${item.safeTitle} | ${item.commandMarkdown} | ${item.safeProof} |',
       );
     }
     buffer
@@ -895,18 +895,24 @@ final class _AcceptanceGateGap {
   String get stderrLine {
     final value = safeCommand;
     final suffix = value == null || value.isEmpty ? '' : '；建议命令：$value';
-    return '$title：${_trimForStderr(current)}；通过标准：${_trimForStderr(required)}$suffix';
+    return '$safeTitle：${_trimForStderr(safeCurrent)}；通过标准：${_trimForStderr(safeRequired)}$suffix';
   }
 
   // 转为 JSON，保持短命令和脱敏短文案。
   Map<String, Object?> toJsonObject() {
     return <String, Object?>{
-      'title': title,
-      'current': current,
-      'required': required,
+      'title': safeTitle,
+      'current': safeCurrent,
+      'required': safeRequired,
       'command': safeCommand,
     };
   }
+
+  String get safeTitle => _safeAcceptanceInstructionText(title);
+
+  String get safeCurrent => _safeAcceptanceInstructionText(current);
+
+  String get safeRequired => _safeAcceptanceInstructionText(required);
 }
 
 // 现场补验项，用于把多条下一步整理成稳定执行顺序。
@@ -934,18 +940,22 @@ final class _AcceptanceChecklistItem {
   String get stderrLine {
     final value = safeCommand;
     final commandPart = value == null || value.isEmpty ? '无需命令' : value;
-    return '$order. $title：$commandPart；通过标准：$proof';
+    return '$order. $safeTitle：$commandPart；通过标准：$safeProof';
   }
 
   // 转为 JSON，命令保持短 npm 入口，不写本机路径或设备标识。
   Map<String, Object?> toJsonObject() {
     return <String, Object?>{
       'order': order,
-      'title': title,
+      'title': safeTitle,
       'command': safeCommand,
-      'proof': proof,
+      'proof': safeProof,
     };
   }
+
+  String get safeTitle => _safeAcceptanceInstructionText(title);
+
+  String get safeProof => _safeAcceptanceInstructionText(proof);
 }
 
 // 清理终端单行拼接前的收尾标点，避免出现“。；”这类噪声。
@@ -1456,7 +1466,9 @@ List<String> _jsonStringList(Object? value) {
 
 // 生成适合 Markdown 单行展示的脱敏文本。
 String _plainText(String value) {
-  return _redactText(value).replaceAll(RegExp(r'\s+'), ' ').trim();
+  return _safeAcceptanceInstructionText(
+    value,
+  ).replaceAll(RegExp(r'\s+'), ' ').trim();
 }
 
 // 生成本机状态短摘要，避免 Markdown 报告铺满底层字段。
@@ -1469,9 +1481,9 @@ String _localStateLabel(Object? value) {
       (detail == null || detail.isEmpty)) {
     return '未知';
   }
-  if (detail == null || detail.isEmpty) return status ?? '未知';
-  if (status == null || status.isEmpty) return detail;
-  return '$status，$detail';
+  if (detail == null || detail.isEmpty) return _plainText(status ?? '未知');
+  if (status == null || status.isEmpty) return _plainText(detail);
+  return _plainText('$status，$detail');
 }
 
 // 从失败文本中提炼下一步命令，保证最终报告能直接指导现场补验。

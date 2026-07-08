@@ -372,8 +372,11 @@ Future<void> _assertFinalAcceptanceNextStepSanitizer() async {
         source.contains('_allowedAcceptanceCommands.contains(command)') &&
         source.contains('_filterPlainAcceptanceCommands') &&
         source.contains('_plainNpmRunCommandPattern') &&
-        source.contains('caseSensitive: false'),
-    'final acceptance 生成端必须过滤 nextSteps 中的非白名单命令和普通文本命令。',
+        source.contains('caseSensitive: false') &&
+        source.contains('safeCurrent') &&
+        source.contains('safeProof') &&
+        source.contains('return _safeAcceptanceInstructionText(value);'),
+    'final acceptance 生成端必须过滤 nextSteps、门禁、清单和嵌入证据里的非白名单命令。',
   );
 }
 
@@ -2165,10 +2168,22 @@ void _assertNoSensitiveText(String text) {
       r'[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}',
     ),
     RegExp(r'\b[0-9A-Fa-f]{24,}\b'),
+    RegExp(r'\brm\s+-rf\b', caseSensitive: false),
+    RegExp(r'\bosascript\s+-e\b', caseSensitive: false),
+    RegExp(r'\bsudo\s+\S+', caseSensitive: false),
+    RegExp(r'\bcurl\s+(?:-|https?://|/|\.)', caseSensitive: false),
+    RegExp(
+      r'\bpython3?\s+(?:-|/|\.|[A-Za-z0-9_.-]+\.py\b)',
+      caseSensitive: false,
+    ),
+    RegExp(r'\bbash\s+(?:-c|/|\.)', caseSensitive: false),
+    RegExp(r'\bzsh\s+(?:-c|/|\.)', caseSensitive: false),
+    RegExp(r'\bsh\s+(?:-c|/|\.)', caseSensitive: false),
   ];
   for (final pattern in patterns) {
     _expect(!pattern.hasMatch(text), '生成留档包含未脱敏内容：$pattern');
   }
+  _expect(_plainTextCommandsAreWhitelisted(text), '生成留档包含非白名单 npm 命令。');
 }
 
 // 从 Map 中读取嵌套对象，缺失时让合同失败。

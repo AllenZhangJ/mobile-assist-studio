@@ -81,8 +81,8 @@ Future<void> main() async {
             'npm run v4:smoke:full:password-prompt',
           ) &&
           finalAcceptance.stderr.contains('现场补验清单') &&
-          finalAcceptance.stderr.contains('当前 iOS') &&
-          finalAcceptance.stderr.contains('当前 Android') &&
+          finalAcceptance.stderr.contains('iOS 当前状态') &&
+          finalAcceptance.stderr.contains('Android 当前状态') &&
           finalAcceptance.stderr.contains('先补齐单平台 smoke'),
       'acceptance final 必须提示最终验收缺口、现场补验清单和可执行门禁命令。',
     );
